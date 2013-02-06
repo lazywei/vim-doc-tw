@@ -1,0 +1,123 @@
+*hebrew.txt*    For Vim version 7.3.  最近更新: 2008年4月
+
+
+	   VIM 參考手冊    by Ron Aaron (and Avner Lottem)
+				譯者: Willis
+				http://vimcdoc.sf.net
+
+
+Vim 的希伯來語支持 (選項和映射)					*hebrew*
+
+
+'rightleft' 的功能是由 Avner Lottem <alottem at gmail dot com> 最早創建的。
+Ron Aaron <ron at ronware dot org> 現在為支持這些功能提供幫助。
+
+{Vi 沒有這些功能}
+
+所有這些只有在編譯時加入 |+rightleft| 特性才能得到。
+
+
+簡介
+------------
+希伯來語專用的選項包括 'hkmap'、'hkmapp'、'keymap'=hebrew 和 'aleph'。
+對希伯來語有用的選項包括 'delcombine'、'allowrevins'、'revins'、'rightleft'
+和 'rightleftcmd'。
+
+'rightleft' 模式反轉顯示的順序，所以字符不是通常的從左到右，而是從右到左的顯
+示。這主要是對希伯來語和其它中東的語言有用。參閱 |rileft.txt| 去瞭解更多。
+
+細節
+--------------
++  選項:
+   +  'rightleft' ('rl') 把窗口朝向設為從右到左。這意味著邏輯上的文字 'ABC' 會
+      被顯示成 'CBA'。文字將從窗口右邊界開始輸出，而不是左邊。
+   +  'hkmap' ('hk') 在插入/替換模式中把鍵盤映射設成希伯來方式。
+   +  'aleph' ('al')，數值，保存 Aleph 的十進制代碼，鍵盤映射用。
+   +  'hkmapp' ('hkp') 把鍵盤映射設成 '根據讀音的希伯來語'。
+
+   注意: 這三個選項 ('hkmap'、'hkmapp' 和 'aleph') 現在已經作廢。你應該用
+	 ":set keymap=hebrewp" 來代替。
+
+   +  'delcombine' ('deco')，布爾值，如果編輯 UTF-8 編碼的希伯來文字，可以在一
+      個字符上 (帶有 niqud ) 上按 'x' 來去掉 niqud 或者 te`amim。
+
+   +  'rightleftcmd' ('rlc') 從右邊開始顯示用於搜索的命令行提示，這只適用於
+      'rightleft' 的窗口。
+
++  編碼:
+   +  Unix 上，ISO 8859-8 編碼 (希伯來字母編碼: 224-250)。
+   +  MS DOS 上，PC 編碼 (希伯來字母編碼: 128-154)。
+      這些都是缺省值，可以用 'aleph' 選項來覆蓋。
+   +  你應該選用 UTF8，因為它支持組合用字符 (如果不是 UTF8 編碼，'deco' 什麼都
+      不做)。
+
++  Vim 參數:
+   +  'vim -H file' 啟動希伯來文件 file 的編輯，也就是，打開 'rightleft' 和
+      'hkmap'。
+
++  按鍵:
+   +  'allowrevins' 選項使得 CTRL-_ 命令在插入和命令行模式下可用。
+
+   +  插入/替換模式下的 CTRL-_ 切換 'revins' 和 'hkmap':
+
+      在從右到左的窗口裡，'revins' 和 'nohkmap' 被切換，因為可能輸入英語。
+
+      在從左到右的窗口裡，'revins' 和 'hkmap' 被切換，因為可能輸入希伯來語。
+
+      CTRL-_ 把光標移到輸入文本的結尾。
+
+   +  CTRL-_ 在命令行模式下切換鍵盤映射 (參見下面的漏洞)。
+      這個設置和 'hkmap' 無關，後者只適用於插入/替換模式。
+
+      注意: 在有些鍵盤上，CTRL-_ 被映射成 CTRL-?。
+
+   +  'hkmap' 設置時，鍵盤的映射如下 (標準以色利鍵盤):
+
+	q w e r t y u i o p
+	/ ' ק ר א ט ו ן ם פ
+
+	 a s d f g h j k l ; '
+	 ש ד ג כ ע י ח ל ך ף ,
+
+	  z x c v b n m , . /
+	  ז ס ב ה נ מ צ ת ץ .
+
+      這也是當 'keymap=hebrew' 設置時的映射方式。使用 'keymap' 的好處是它在
+      UTF8 下正常工作，例如，輸入的字符是正確的；'hkmap' 則不然。'keymap' 鍵盤
+      也可以插入 niqud 和 te`amim。要瞭解具體這些映射是什麼，看看 'hebrew' 等
+      鍵盤映射文件。
+
+反向輸入
+
+如果 'revins' (反向輸入) 選項被打開，插入是反向的。這可以用來輸入希伯來語。這
+時，輸入文字時，光標不動，文本向右移動。<BS> 刪除光標下的字符，CTRL-W 和
+CTRL-U 工作的方向也經過反轉。無論 'backspace' 選項如何設置，<BS>、CTRL-W 和
+CTRL-U 並不會在插入點開始處和行尾停住。
+
+現在 (還) 沒有反向替換模式。
+
+如果設置了 "showmode" 選項，反向插入模式激活時，狀態行會顯示
+"-- REVERSE INSERT --"。
+
+如果打開了 'allowrevins' 選項，CTRL-_ 也可以進入反向插入模式，而且還有一些附帶
+的功能: 首先，鍵盤映射根據窗口的朝向自動切換 - 如果在從左到右的窗口，'revins' 
+被用來輸入希伯來文，所以鍵盤改變為希伯來方式 (設置 'hkmap')；如果在從右到左的
+窗口，'revins' 被用來輸入英語，所以鍵盤切換成英語方式 (關閉 'hkmap')。其次，通
+過 CTRL-_ 來退出 'revins' 時的光標移動到輸入文字的末尾 (如果可能的話)。
+
+在從右到左的窗口粘貼
+ ----------------------------------
+如果用鼠標剪切文本，然後在從右到左的窗口中粘貼，文本會被反向，這時因為從剪切緩
+沖區裡得到的字符是從左到右的，而文件中的插入操作是從右到左的。要避免這個問題，
+在粘貼前切換 'revins' 選項 (通過鍵入 CTRL-? 或者 CTRL-_ )。
+
+
+希伯來字母和 'isprint' 變量
+--------------------------------------------
+有時希伯來字母代碼在 'isprint' 變量定義的非可顯示字符的範圍內。例如，在 Linux
+控制台上，希伯來字體的編碼從 128 開始，而缺省的 'isprint' 變量是 @,161-255。
+結果就是所有的希伯來字母都被顯示成 ~x。要解決這個問題，執行 >
+	set isprint=@,128-255	
+
+
+ vim:tw=78:ts=8:ft=help:norl:

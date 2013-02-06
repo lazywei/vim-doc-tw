@@ -1,0 +1,49 @@
+*pi_paren.txt*  For Vim version 7.3.  最近更新: 2008年6月
+
+
+		  VIM 參考手冊	  by Bram Moolenaar
+				譯者: Willis
+				http://vimcdoc.sf.net
+
+
+高亮匹配括號						*matchparen*
+
+這裡提到的功能是一個標準插件 |standard-plugin|。
+只有 'compatible' 不置位時才能使用此插件。
+
+設置 "loaded_matchparen" 變量可以避免載入此插件: >
+	:let loaded_matchparen = 1
+
+此插件安裝 CursorMoved、CursorMovedI 和 WinEnter 自動命令來重新定義匹配高亮。
+
+					*:NoMatchParen* *:DoMatchParen*
+要在載入此插件後關閉它，用: >
+
+	:NoMatchParen
+
+要再次打開: >
+
+	:DoMatchParen
+
+使用的高亮是 MatchParen。":highlight" 命令可用來為它指定不同的顏色。例如: >
+>
+	:hi MatchParen ctermbg=blue guibg=lightblue
+
+匹配的字符組來自 'matchpairs' 選項。你可以改變該值來高亮不同的匹配。注意 不是
+什麼值都可以。比如，你不能高亮單引號或雙引號，因為它們的開始和結束字符相同。
+
+使用語法高亮的屬性。如果光標目前不在字符串或註釋語法項目裡，則忽略字符串和註釋
+裡的匹配。任何名字裡包含 "string" 或 "comment" 的語法項目都被認為是字符串或注
+釋項目。
+
+移動光標時，限制搜索範圍以避免延遲。這些限制包括:
+- 窗口的可見部分。
+- 光標上下 100 行，避免關閉折疊存在時的延遲過長。
+- 光標前後 'synmaxcol' 乘以 2 個字節，避免存在帶語法高亮的長行時延遲過長。
+
+
+如果你希望 |%| 命令更好的工作，可以使用 matchit 插件，見 |matchit-install|。該
+插件也可用於跳過註釋裡的匹配。這不同於 matchparen 高亮，兩者使用不同的機制。
+
+==============================================================================
+ vim:tw=78:ts=8:ft=help:norl:

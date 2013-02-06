@@ -1,0 +1,507 @@
+*gui_x11.txt*   For Vim version 7.3.  最後修改: 2010年6月
+
+
+		  VIM REFERENCE MANUAL    by Bram Moolenaar
+		      譯者: Zimin<cranecai@users.sf.net>，tocer
+		      http://vimcdoc.sf.net
+
+
+Vim 的圖形用戶界面					*gui-x11* *GUI-X11*
+							*Athena* *Motif*
+1. 啟動 X11 GUI			|gui-x11-start|
+2. GUI 資源			|gui-resources|
+3. Shell 命令行			|gui-pty|
+4. 雜項				|gui-x11-various|
+5. GTK 版本			|gui-gtk|
+6. GNOME 版本			|gui-gnome|
+7. KDE 版本			|gui-kde|
+8. 編譯				|gui-x11-compiling|
+9. X11 選擇機制			|x11-selection|
+
+其他相關文章：
+|gui.txt|	所有的 GUI 版本的通用功能
+
+{Vi 沒有這裡提到的任何命令}
+
+==============================================================================
+1. 啟動 X11 GUI						*gui-x11-start* *E665*
+
+你可以通過以下兩種方式之一來啟動 GUI 版本的 Vim:
+    gvim [options] [files...]
+    vim -g [options] [files...]
+
+所以，如果你將可執行文件取名為 "gvim"，或者做一個叫 "gvim" 的鏈接，GUI 版本的
+Vim 就會被自動運行。在 "gvim" 後也可以添加字符，如 "gvim-5"。
+
+通過以下命令之一，你也可以從終端版本進入 GUI：
+	:gui [++opt] [+cmd] [-f|-b] [files...]			*:gu* *:gui*
+	:gvim [++opt] [+cmd] [-f|-b] [files...]			*:gv* *:gvim*
+"-f" 參數在前台運行 Vim。
+"-b" 參數在後台運行 Vim (默認)。
+參考 |++opt| 和 |+cmd|。
+
+							*gui-fork*
+
+當 GUI 啟動時，它調用 fork() 並退出當前進程。當 gvim 從 shell 啟動時，這將允許
+shell 接受其後更多的命令。如果你不想這樣 (例如，當一郵件程序要等待運行的 gvim
+退出時)，可以用 "gvim -f"，"vim -gf" 或 ":gui -f" 來啟動。不要用 "vim -fg"，因
+為 "-fg" 表示前台顏色。
+
+當用 "gvim -f" 啟動，然後使用 ":gui"，Vim 將在前台運行。參數 "-f" 將被記住。要
+強迫 Vim 在後台運行，使用 ":gui -b"。
+
+"gvim --nofork" 和 "gvim -f" 的效果一樣。
+
+如果你想一直在前台運行 GUI，給 'guioptions' 加入 'f' 標誌位。|-f|。
+
+==============================================================================
+2. GUI 資源				*gui-resources* *.Xdefaults*
+
+如果使用 Motif 或者 Athena 版本的 GUI (不是 KDE、GTK+ 或 Win32 版本)，有很多 X
+資源可以用。你應該使用類名 Vim 來設置。它們被列如下：
+
+    資源名稱		意義		~
+
+    reverseVideo	布爾型: 是不是翻轉視頻？
+    background		背景色。
+    foreground		普通文字顏色。
+    scrollBackground	滾動條槽的顏色。
+    scrollForeground	滾動條滑塊和箭頭顏色。
+    menuBackground	菜單背景色。
+    menuForeground	菜單前景色。
+    tooltipForeground	工具和氣泡提示前景色。
+    tooltipBackground	工具和氣泡提示背景色。
+
+    font		普通文字的字體名稱。
+    boldFont		加粗文字的字體名稱。
+    italicFont		斜體文字的字體名稱。
+    boldItalicFont	加粗、斜體文字的字體名稱。
+    menuFont		菜單字體名稱。編譯時沒有 |+xfontset| 特性時使用
+    menuFontSet		菜單字體集名稱。編譯時有 |+xfontset| 特性時使用
+    tooltipFont		工具和氣泡提示的字體名稱。
+			當編譯時帶有 |+xfontset| 特性時，使用字體集名稱。
+
+    geometry		啟動時的 gvim 窗口大小 (默認和啟動它的終端窗口一樣)。
+    scrollbarWidth	滾動條寬度。
+    borderWidth		文本區域周圍邊框的寬度。
+    menuHeight		菜單欄高度 (僅對 Athena 有效)。
+
+只有用戶通過上述資源指定了粗體、斜體、斜粗體文本的特定字體時，Vim 才會使用它。
+Vim 不會根據正常字體來推測應該使用的字體。
+
+備註: 顏色也可用 ":highlight" 命令設置。可以使用這幾個組: "Normal"，"Menu"，
+"Tooltip"，"Scrollbar"。例如： >
+	:highlight Menu guibg=lightblue
+	:highlight Tooltip guibg=yellow
+	:highlight Scrollbar guibg=lightblue guifg=blue
+	:highlight Normal guibg=grey90
+<
+							*font-sizes*
+備註: 所有的字體 (除了菜單和工具按鈕提示) 必須是同樣大小！！！如果你不這樣做，
+文字將無法顯示或混成一團。Vim 不檢查字體大小。必須一樣的是以屏幕像素計算的尺
+寸。注意有些字體有同樣的 "點" 數但是像素尺寸卻不同！另外，與字體位置相關的屬性
+擺放 (ascent 和 descent) 也必須相同。你可以用 "xlsfonts -l {fontname}" 核實。
+
+如果上述任何一個資源其後用 Vim 命令設置，例如用 ":set guifont=Screen15"，X 資
+源的設置將被覆蓋 (目前唯一支持的選項是 'guifont')。
+
+這裡有個例子，你可以考慮加入到 ~/.Xdefaults 文件中： >
+
+	Vim*useSchemes:			all
+	Vim*sgiMode:			true
+	Vim*useEnhancedFSB:		true
+	Vim.foreground:			Black
+	Vim.background:			Wheat
+	Vim*fontList:			7x13
+
+前三個是 Silicon Graphics 機器的標準資源，這將使 Motif 應用效果更好，強烈推
+薦！
+
+"Vim*fontList" 設置 Motif 的菜單字體。例如： >
+	Vim*menuBar*fontList:	     -*-courier-medium-r-*-*-10-*-*-*-*-*-*-*
+在 Athena 上： >
+	Vim*menuBar*SmeBSB*font:     -*-courier-medium-r-*-*-10-*-*-*-*-*-*-*
+	Vim*menuBar*MenuButton*font: -*-courier-medium-r-*-*-10-*-*-*-*-*-*-*
+<
+備註: 一個更通用，更完善，可同時在 Motif 和 Athena 使用的設置字體的方法： >
+	Vim.menuFont:	     -*-courier-medium-r-*-*-10-*-*-*-*-*-*-*
+或者，當編譯進 |+xfontset| 特性時: >
+	Vim.menuFontSet:     -*-courier-medium-r-*-*-10-*-*-*-*-*-*-*
+
+用 "Vim.geometry" 替代 "Vim*geometry"。不然，菜單將被破壞。
+
+如果出現 "Cannot allocate colormap entry for "gray60" 的錯誤信息，試試在你的
+Vim 資源中加入這些 (改變成你喜歡的顏色)： >
+
+	Vim*scrollBackground:		Black
+	Vim*scrollForeground:		Blue
+
+資源也可用 Vim 參數來設定：
+
+    參數		含義	~
+							*-gui*
+   -display {display}	在 {display} 上運行 Vim 	*-display*
+   -iconic		圖標化運行 Vim			*-iconic*
+   -background {color}	背景使用 {color}		*-background*
+   -bg {color}		同上				*-bg*
+   -foreground {color}	普通文字使用 {color}		*-foreground*
+   -fg {color}		同上				*-fg*
+   -ul {color}		同上				*-ul*
+   -font {font}		普通文字使用 {font}		*-font*
+   -fn {font}		同上	 			*-fn*
+   -boldfont {font}	粗體字使用 {font} 		*-boldfont*
+   -italicfont {font}	斜體字使用 {font}		*-italicfont*
+   -menufont {font}	菜單項使用 {font} 		*-menufont*
+   -menufontset {fontset} 菜單項使用 {fontset} 		*-menufontset*
+   -mf {font}		同上				*-mf*
+   -geometry {geom}	初始大小設為 {geom} 		*-geometry*
+   -geom {geom}		同上，參見 |-geometry-example|	*-geom*
+   -borderwidth {width}	使用寬度 {width}		*-borderwidth*
+   -bw {width}		同上				*-bw*
+							*-scrollbarwidth*
+   -scrollbarwidth {width}	滾動條寬度使用 {width}
+   -sw {width}		同上				*-sw*
+   -menuheight {height}	菜單欄高度使用 {height} 	*-menuheight*
+   -mh {height}		同上				*-mh*
+			備註:Motif 忽略此值，那裡自動計算高度來使菜單合身
+   -reverse		使用反轉視頻			*-reverse*
+   -rv			同上				*-rv*
+   +reverse		不使用反轉視頻			*-+reverse*
+   +rv			同上				*-+rv*
+   -xrm {resource}	設定指定資源			*-xrm*
+
+注意 有關反轉視頻的注意事項：Vim 檢查最終效果是在暗的背景配亮文字。原因是有些
+版本的 X11 交換顏色，有些不這麼做。以下兩個例子都是設定了黃色文字、藍色背景：
+    gvim -fg Yellow -bg Blue -reverse
+    gvim -bg Yellow -fg Blue -reverse
+
+							*-geometry-example*
+一個尺寸的例子: >
+	gvim -geometry 80x63+8+100
+這個命令創建一個自左 8 像素，自頂 100 像素的一個 80 列寬，63 行高的窗口。
+
+==============================================================================
+3. Shell 命令行						*gui-pty*
+
+警 告：從 GUI 中執行外部命令並不總是可行的。像 "ls"、"grep"、 "make" 這樣的普
+通命令一般都是有效的。那些需要智能終端的命令如，"less"、"ispell" 就未必了。有
+些甚至可能使 GUI 掛起，你從而必須從另外個終端裡 kill 它。所以要小心。
+
+有兩種方式可以用 shell 命令做 I/O 操作：管道和偽終端。默認是偽終端，它可以很好
+地工作在許多系統上。
+
+不幸的是，偽終端的實現在每個 Unix 系統上是不同的。並且，一些系統上需要 root 權
+限。為了避免這類問題，可以在編輯文件之前先試一下。做好 kill 那個命令或 Vim 的
+準備。如 ":r !cat" 這樣的命令會導致掛起的。
+
+如果你的無法使用偽終端，可以復位 'guipty' 選項： >
+
+	:set noguipty
+
+管道可用在任一 Unix 系統上，但也有缺點：
+- 一些 shell 命令會注意到管道的存在，而作出不同的操作。如 ":!ls"，將在一欄裡列
+  文件。
+- ":sh" 命令將不會顯示提示符，但可以部分工作。
+- 當使用 ":make" 時，很可能無法用 CTRL-C 中斷。
+
+當外部命令運行時，事先鍵入的內容經常丟失。這在管道和偽終端中，都有發生。這是個
+已知的問題，但看上去無法解決 (至少很困難)。
+
+							*gui-pty-erase*
+當你的刪除鍵工作不正常時，你應該修改 "~/.cshrc" 文件，或這你所用的 shell 的等
+同文件。例如，當你使用退格鍵來刪除字符時，反而產生了 "^H"，你可以添加以下內容
+到 "~/.cshrc" 中： >
+	stty erase ^H
+^H 是 CTRL-H，要鍵入它，用 CTRL-V CTRL-H。
+
+==============================================================================
+4. 雜項							*gui-x11-various*
+
+							*gui-x11-printing*
+"File/Print" 僅僅發送當前的緩衝區內容到 "lpr"。沒有選項或其他東西。如果你需要
+其它效果，可以定義你自己的打印命令。如: >
+
+  :10amenu File.Print :w !lpr -Php3
+  :10vmenu File.Print :w !lpr -Php3
+<
+							*X11-icon*
+默認的 Motif 或 Athena 版本的 Vim 使用黑白按鈕。在 $VIMRUNTIME/vim32x32.xpm 包
+含一個彩色的 Vim 圖標。在 GTK+，這是內建的圖標。不幸的是，你該怎樣安裝它取決於
+你的窗口管理器。你可以從 'guioptions' 除去 'i' 標誌，來除去黑白按鈕： >
+  :set guioptions-=i
+
+如果你使用 fvwm* 系列窗口管理器，你只需要在 .fvwm2rc 配置文件中加入： >
+
+  Style "vim"		Icon vim32x32.xpm
+
+要保證圖標文件的位置和窗口管理器 ImagePath 語句聲明中所指定的一致。要麼在
+.fvwm2rc 修改圖標路徑，要麼將圖標放入以下預定義的任一目錄中： >
+
+  ImagePath /usr/X11R6/include/X11/pixmaps:/usr/X11R6/include/X11/bitmaps
+<
+備註: 舊版本的 fvwm 使用 "IconPath" 而不是 "ImagePath"。
+
+對於 CDE "dtwm" (Motif 的一個變體)，在 .Xdefaults 中加入這一行： >
+   Dtwm*Vim*iconImage: /usr/local/share/vim/vim32x32.xpm
+
+在 "mwm" (Motif 窗口管理器) 該行應是: >
+   Mwm*Vim*iconImage: /usr/local/share/vim/vim32x32.xpm
+
+X11 中可用的鼠標指針					*X11_mouse_shapes*
+
+當使用 |'mouseshape'| 選項時，vim 進入各種模式時鼠標指針都會自動改變 (例如，在
+插入或命令模式中)。目前可用的指針如下：
+
+	arrow			一個指向西北的箭頭
+	beam			象 I 的豎直條
+	size			一個指著上下的箭頭
+	busy			一個時間漏斗
+	blank			一個不可見的指針
+	crosshair		一個瘦 "+" 符號
+	hand1			一個指向西北的暗手
+	hand2			一個指向西北的亮手
+	pencil			一支指向東南的筆
+	question		帶問號的箭頭
+	right_arrow		一個指向東南的箭頭
+	up_arrow		一個指向上面的箭頭
+
+另外，任何 X11 內建的鼠標指針都可以通過指定一個在 X11/cursorfont.h 中定義的整
+數來使用。
+
+如果使用一個在其它系統有效，而在 X11 中無效的名字，使用默認的 "arrow"。
+
+==============================================================================
+5. GTK 版本						*gui-gtk* *GTK+* *GTK*
+
+GUI 的 GTK 版本的使用略有不同。
+
+GTKˍ不ˍ使用傳統的 X 資源設置。所以，你的 ~/.Xdefaults 或 app-defaults 文件不
+會被使用。
+不支持許多傳統的 X 命令行參數。(例如，-bg，-fg 等)。支持的有：
+
+    命令行參數		    資源名稱		含義 ~
+    -fn  或  -font	    .font		文字字體名稱
+    -geom  或  -geometry    .geometry		gvim 窗口尺寸
+    -rv  或  -reverse	    *reverseVideo	白字黑底
+    -display					使用顯示
+    -fg -foreground {color}			前景色
+    -bg -background {color}			背景色
+
+要設置字體，參閱 |'guifont'|。對 GTK，也可以使用相應的菜單選項設置。
+
+另外，也有 GTK 內部處理的命令行參數。要知道如何使用以下的參數，請查看 GTK 文
+檔：
+	--sync
+	--gdk-debug
+	--gdk-no-debug
+	--no-xshm	(GTK+ 2 版本不使用)
+	--xim-preedit	(GTK+ 2 版本不使用)
+	--xim-status	(GTK+ 2 版本不使用)
+	--gtk-debug
+	--gtk-no-debug
+	--g-fatal-warnings
+	--gtk-module
+	--display	(GTK+ 對應 -display 的選項；用法相同)
+	--screen	(屏幕號；用於對 GTK+ 2.2 多屏幕支持。)
+
+以下的參數在用到 |+netbeans_intg| 特性時被忽略:
+	-xrm
+	-mf
+
+關於顏色，vim 的顏色設置 (用於語法高亮) 仍然和傳統的 Vim 方式一致。參考
+|:highlight|。
+
+如果你想設置其它的 gui 組件 (如，菜單欄，滾動條，等等) 的顏色，那些是 GTK 的特
+別設置，你需要改動 gtkrc 之類的文件。至於如何改動，可參考 GTK 文檔。更多的信息
+請參考 http://developer.gnome.org/doc/API/2.0/gtk/gtk-Resource-Files.html。
+
+							*gtk-tooltip-colors*
+如，設定工具提示條為黑字亮黃色背景： >
+
+	style "tooltips"
+	{
+		bg[NORMAL] = "#ffffcc"
+		fg[NORMAL] = "#000000"
+	}
+
+	widget "gtk-tooltips*"		style "tooltips"
+
+寫入文件 ~/.gtkrc，這些設置就會被 GTK+ 使用。對於 GTK+ 2 而言，可能要修改的文
+件是 ~/.gtkrc-2.0。但各個發行版本不一樣。
+
+使用 Vim 作為 GTK+ 的插件				*gui-gtk-socketid*
+
+當 GTK+ 版本的 Vim 啟動時，它會創建自己的頂層窗口 (技術上，'GtkWindow')。GTK+
+提供了用 GtkSocket 和 GtkPlug 組件 (widget) 嵌入的便利手段。如果一 GTK+ 應用程
+序在它的一個窗口裡創建了一個 GtkSocket 組件，另外一個完全不同的 GTK+ 程序就可
+以使用該 socket 的 ID 來建立一個在頂層的 GtkPlug 組件，從而將自己完全嵌入前一
+個應用程序中。
+
+如果你通過命令行參數 '--socketid' 傳給 Vim 一個十進制或十六進制的值，Vim 將使
+用該值來創建一個 GtkPlug 組件，而不是普通的 GtkWindow。這將使 Vim 作為 GTK 的
+插件來運行。
+
+這其實是一個編程的接口，必須有專門的應用程序支持 (該程序必須正確地啟動 Vim)。
+有關更多的 GTK+ socket 信息，參考 http://www.gtk.org/api/
+
+備註: 這個功能需要最新的 GTK 版本。GTK 1.2.10 仍然有小問題。socket 特性還沒有
+在 GTK+ 2 下測試過，歡迎毛遂自薦。
+
+==============================================================================
+6. GNOME 版本					*gui-gnome* *Gnome* *GNOME*
+
+Gnome GUI 就像 GTK 一樣工作。有關細節可以參考 |GTK|。但是程序的外觀有些不同，
+而且 Gnome GUI 有一個很重要的特性是 GTK+ 沒有的：和會話管理器的交互。
+|gui-gnome-session|
+
+以下是外觀上的不同之處：
+- 使用 GNOME 對話框 (僅對 GNOME 1 而言)。GNOME 2 GUI 使用和 GTK+ 2 一樣的對話
+  框。
+- 使用 GNOME 錨接機制 (dock)，這使得工具欄、菜單欄可以移至不同的地方，而不是必
+  須在頂部 (如，工具欄可以放在上下左右任何一處)。只有在 GNOME 2 中，保存它們的
+  位置。
+- 那意味著菜單欄和工具欄的句柄回來了！Yeah！並且重設網格尺寸又可以工作了。
+
+在 configure (配置) 階段如果發現 GNOME 或者使用 --enable-gnome-check 參數，
+GNOME 將被編譯進來。
+
+
+GNOME 會話支持				*gui-gnome-session* *gnome-session*
+
+如果在退出登錄時有任何改動過的緩衝區，Vim 會顯示一個確認窗口。單擊 [Cancel] 會
+終止退出的過程。否則當前的會話會被用 |:mksession| 命令存入硬盤，並在下次登陸時
+自動恢復。
+
+GNOME 會話支持應該也對 KDE 會話管理器有效。如果你有在使用時遇到什麼問題的話，
+請提交漏洞報告。
+
+備註: 會話的自動存儲完全是透明的。這樣避免了與你自己的會話文件，腳本和自動命令
+的衝突。具體的細節如下:
+- 會話文件被存儲於一個獨立的路徑 (通常是 $HOME/.gnome2)。
+- 'sessionoptions' 被忽略，Vim 會使用一些合適的，硬性規定的選項: >
+	blank,curdir,folds,globals,help,options,tabpages,winsize
+- 在存儲時，內部變量 |v:this_session| 的值不會被改變。同時，當再次登錄時，該值
+  會被恢復。
+
+Vim 不會存儲 GUI 窗口的大小和位置，因為這是窗口管理器的職責。但是如果編譯了
+GTK+ 2 支持，Vim 會通過恢復窗口角色的方法 (用命令行參數 |--role|)，幫助窗口管
+理器識別窗口。
+
+==============================================================================
+7. KDE 版本					*gui-kde* *kde* *KDE* *KVim*
+							*gui-x11-kde*
+
+現在沒有 Vim 的 KDE 版本。曾有過基於 Qt 工具包的一些移植工作，但是一直不能正常
+運行，而該項工作也已放棄。在 Yzis: www.yzis.org 上，還在開發。
+
+==============================================================================
+8. 編譯							*gui-x11-compiling*
+
+如果使用 X11，Vim 的 Makefile 將首先試著在你的系統裡找到需要的 GTK+ 的文件。如
+果失敗，就試著找 Motif 文件。如果還是找不到，就找 Athena 文件。如果全失敗，
+GUI 會被禁用。
+
+對於 GTK+，Vim 的配置過程需要 GTK+ 被正確安裝。就是說，shell 腳本 'gtk-config'
+必須在你的 PATH 中，並且你已可以成功地編譯，安裝和執行 GTK+ 程序。這樣做的原因
+是: 編譯、連接選項 (CFLAGS 和 LDFLAGS) 是通過 'gtk-config' shell 腳本來確定
+的。
+
+如果你想編譯 GTK+ 2 版本，可以在運行 ./configure 時加入 --enable-gtk2-check 參
+數。另外，對 GNOME 2 的支持在加入 --enable-gnome-check 時也會被編譯進來。
+
+否則，如果你安裝了 Motif 或 Athena，但配置程序無法找到它們所在的目錄時，更改
+Makefile 使之含有它們所在的目錄名稱。如，查找 "GUI_INC_LOC" 來設置 Motif 的目
+錄，或 "GUI_OPT_X" 來設置 Athena 的目錄。
+
+							*gui-x11-gtk*
+在寫這篇文檔時，GTK+ 1.0.6 或 1.2 版本已經過時。建議使用 GTK 2。GTK 1 的支持可
+能很快會被放棄。
+
+對於 GTK+ 2 GUI 版本，推薦使用最新的 GTK+ 2.0 或者 GTK+ 2.2。
+
+最後，儘管 GTK+ 已被移植到 Win32 平台上，這還沒有連同 Vim 測試過，所以也不支
+持。同時，由於 GTK+ GUI 使用了部分通用的 X11 代碼，這很可能都無法編譯。在較遙
+遠的將來，這種情況也許會改變：因為對 GTK+ 幀緩衝區的支持也要求去掉那些以 X11
+為中心的代碼部分。
+
+							*gui-x11-motif*
+對於 Motif，你需要至少 1.2 和/或 X11R5 版本。Motif 2.0 和 X11R6 也可以。Motif
+1.1 和 X11R4 可能可以工作，但不保證 (可能有些問題，但也許稍作改動就可以編譯、
+運行成功。如果你這樣做了，請將補丁發給我)。最新版的 LessTif 據報告是可以的。
+
+							*gui-x11-athena*
+Athena 版本默認使用 Xaw widget。如果你有 3D 版本的，有可能要用 Xaw3d 來連接。
+這樣菜單看上去好看些。編輯 Makefile 文件並查找 "XAW_LIB"。滾動條仍然一樣，因為
+Vim 使用它自己的。它已經有 3D 效果了 (事實上，它更像 Motif 裡的滾動條)。
+
+							*gui-x11-neXtaw*
+neXtaw 版本和 Athena 版本非常像，但使用不同的窗口組件 (widget)。
+
+							*gui-x11-misc*
+總的來說，不要混合不同版本的 GTK+，Motif，Athena，和 X11 的文件。這會引起問
+題。如，使用 X11R5 的頭文件和 X11R6 的庫，大半不能工作 (儘管連接不報錯，Vim 之
+後的運行將崩潰)。
+
+==============================================================================
+9. X11 選擇機制						*x11-selection*
+
+如果使用 X11，無論是 GUI 的還是 xterm 中運行的，Vim 都提供了多種使用 X11 的選
+擇機制和剪貼板的方法。它們是通過兩個選擇寄存器 "* 和 "+ 來實現的。
+
+X11 提供了兩種基本類型的全局存儲方式，選擇區和剪切緩衝區。在一個重要的方面它們
+是有區別的：選擇區是程序擁有的，並在程序退出時 (如 Vim) 消失，因而數據也消失
+了。而剪切緩衝區存儲在 X 服務器的內部，會保持到被重寫或 X 服務器退出 (例如登出
+時) 為止。
+
+發起程序擁有選擇區的內容 (如，通過複製)，僅當其它程序請求時才執行傳送操作
+(如，通過粘貼)。
+
+剪切緩衝區立即被寫入，之後便可直接通過 X 服務器進行存取，無需與發起程序交互。
+
+							*quoteplus* *quote+*
+文檔上說，有三種 X 選擇區：PRIMARY (用於代表當前的可視選擇內容，就像 Vim 的可
+視模式的操作對像)，SECONDARY (定義不明) 和 CLIPBOARD (用於剪切、複製和粘貼操
+作)。
+
+在三種選擇區裡，Vim 使用 PRIMARY 用於讀寫 "* 寄存器 (因而，如果 X11 選擇區可
+用，Vim 為 |'clipboard'| 的缺省值加上 "autoselect")。CLIPBOARD 用於讀寫 "+ 寄
+存器。Vim 不使用 SECONDARY 選擇區。
+
+例如：(假定使用默認選項)
+- 在 Vim 的可視模式裡選中一個 URL。轉到你的瀏覽器的 URL 文本框裡並單擊鼠標中
+  鍵。所選擇的文字將被插入 (希望如此！)。備註: 在 Firefox 中，可以在
+  about;config 裡設置 middlemouse.contentLoadURL 屬性為 true，這樣在窗口的大多
+  數位置單擊鼠標中鍵都可以打開選中的 URL。
+- 通過在你的瀏覽器中拖動鼠標選擇一段文字。再到 Vim 中並按鼠標中鍵：選中的文字
+  被插入。
+- 在 Vim 裡選中一段文字並執行 "+y。轉到你的瀏覽器，拖動鼠標選中另一段文字。現
+  在使用鼠標右鍵並在彈出菜單裡選擇 "Paste"。所選中的文字被 Vim 中選中的文字所
+  替換。
+備註: 使用可視模式進行選擇時，"+ 寄存器中的文字仍然存在。而選中的文字存於 "*
+寄存器中。這樣就可以選擇被覆蓋的文字了。
+							*x11-cut-buffer*
+默認有 8 個剪切緩衝區：CUT_BUFFER0 到 CUT_BUFFER7。Vim 僅使用 CUT_BUFFER0，就
+是 xterm 默認使用的那一個。
+
+只有當 Vim 不可用 (或退出或掛起)，並且因此不能響應另一個程序的選擇區請求時，
+Vim 才將它自己的選擇區內容寫入 CUT_BUFFER0 中。如果是 Vim 擁有 "+ CLIPBOARD 選
+擇區，那麼優先寫入它的值；否則，如果 Vim 擁有 "* PRIMARY 選擇區，寫入該值。
+
+類似的，當 Vim 試圖從 "* 或 "+ 來粘貼時 (或顯式或通過點擊鼠標中鍵隱式地對 "*
+寄存器操作)，如果被請求的 X 選擇區為空或不可用，Vim 退而求取 CUT_BUFFER0 的
+值。
+
+備註: 用這種方式複製文字到 CUT_BUFFER0 時，選擇區的類型 (字符，行或列塊) 總是
+被丟失，即使之後要粘貼的還是 Vim。
+
+默認情況下 Xterm 總是將選擇區內容同時寫入 PRIMARY 和 CUT_BUFFER0 中。當它粘貼
+時，xterm 會優先選用 PRIMARY。如果失敗才會選用 CUT_BUFFER0。因此，在 Vim 和
+Xterm 之間剪切和粘貼時，你應該使用 "* 寄存器。Xterm 不用 CLIPBOARD，所以 "+ 在
+xterm 中無效。
+
+多數較新的應用程序會通過 PRIMARY ("*) 來提供它們當前的選擇區內容，並使用
+CLIPBOARD ("+) 用作剪切、拷貝、粘貼操作。你可以通過選擇 "* 或 "+ 寄存器來訪問
+兩者。
+
+
+ vim:tw=78:sw=4:ts=8:ft=help:norl:

@@ -1,0 +1,262 @@
+*if_perl.txt*   For Vim version 7.3.  最近更新: 2010年7月
+
+
+		  VIM REFERENCE MANUAL    by Sven Verdoolaege
+					 and Matt Gerassimof
+			    譯者: foolstone@ustc.edu，Willis，tocer
+			    http://vimcdoc.sf.net
+
+
+Perl 與 Vim						*perl* *Perl*
+
+1. 編輯 Perl 文檔		|perl-editing|
+2. 編譯帶 Perl 接口的 VIM	|perl-compiling|
+3. Perl 接口的使用		|perl-using|
+4. 動態調入			|perl-dynamic|
+
+{Vi 沒有上述這些功能}
+Perl 接口只有在編譯 Vim 時加入 |+perl| 才能使用。
+
+==============================================================================
+1. 編輯 Perl 文件					*perl-editing*
+
+Vim 語法高亮顯示支持 Perl 和 POD 文件。Vim 假設後綴為 .pl 和 .pm 的文件是 Perl
+文件。Vim 同時不管文件後綴而測試文件的首行來檢查一個文件是否為 Perl 腳本 (參見
+Vim 的 syntax 目錄下的 scripts.vim)。Vim 假設帶後綴 .POD 的文件是 POD 文本。
+
+要使用 Perl 標籤，你需要 Exuberant ctags 的最新版本。在這裡可以找到它:
+	http://ctags.sourceforge.net
+
+當然，作為選擇你還可以用一個叫 pltags.pl 的 Perl 腳本，它和 Vim 一起發行的，位
+於 $VIMRUNTIME/tools 目錄下。這個腳本比 Exuberant ctags 的 Perl 支持具備更多的
+功能。
+
+==============================================================================
+2. 編譯帶 Perl 接口的 VIM				*perl-compiling*
+
+為了編譯帶 Perl 接口的 Vim，需要 Perl 5.004 (或者更新) 的版本。Perl 必須在你編
+譯 Vim 前安裝。 Vim 的 Perl 接口_不能_和官方發行的 Perl 5.003 一起正常工作！它
+也許能和 Perl 5.003_05 或者更新版本一起正常工作。
+_[譯者注]到翻譯的時候，這個問題已經不會是大問題了_
+
+Vim 的 Perl 補丁由
+	Sven Verdoolaege<skimo@breughel.ufsia.ac.be> 和
+	Matt Gerassimof
+製作。
+
+Perl 的 MS-Windows 版本可以在下面這個網址找到:
+http://www.perl.com/CPAN/ports/nt/Standard/x86/
+
+==============================================================================
+3. Perl 接口的使用					*perl-using*
+
+							*:perl* *:pe*
+:pe[rl] {cmd}		執行 Perl 命令 {cmd}。當前包是 "main"。
+
+:pe[rl] << {endpattern}
+{script}
+{endpattern}
+			執行 Perl 腳本 {script}。
+			{endpattern} _不能_有任何前導空格。如果忽略了
+			{endpattern}，就會像 |:append| 和 |:insert| 命令那樣，
+			默認為點 '.'。在函數內使用時，最好指明 '.'，因為 "$i;"
+			看起來像 Vim 的 |:insert| 命令的開始。
+			|:perl| 命令的這種形式主要是用來在 vim 腳本裡面包含
+			perl 代碼。
+			備註: 當 Perl 特性沒有被編譯進 vim 時這條命令不能工
+			作。為了避免出錯，請參考 |script-here|。
+vim 腳本示例: >
+
+	function! WhitePearl()
+	perl << EOF
+		VIM::Msg("pearls are nice for necklaces");
+		VIM::Msg("rubys for rings");
+		VIM::Msg("pythons for bags");
+		VIM::Msg("tcls????");
+	EOF
+	endfunction
+<
+
+							*:perldo* *:perld*
+:[range]perld[o] {cmd}  對 [range] 中的每行執行 Perl 命令 {cmd}，同時 $_ 依次
+			被賦值為每行的文本，但不包括行尾的 <EOL>。改變 $_ 會改
+			變每行的內容，但注意不能用這個命令添加或者刪除行。
+			[range] 的缺省值是整個文件: "1，$"。
+
+可以試一下下面的代碼: >
+
+  :perl $a=1
+  :perldo $_ = reverse($_);1
+  :perl VIM::Msg("hello")
+  :perl $line = $curbuf->Get(42)
+<
+
+							*E299*
+在沙盤 |sandbox| 裡執行 Perl 命令是受限制的。":perldo" 根本就不能執行。如果可
+能，":perl" 會在安全環境下被執行。
+
+							*perl-overview*
+下面是在 Perl 下可用的函數概要: >
+
+  :perl VIM::Msg("Text")		# 顯示信息
+  :perl VIM::Msg("Error", "ErrorMsg")	# 顯示錯誤信息
+  :perl VIM::Msg("remark", "Comment")	# 顯示高亮的信息
+  :perl VIM::SetOption("ai")		# 設定一個 vim 選項
+  :perl $nbuf = VIM::Buffers()		# 返回緩衝區的個數
+  :perl @buflist = VIM::Buffers()	# 返回所有緩衝區的數組
+  :perl $mybuf = (VIM::Buffers('qq.c'))[0] # 返回一個 'qq.c' 的緩衝區對像
+  :perl @winlist = VIM::Windows()	# 返回所有窗口的數組
+  :perl $nwin = VIM::Windows()		# 返回窗口的個數
+  :perl ($success, $v) = VIM::Eval('&path') # $v: 'path' 選項值，$success: 1
+  :perl ($success, $v) = VIM::Eval('&xyz')  # $v: '' 而 $success: 0
+  :perl $v = VIM::Eval('expand("<cfile>")') # 展開文件 <cfile>
+  :perl $curwin->SetHeight(10)		# 設定窗口高度
+  :perl @pos = $curwin->Cursor()	# 返回坐標 (row，col) 數組
+  :perl @pos = (10, 10)
+  :perl $curwin->Cursor(@pos)		# 把光標位置設為 @pos
+  :perl $curwin->Cursor(10,10)		# 把光標位置設為第 10 行第 10 列
+  :perl $mybuf = $curwin->Buffer()	# 返回窗口的緩衝區對像
+  :perl $curbuf->Name()			# 返回緩衝區名字
+  :perl $curbuf->Number()		# 返回緩衝區編號
+  :perl $curbuf->Count()		# 返回行數
+  :perl $l = $curbuf->Get(10)		# 返回第 10 行
+  :perl @l = $curbuf->Get(1 .. 5)	# 返回第 1 到第 5 行
+  :perl $curbuf->Delete(10)		# 刪除第 10 行
+  :perl $curbuf->Delete(10, 20)		# 刪除第 10－20 行
+  :perl $curbuf->Append(10, "Line")	# 添加一行
+  :perl $curbuf->Append(10, "Line1", "Line2", "Line3") # 添加三行
+  :perl @l = ("L1", "L2", "L3")
+  :perl $curbuf->Append(10, @l)		# 添加 L1，L2 和 L3
+  :perl $curbuf->Set(10, "Line")	# 替換第 10 行
+  :perl $curbuf->Set(10, "Line1", "Line2")      # 替換第 10 行和第 11 行
+  :perl $curbuf->Set(10, @l)		# 分別用 L1，L2 和 L3 替換 10－12 行
+<
+							*perl-Msg*
+VIM::Msg({msg}, {group}?)
+			顯示消息 {msg}。可選 {group} 參數指定用來顯示這個消息
+			的高亮方式。
+
+							*perl-SetOption*
+VIM::SetOption({arg})
+			設置一個 vim 選項。{arg} 可以是任何 ":set" 命令能接受
+			的參數。這就意味著參數里面不允許有空格！見 |:set|。
+
+							*perl-Buffers*
+VIM::Buffers([{bn}...]) 沒有參數的時候，在數組上下文裡面返回所有緩衝區的列表，
+			在標量上下文裡返回緩衝區的個數。對於一個緩衝區名字或者
+			編號的列表 {bn}，返回匹配 {bn} 的緩衝區列表，與 Vim 內
+			部函數 |bufname()| 使用同樣的規則。
+			警告: 使用 |:bwipe| 後，該列表就不合法了。如果要強行使
+			用會使 Vim 崩潰。
+
+							*perl-Windows*
+VIM::Windows([{wn}...]) 沒有參數的時候，在數組上下文裡面返回所有窗口的列表，在
+			標量上下文裡返回窗口的個數。對於一個窗口編號的列表
+			{wn}，返回匹配 {wn} 的窗口列表。
+			警告: 窗口關閉後，該列表就不合法了。如果要強行使用會使
+			Vim 崩潰。
+
+							*perl-DoCommand*
+VIM::DoCommand({cmd})   執行 Ex 命令 {cmd}。
+
+							*perl-Eval*
+VIM::Eval({expr})       對 {expr} 求值並返回 (success，val)。success=1 表示
+			val 包含 {expr} 的值。success=0 表示表達式求值失敗。
+			'@x' 返回寄存器 x 的內容， '&x' 返回選項 x 的值，'x' 
+			返回內部變量 x 的值，'$x' 等價於 perl 中的 $ENV{x}。所
+			有在命令行可以訪問的函數都可用於 {expr}。
+			列表 |List| 通過連接項目並在項目間插入換行符來轉化為字
+			符串。
+
+							*perl-SetHeight*
+Window->SetHeight({height})
+			把窗口的高度設定為 {height}，不超過屏幕範圍。
+
+							*perl-GetCursor*
+Window->Cursor({row}?, {col}?)
+			在沒有參數的情況下，返回窗口光標所處位置的坐標 (row，
+			col) 數組。當有參數 {row} 和 {col} 的情況下，把窗口光
+			標的位置設為 {row} 和 {col}。注意 {col} 是按 Perl 風格
+			從0 數起的，比 Vim 的尺度小 1。
+
+Window->Buffer()					*perl-Buffer*
+			返回給定窗口的緩衝區對象。
+
+							*perl-Name*
+Buffer->Name()		返回緩衝區的文件名。
+
+							*perl-Number*
+Buffer->Number()	返回緩衝區的編號。
+
+							*perl-Count*
+Buffer->Count()		返回緩衝區中的行數。
+
+							*perl-Get*
+Buffer->Get({lnum}, {lnum}?, ...)
+			對每個指定的 {lnum}，返回緩衝區中第 {lnum} 行的文本字
+			符串。通過指定一個 {lnum} 列表可以傳遞一個數組。
+
+							*perl-Delete*
+Buffer->Delete({lnum}, {lnum}?)
+			刪除緩衝區的第 {lnum} 行。當有第二個參數 {lnum} 時，刪
+			除由第一個 {lnum} 到第二個 {lnum} 指定的範圍。
+
+							*perl-Append*
+Buffer->Append({lnum}, {line}, {line}?, ...)
+			把每個 {line} 字符串添加到緩衝區的第 {lnum} 行後面。
+			{line} 列表可以是一個數組。
+
+							*perl-Set*
+Buffer->Set({lnum}, {line}, {line}?, ...)
+			替代緩衝區從第 {lnum} 行開始，由 {line} 指定的一行或者
+			多行。 {line} 列表可以是一個數組。如果參數無效，就不作
+			替代。
+$main::curwin
+			當前窗口對象。
+$main::curbuf
+			當前緩衝區對象。
+
+							*script-here*
+當使用嵌入式腳本語言時，你可能想在語言不支持時跳過這些語言的代碼。但是以下機制
+不能工作: >
+   if has('perl')
+     perl << EOF
+       this will NOT work!
+   EOF
+   endif
+相反，應把 Perl / Python / Ruby 等的命令放在一個函數里面並調用它: >
+    if has('perl')
+      function DefPerl()
+	perl << EOF
+	  this works
+    EOF
+      endfunction
+      call DefPerl()
+    endif
+備註: "EOF" 必須在行首 (前面不能有前導空格)。
+
+==============================================================================
+4. 動態調入						*perl-dynamic*
+
+MS-Windows 和 Unix 上，可以動態調入 Perl 庫。|:version| 輸出這時應包括
+|+perl/dyn|。
+
+這意味著 Vim 只有在必要時才尋找 Perl DLL 或共享庫文件。如果不使用 Perl 接口，
+你就不需要它。這樣，即使沒有該文件，你也可使用 Vim。
+
+
+MS-Windows ~
+
+你可以從 http://www.perl.org 下載 Perl。用於編譯 Vim 的是 ActiveState 提供的版
+本。
+
+要使用 Perl 接口，Perl DLL 必須在搜索路徑上。
+如果 Vim 報告找不到 perl512.dll，確保 $PATH 包含該文件所在的路徑。Perl 安裝程
+序通常會做好這一點。
+控制台窗口裡輸入 "path" 可以看到 (搜索路徑) 當前使用的目錄。
+
+DLL 名必須匹配 Vim 編譯時所使用的 Perl 版本。目前，該名字為 "perl512.dll"，也
+就是 Perl 5.12。要確信這一點，編輯 "gvim.exe" 文件並查找 "perl\d*.dll\c"。
+
+==============================================================================
+ vim:tw=78:ts=8:ft=help:norl:

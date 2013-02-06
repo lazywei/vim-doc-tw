@@ -1,0 +1,7261 @@
+*eval.txt*      For Vim version 7.3.  最近更新: 2010年8月
+
+
+		  VIM 參考手冊    by Bram Moolenaar
+				譯者: Willis
+				http://vimcdoc.sf.net
+
+
+表達式求值				*expression* *expr* *E15* *eval*
+
+用戶手冊第 41 章 |usr_41.txt| 有使用表達式的介紹。
+
+注意: 表達式求值可以在編譯時關閉。如果你這麼做，本文檔介紹的特性就不復存在。見
+|+eval| 和 |no-eval-feature|。
+
+1.  變量		|variables|
+    1.1 變量類型
+    1.2 函數引用		|Funcref|
+    1.3 列表			|Lists|
+    1.4 字典			|Dictionaries|
+    1.5 變量的更多細節		|more-variables|
+2.  表達式語法		|expression-syntax|
+3.  內部變量		|internal-variables|
+4.  內建函數		|functions|
+5.  定義函數		|user-functions|
+6.  花括號名字		|curly-braces-names|
+7.  命令		|expression-commands|
+8.  例外處理		|exception-handling|
+9.  示例		|eval-examples|
+10. 不包含 +eval 特性	|no-eval-feature|
+11. 沙盤 (sandbox)	|eval-sandbox|
+12. 文本鎖		|textlock|
+
+{Vi 無此功能}
+
+==============================================================================
+1. 變量							*variables*
+
+1.1 變量類型 ~
+							*E712*
+有六種類型的變量:
+
+數值		32 位帶符號整數。|expr-number| *Number*
+		示例:  -123  0x10  0177
+
+浮點數		帶小數的數值。|floating-point-format| *Float*
+		{僅當編譯時加入 |+float| 特性才有效}
+		示例: 123.456  1.15e-6  -1.1e3
+
+字符串		NUL 結尾的 8 位無符號字符 (即字節) 的串。|expr-string|
+		示例: "ab\txx\"--"  'x-z''a,c'
+
+函數引用	指向一個函數的引用 |Funcref|。
+		示例: function("strlen")
+
+列表		項目的有序的序列 |List|。
+		示例: [1, 2, ['a', 'b']]
+
+字典		關聯的無序數組: 每個項目包含一個鍵和一個值。|Dictionary|
+		示例: {'blue': "#0000ff", 'red': "#ff0000"}
+
+數值和字符串類型之間會根據使用的情況自動轉換。
+
+數值到字符串的轉換使用數值的 ASCII 表示。例如: >
+	數值 123	-->	字符串 "123"
+	數值 0		-->	字符串 "0"
+	數值 -1		-->	字符串 "-1"
+
+							*octal*
+字符串到數值的轉換則把字符串開頭的一系列數字位轉換成數值。十六進制 "0xf9" 和八
+進制 "017" 形式的數值可以識別。如果字符串不以數字開始，則結果為零。例如: >
+	字符串 "456"	-->	數值 456
+	字符串 "6bar"	-->	數值 6
+	字符串 "foo"	-->	數值 0
+	字符串 "0xf1"	-->	數值 241
+	字符串 "0100"	-->	數值 64
+	字符串 "-8"	-->	數值 -8
+	字符串 "+8"	-->	數值 0
+
+要強制從字符串轉換到數值，給它加零: >
+	:echo "0100" + 0
+<	64 ~
+
+要避免開頭的零導致八進制的轉換，或者想換不同的基底，用 |str2nr()|。
+
+布爾型的操作使用數值類型。零代表假值 (FALSE)，非零代表真值 (TRUE)。
+
+注意 在命令 >
+	:if "foo"
+裡，"foo" 被轉換成 0，也就是假值。要測試字符串非空，應該使用 strlen(): >
+	:if strlen("foo")
+
+<				*E745* *E728* *E703* *E729* *E730* *E731*
+列表、字典和函數引用類型不會自動進行轉換。
+
+							*E805* *E806* *E808*
+混合數值和浮點數的計算時，數值轉換為浮點數。否則沒有自動到浮點數的轉換。用
+str2float() 可轉換字符串到浮點數，printf() 從浮點數到字符串，float2nr() 則從浮
+點數到數值。
+
+						*E706* *sticky-type-checking*
+如果你試圖改變變量類型，你會得到錯誤。先 |:unlet| 可以避免此錯誤。不過，字符串
+和數值被認為是等價的類型，浮點數和數值之間也是如此。考慮如下的命令序列: >
+	:let l = "string"
+	:let l = 44		" 類型從字符串改為數值
+	:let l = [1, 2, 3]	" 出錯！l 仍為數值
+	:let l = 4.4		" 類型從數值改為浮點數
+	:let l = "string"	" 出錯！
+
+
+1.2 函數引用 ~
+					*Funcref* *E695* *E718*
+函數引用變量可以通過 |function()| 函數得到。可以在表達式裡用它來代替函數名，在
+圍繞參數的括號之前，以調用它引用的函數。例如: >
+
+	:let Fn = function("MyFunc")
+	:echo Fn()
+<							*E704* *E705* *E707*
+函數引用變量必須以大寫字母、"s:"、"w:"、"t:" 或 "b:" 開始。函數引用變量不能和
+任何函數重名。
+
+特例是可以定義函數並直接把它的函數引用賦給字典的一個項目。例如: >
+	:function dict.init() dict
+	:   let self.val = 0
+	:endfunction
+
+該字典的鍵可以用小寫字母開始。這裡不用實際的函數名。另見 |numbered-function|。
+
+函數引用可以用 |:call| 命令調用: >
+	:call Fn()
+	:call dict.init()
+
+所引用的函數的名字可以用 |string()| 得到， >
+	:let func = string(Fn)
+
+你可以用 |call()| 來調用函數引用並用一個列表變量來傳遞參數: >
+	:let r = call(Fn, mylist)
+
+
+1.3 列表 ~
+							*List* *Lists* *E686*
+列表是項目的有序序列。項目可以是任何類型，用索引號可以進行訪問。可以在序列的任
+何位置上增加或者刪除項目。
+
+
+列表建立 ~
+							*E696* *E697*
+列表用方括號裡逗號分隔的項目序列建立。例如: >
+	:let mylist = [1, two, 3, "four"]
+	:let emptylist = []
+
+項目可以是任何表達式。用列表作為項目就能建立列表的列表: >
+	:let nestlist = [[11, 12], [21, 22], [31, 32]]
+
+忽略末項之後額外的逗號。
+
+
+列表索引 ~
+							*list-index* *E684*
+在列表之後的方括號中放上索引號可以訪問列表項目。索引從零開始，也就是說，第一個
+項目的索引值為零。 >
+	:let item = mylist[0]		" 得到第一個項目: 1
+	:let item = mylist[2]		" 得到第三個項目: 3
+
+如果返回的項目本身是列表，可以重複這樣的操作: >
+	:let item = nestlist[0][1]	" 得到第一個列表的第二個項目: 12
+<
+負索引從尾端開始計算。索引 -1 指向列表的最後一個項目，-2 指向倒數第二個項目，
+依此類推。 >
+	:let last = mylist[-1]		" 得到最後一個項目: "four"
+
+要避免非法索引值產生的錯誤，用 |get()| 函數。如果項目不存在，它返回零或者你指
+定的缺省值: >
+	:echo get(mylist, idx)
+	:echo get(mylist, idx, "NONE")
+
+
+列表連接 ~
+
+兩個列表可以用 "+" 操作符連接: >
+	:let longlist = mylist + [5, 6]
+	:let mylist += [7, 8]
+
+要在前面或後面附加項目，在項目外面加上 [] 從而把它變為一個列表。要改變列表內部
+的值，見下 |list-modification|。
+
+
+子列表~
+
+列表的一部分可以通過指定首末兩個索引獲得，方括號內以冒號分隔兩者: >
+	:let shortlist = mylist[2:-1]	" 得到列表 [3, "four"]
+
+首索引的省略類似於用 0。末索引的省略類似於用 -1。 >
+	:let endlist = mylist[2:]	" 從項目 2 到結束: [3, "four"]
+	:let shortlist = mylist[2:2]	" 單個項目的列表: [3]
+	:let otherlist = mylist[:]	" 複製列表
+
+如果首索引在列表末項之後或者末索引小於首索引，返回空列表。沒有錯誤信息。
+
+如果末索引大於等於列表的長度，使用列表長度減一: >
+	:let mylist = [0, 1, 2, 3]
+	:echo mylist[2:8]		" 返回: [2, 3]
+<
+注意: mylist[s:e] 意味著用變量 "s:e" 作為索引。在 ":" 之前用單個字母作為變量要
+小心。需要的話加上空格: mylist[s : e]。
+
+
+列表同一 ~
+							*list-identity*
+如果變量 "aa" 是列表，把它賦給另一個變量 "bb" 後，兩個變量指向同一列表。因此，
+對列表 "aa" 的修改也同時修改了 "bb": >
+	:let aa = [1, 2, 3]
+	:let bb = aa
+	:call add(aa, 4)
+	:echo bb
+<	[1, 2, 3, 4]
+
+|copy()| 函數可以複製列表。如上所述，用 [:] 也可。這種方式建立列表的淺備份: 改
+變列表中的列表項目仍然會修改複製列表的相應項目: >
+	:let aa = [[1, 'a'], 2, 3]
+	:let bb = copy(aa)
+	:call add(aa, 4)
+	:let aa[0][1] = 'aaa'
+	:echo aa
+<	[[1, aaa], 2, 3, 4] >
+	:echo bb
+<	[[1, aaa], 2, 3]
+
+要建立一個完全獨立的列表，用 |deepcopy()|。它遞歸地建立列表值的備份。最深可達
+100 層。
+
+可用操作符 "is" 檢查兩個變量是否指向同一個列表。"isnot" 剛好相反。與此對照，
+"==" 比較兩個列表的值是否相同。 >
+	:let alist = [1, 2, 3]
+	:let blist = [1, 2, 3]
+	:echo alist is blist
+<	0 >
+	:echo alist == blist
+<	1
+
+比較列表時 注意: 如果長度相同，所有項目用 "==" 的比較的結果也相同，兩個列表就
+認為相同。有一個例外: 數值和字符串總被認為不相同。這裡不進行自動類型轉換，而在
+變量間直接用 "==" 卻不是如此。例如: >
+	echo 4 == "4"
+<	1 >
+	echo [4] == ["4"]
+<	0
+
+因此可以說，列表的比較比數值和字符串的比較更嚴格。你同樣可以用這種方式比較簡單
+類型的值，把它們放到列表裡就行了: >
+
+	:let a = 5
+	:let b = "5"
+	:echo a == b
+<	1 >
+	:echo [a] == [b]
+<	0
+
+
+列表解包 ~
+
+要給列表項目解包，即把它們分別存入單獨的變量，用方括號把變量括起來，如同把它們
+當作列表項目: >
+	:let [var1, var2] = mylist
+
+如果變量和列表的項目數量不同，報錯。要處理列表中所有額外的項目，加上 ";" 和單
+個變量: >
+	:let [var1, var2; rest] = mylist
+
+它的工作方式就像: >
+	:let var1 = mylist[0]
+	:let var2 = mylist[1]
+	:let rest = mylist[2:]
+
+如果只有兩個項目，不會報錯。這時 "rest" 成為空表。
+
+
+列表修改 ~
+							*list-modification*
+要修改列表的指定項目，用 |:let|: >
+	:let list[4] = "four"
+	:let listlist[0][3] = item
+
+要修改列表的一部分，可以指定要修改的首末項目。提供的值的個數必須不少於該範圍內
+的項目數: >
+	:let list[3:5] = [3, 4, 5]
+
+給列表增加和刪除項目可以通過函數完成。一些例子如下: >
+	:call insert(list, 'a')		" 在最前面插入 'a'
+	:call insert(list, 'a', 3)	" 在 list[3] 前插入項目 'a'
+	:call add(list, "new")		" 在最後附加字符串項目
+	:call add(list, [1, 2])		" 在最後附加新的列表項目
+	:call extend(list, [1, 2])	" 在最後擴展列表，使之多包含兩個項目
+	:let i = remove(list, 3)	" 刪除項目 3
+	:unlet list[3]			" 同上
+	:let l = remove(list, 3, -1)	" 從項目 3 刪除到最後
+	:unlet list[3 : ]		" 同上
+	:call filter(list, 'v:val !~ "x"')  " 刪除有 'x' 的項目
+
+改變列表項目的順序: >
+	:call sort(list)		" 按字母給列表排序
+	:call reverse(list)		" 反轉項目的順序
+
+
+For 循環 ~
+
+|:for| 循環為每個列表項目執行命令。一個變量被依次設為每個列表項目。例如: >
+	:for item in mylist
+	:   call Doit(item)
+	:endfor
+
+它的工作方式就像: >
+	:let index = 0
+	:while index < len(mylist)
+	:   let item = mylist[index]
+	:   :call Doit(item)
+	:   let index = index + 1
+	:endwhile
+
+注意 所有列表項目必須是相同類型，不然會報錯 |E706|。要避免這一點，在循環尾部
+|:unlet| 該變量。
+
+如果你只是想要修改每個列表項目，|map()| 函數比 for 循環簡單得多。
+
+就像 |:let| 命令，|:for| 也可以接受變量的列表。這需要參數是列表的列表。 >
+	:for [lnum, col] in [[1, 3], [2, 8], [3, 0]]
+	:   call Doit(lnum, col)
+	:endfor
+
+這就像對列表的每個項目使用了 |:let| 命令。重複一次，類型必須相同，否則會報錯。
+
+也可以用變量保存列表變量的其餘項目: >
+	:for [i, j; rest] in listlist
+	:   call Doit(i, j)
+	:   if !empty(rest)
+	:      echo "remainder: " . string(rest)
+	:   endif
+	:endfor
+
+
+列表的相關函數 ~
+						*E714*
+可用於列表的函數: >
+	:let r = call(funcname, list)	" 調用帶參數列表的函數
+	:if empty(list)			" 檢查 list 是否為空
+	:let l = len(list)		" list 項目的數量
+	:let big = max(list)		" list 項目的最大值
+	:let small = min(list)		" list 項目的最小值
+	:let xs = count(list, 'x')	" 計算 list 裡 'x' 出現的次數
+	:let i = index(list, 'x')	" list 第一個 'x' 的位置
+	:let lines = getline(1, 10)	" 得到緩衝區十行文本行
+	:call append('$', lines)	" 附加若干文本行到緩衝區尾部
+	:let list = split("a b c")	" 用字符串中的項目建立列表
+	:let string = join(list, ', ')	" 用 list 項目構造字符串
+	:let s = string(list)		" list 的字符串表示
+	:call map(list, '">> " . v:val')  " 在每個項目前加上 ">> "
+
+不要忘記組合使用不同功能可以簡化任務。例如，要計算列表中所有數值的總和: >
+	:exe 'let sum = ' . join(nrlist, '+')
+
+
+1.4 字典 ~
+						*Dictionaries* *Dictionary*
+字典是關聯數組: 每個項目有一個鍵和一個值。用鍵可以定位項目，而項目的存儲不能確
+定任何特定順序。
+
+
+字典建立 ~
+						*E720* *E721* *E722* *E723*
+字典通過花括號裡逗號分隔的項目列表建立。每個項目包含以冒號分隔的鍵和值。一個鍵
+只能出現一次。例如: >
+	:let mydict = {1: 'one', 2: 'two', 3: 'three'}
+	:let emptydict = {}
+<							*E713* *E716* *E717*
+鍵必須是字符串。用數值也可以，但它總被自動轉換為字符串。所以字符串 '4' 和數值
+4 總會找到相同的項目。注意 字符串 '04' 和數值 04 是不一樣的，因為後者被轉換成
+字符串 '4'。
+
+值可以是任何表達式。如果值本身是字典，就可以建立嵌套的字典: >
+	:let nestdict = {1: {11: 'a', 12: 'b'}, 2: {21: 'c'}}
+
+忽略末項之後的逗號。
+
+
+訪問項目 ~
+
+常見的訪問項目的方式是把鍵放入方括號: >
+	:let val = mydict["one"]
+	:let mydict["four"] = 4
+
+用這種方式可以給已存在的字典增加新項目，這和列表不同。
+
+如果鍵只包含字母、數字和下劃線，可以使用如下形式 |expr-entry|: >
+	:let val = mydict.one
+	:let mydict.four = 4
+
+因為項目可以是包括列表和字典的任何類型，你可以反覆使用索引和鍵進行訪問: >
+	:echo dict.key[idx].key
+
+
+字典到列表的轉換 ~
+
+你可以循環遍歷字典的所有項目。為此，你需要把字典轉為列表，然後把它傳遞給
+|:for|。
+
+通常，你期望遍歷所有的鍵，用 |keys()| 函數就可以了: >
+	:for key in keys(mydict)
+	:   echo key . ': ' . mydict[key]
+	:endfor
+
+鍵列表沒有經過排序。你可能希望先進行排序: >
+	:for key in sort(keys(mydict))
+
+要遍歷所有的值，用 |values()| 函數:  >
+	:for v in values(mydict)
+	:   echo "value: " . v
+	:endfor
+
+如果你想同時得到鍵和值，用 |items()| 函數。它返回一個列表，其中每個項目是兩個
+項目的列表: 鍵和值: >
+	:for [key, value] in items(mydict)
+	:   echo key . ': ' . value
+	:endfor
+
+
+字典同一 ~
+							*dict-identity*
+就像列表那樣，你需要用 |copy()| 和 |deepcopy()| 來構造字典的備份。否則，賦值產
+生的結果會引用同一個字典: >
+	:let onedict = {'a': 1, 'b': 2}
+	:let adict = onedict
+	:let adict['a'] = 11
+	:echo onedict['a']
+	11
+
+如果所有的鍵-值組對的比較結果相同，兩個字典比較的結果也相同。詳情見
+|list-identity|。
+
+
+字典修改 ~
+							*dict-modification*
+要修改字典已經存在的項目或者增加新的項目，用 |:let|: >
+	:let dict[4] = "four"
+	:let dict['one'] = item
+
+從字典裡刪除項目可以通過 |remove()| 或 |:unlet| 完成。
+從 dict 裡刪除鍵 "aaa" 的項目有三種方法: >
+	:let i = remove(dict, 'aaa')
+	:unlet dict.aaa
+	:unlet dict['aaa']
+
+兩個字典的合併可以用 |extend()|: >
+	:call extend(adict, bdict)
+這使得 adict 得到擴展，加入所有的 bdict 項目。對於重複的鍵，adict 項目被覆蓋。
+可選的第三個參數可以改變這一點。
+注意 這不影響字典項目的順序，不要希望 ":echo adict" 會先顯示原有 adict 項目，
+然後再顯示 bdict 的項目。
+
+從字典裡刪除多個項目可以用 |filter()| 完成: >
+	:call filter(dict, 'v:val =~ "x"')
+刪除 "dict" 裡所有值不匹配 "x" 的項目。
+
+
+字典函數 ~
+					*Dictionary-function* *self* *E725*
+定義函數時，如果帶有 "dict" 屬性，可以以一種特殊方式使用字典。例如: >
+	:function Mylen() dict
+	:   return len(self.data)
+	:endfunction
+	:let mydict = {'data': [0, 1, 2, 3], 'len': function("Mylen")}
+	:echo mydict.len()
+
+這類似於面向對像編程的方法。字典項目用作 |Funcref|。局部變量 "self" 引用函數所
+在的字典。
+
+字典裡也可以加入指向沒有 "dict" 屬性的函數的函數引用，不過這時無法使用 "self"
+變量。
+
+				*numbered-function* *anonymous-function*
+要避免額外的函數名，可以定義時直接賦給字典: >
+	:let mydict = {'data': [0, 1, 2, 3]}
+	:function mydict.len() dict
+	:   return len(self.data)
+	:endfunction
+	:echo mydict.len()
+
+該函數會得到一個編號，而 dict.len 的值是指向此函數的 |Funcref|。該函數只能通過
+|Funcref| 訪問。如果沒有任何 |Funcref| 引用，它會被自動刪除。
+
+編號函數不一定要有 "dict" 屬性。
+
+如果你的編號函數有錯，可以用一個技巧知道它是什麼內容。假定函數是 42，命令為: >
+ :function {42}
+
+
+字典相關函數 ~
+							*E715*
+可以用於字典的函數: >
+	:if has_key(dict, 'foo')	" 如果 dict 有帶 "foo" 鍵的項目則為真
+	:if empty(dict)			" 如果 dict 為空則為真
+	:let l = len(dict)		" dict 項目的數量
+	:let big = max(dict)		" dict 項目的最大值
+	:let small = min(dict)		" dict 項目的最小值
+	:let xs = count(dict, 'x')	" 統計 dict 裡 'x' 出現的數目
+	:let s = string(dict)		" dict 的字符串表示
+	:call map(dict, '">> " . v:val')  " 在每個項目前加上 ">> "
+
+
+1.5 變量的更多細節 ~
+							*more-variables*
+如果你需要知道變量或表達式的類型，使用 |type()| 函數。
+
+如果 'viminfo' 選項包含 '!' 標誌位，大寫開頭且不包含小寫字母的全局變量被保存在
+viminfo 文件裡 |viminfo-file|。
+
+如果 'sessionoptions' 選項包含 "global"，大寫開頭且包含至少一個小寫字母的全局
+變量被保存在會話文件裡 |session-file|。
+
+變量名			可以保存的位置 ~
+my_var_6		無
+My_Var_6		會話文件
+MY_VAR_6		viminfo 文件
+
+
+可以使用花括號來構造變量名，見 |curly-braces-names|。
+
+==============================================================================
+2. 表達式語法						*expression-syntax*
+
+表達式語法小結，優先級從低到高排列:
+
+|expr1| expr2 ? expr1 : expr1	if-then-else
+
+|expr2|	expr3 || expr3 ..	邏輯或
+
+|expr3|	expr4 && expr4 ..	邏輯與
+
+|expr4|	expr5 == expr5		等於
+	expr5 != expr5		不等於
+	expr5 >	 expr5		大於
+	expr5 >= expr5		大於等於
+	expr5 <	 expr5		小於
+	expr5 <= expr5		小於等於
+	expr5 =~ expr5		匹配正規表達式
+	expr5 !~ expr5		不匹配正規表達式
+
+	expr5 ==? expr5		等於，忽略大小寫
+	expr5 ==# expr5		等於，匹配大小寫
+	等等			如上，? 忽略大小寫，# 則匹配之
+
+	expr5 is expr5		相同的 |List| 實例
+	expr5 isnot expr5	不同的 |List| 實例
+
+|expr5|	expr6 +	 expr6 ..	數值加法或列表連接
+	expr6 -	 expr6 ..	數值減法
+	expr6 .	 expr6 ..	字符串連接
+
+|expr6|	expr7 *	 expr7 ..	數值乘法
+	expr7 /	 expr7 ..	數值除法
+	expr7 %	 expr7 ..	數值求余
+
+|expr7|	! expr7			邏輯非
+	- expr7			一元減法: 取反
+	+ expr7			一元加法: 原值
+
+|expr8|	expr8[expr1]		字符串裡的字節或者 |List| 的項目
+	expr8[expr1 : expr1] 	字符串子串或 |List| 的子列表
+	expr8.name		|Dictionary| 的項目
+	expr8(expr1, ...)	使用 |Funcref| 變量的函數調用
+
+|expr9|	number			數值常數
+	"string"		字符串常數，反斜槓有特殊含義
+	'string'		字符串常數，' 加倍
+	[expr1, ...]		|List|
+	{expr1: expr1, ...}	|Dictionary|
+	&option			選項值
+	(expr1)			嵌套表達式
+	variable		內部變量
+	va{ria}ble		帶花括號的內部變量
+	$VAR			環境變量
+	@r			寄存器 'r' 的值
+	function(expr1, ...)	函數調用
+	func{ti}on(expr1, ...)	帶花括號的函數調用
+
+
+".." 標明這一層上的操作可以連接。比如: >
+	&nu || &list && &shell == "csh"
+
+同一層的表達式從左到右進行分析。
+
+
+expr1							*expr1* *E109*
+-----
+
+expr2 ? expr1 : expr1
+
+'?' 之前的表達式作為數值求值。如果結果非零，最終的結果是 '?' 和 ':' 之間的表達
+式的值，不然最終的結果是 ':' 之後的表達式的值。例如: >
+	:echo lnum == 1 ? "top" : lnum
+
+因為第一個表達式是 "expr2"，它不能包含另一個 ?:。另外兩個表達式則沒有這個限
+制，從而使得遞歸使用 ?: 成為可能。例如: >
+	:echo lnum == 1 ? "top" : lnum == 1000 ? "last" : lnum
+
+要使之可讀，建議使用續行符 |line-continuation|: >
+	:echo lnum == 1
+	:\	? "top"
+	:\	: lnum == 1000
+	:\		? "last"
+	:\		: lnum
+
+在 ':' 前，你總是應該加上空格，否則它可能被錯誤用在如 "a:1" 這樣的變量裡。
+
+
+expr2 和 expr3						*expr2* *expr3*
+---------------
+
+					*expr-barbar* *expr-&&*
+"||" 和 "&&" 操作符左右兩邊各接受一個參數。參數是 (或轉化為) 數值。運算結果是:
+
+	 輸入				 輸出 ~
+n1		n2		n1 || n2	n1 && n2 ~
+零		零		零		零
+零		非零		非零		零
+非零		零		非零		零
+非零		非零		非零		非零
+
+操作符可以連接。比如: >
+
+	&nu || &list && &shell == "csh"
+
+注意 "&&" 比 "||" 優先級高，所以這等價於: >
+
+	&nu || (&list && &shell == "csh")
+
+一旦結果可以確定，表達式使用 "短路" 計算，也就是，不再計算後面的參數，這和 C
+的情形類似。比如: >
+
+	let a = 1
+	echo a || b
+
+這是合法的，即使沒有叫 "b" 的變量也是如此。因為 "a" 已經是非零值，結果必然是非
+零。下面的情形類似: >
+
+	echo exists("b") && b == "yes"
+
+無論 "b" 定義與否，這是合法的。第二個子句只有在 "b" 定義的時候才會被計算。
+
+
+expr4							*expr4*
+-----
+
+expr5 {cmp} expr5
+
+比較兩個 expr 表達式，如果結果為假，返回 0，如果結果為真，返回 1。
+
+			*expr-==*  *expr-!=*  *expr->*	 *expr->=*
+			*expr-<*   *expr-<=*  *expr-=~*  *expr-!~*
+			*expr-==#* *expr-!=#* *expr->#*  *expr->=#*
+			*expr-<#*  *expr-<=#* *expr-=~#* *expr-!~#*
+			*expr-==?* *expr-!=?* *expr->?*  *expr->=?*
+			*expr-<?*  *expr-<=?* *expr-=~?* *expr-!~?*
+			*expr-is*
+		使用 'ignorecase'    匹配大小寫	    忽略大小寫 ~
+等於			==		==#		==?
+不等於			!=		!=#		!=?
+大於			>		>#		>?
+大於等於		>=		>=#		>=?
+小於			<		<#		<?
+小於等於		<=		<=#		<=?
+匹配正規表達式		=~		=~#		=~?
+不匹配正規表達式	!~		!~#		!~?
+相同實例		is
+不同實例		isnot
+
+示例:
+"abc" ==# "Abc"	  結果為 0
+"abc" ==? "Abc"	  結果為 1
+"abc" == "Abc"	  如果置位了 'ignorecase'，結果為 1，不然結果為 0
+
+							*E691* *E692*
+|List| 只能和 |List| 比較，而且只能用 "等於"、"不等於" 和 "is"。比較針對列表的
+值，遞歸進行。忽略大小寫意味著比較項目的值時忽略大小寫。
+
+							*E735* *E736*
+|Dictionary| 只能和 |Dictionary| 比較，而且只能用 "等於"、"不等於" 和 "is"。比
+較針對 |Dictionary| 的鍵/值，遞歸進行。忽略大小寫意味著比較項目的值時忽略大小
+寫。
+
+							*E693* *E694*
+|Funcref| 只能和 |Funcref| 比較，而且只能用 "等於" 和 "不等於"。這裡永不忽略大
+小寫。
+
+|List| 用 "is" 或 "isnot" 時，檢查表達式是否指向同一個 |List| 實例。|List| 的
+備份和原來的 |List| 不同。如果不是 |List|，用 "is" 等價於用 "等於"，而 "isnot"
+等價於 "不等於"，有一點區別: 不同的類型總認為有不同的值。"4 == '4'" 為真，而
+"4 is '4'" 為假。
+
+如果比較字符串和數值，字符串被轉化成數值，而比較是在數值之間進行的。這意味著
+"0 == 'x'" 為真，因為 'x' 被轉化成數值 0。
+
+如果比較兩個字符串，使用 strcmp() 或 stricmp()。因而，比較的是數學上的差異 (比
+較字節碼)，而不必然是本地語言的字母的差異。
+
+如果操作符後帶上 '#'，或者 'ignorecase' 關閉時使用無 '#' 的版本時，比較使用
+strcmp(): 大小寫相關。
+
+如果操作符後帶上 '?'，或者 'ignorecase' 打開時使用無 '?' 的版本時，比較使用
+stricmp(): 大小寫無關。
+
+這裡 'smartcase' 不適用。
+
+"=~" 和 "!~" 操作符使用右邊的參數作為模式來匹配左邊的參數。模式的定義見
+|pattern|。匹配進行時，總是假設置位了 'magic' 並且 'cpoptions' 為空，無論
+'magic' 或 'cpoptions' 實際的值為何。這使得腳本可移植。要避免在正規表達式裡使
+用的反斜槓需要加倍的問題，可以使用單引號的字符串，見 |literal-string|。
+既然字符串假定為單行，多行的模式 (包含 \n，即反斜槓-n) 不會被匹配。不過，按本
+義出現的單個 NL 字符可以像普通字符一樣匹配。比如:
+	"foo\nbar" =~ "\n"	結果為 1
+	"foo\nbar" =~ "\\n"	結果為 0
+
+
+expr5 和 expr6						*expr5* *expr6*
+---------------
+expr6 +	 expr6 ..	數值加法或 |List| 連接			*expr-+*
+expr6 -	 expr6 ..	數值減法				*expr--*
+expr6 .	 expr6 ..	字符串連接				*expr-.*
+
+|Lists| 只能用 "+"，而且兩個 expr6 必須都是列表。返回兩者連接以後的新列表。
+
+expr7 *	 expr7 ..	數值乘法				*expr-star*
+expr7 /	 expr7 ..	數值除法				*expr-/*
+expr7 %	 expr7 ..	數值求余				*expr-%*
+
+除了 "." 以外，這裡所有的操作都把字符串轉化成數值。
+
+注意 "+" 和 "." 的差異:
+	"123" + "456" = 579
+	"123" . "456" = "123456"
+
+因為 '.' 和 '+' 與 '-' 的優先級相同，你需要把: >
+	1 . 90 + 90.0
+看作: >
+	(1 . 90) + 90.0
+這沒問題，因為字符串 "190" 被自動轉換為數值 190，然後和浮點數 90.0 相加。不
+過: >
+	1 . 90 * 90.0
+應被看作: >
+	1 . (90 * 90.0)
+因為 '.' 的優先級比 '*' 低，這_不能_工作，因為它試圖連接浮點數和字符串。
+
+數值除以零時，結果取決於該值:
+	  0 / 0  = -0x80000000	(類似於浮點數的 NaN)
+	 >0 / 0  =  0x7fffffff	(類似於正無窮大)
+	 <0 / 0  = -0x7fffffff	(類似於負無窮大)
+	(Vim 7.2 之前，總是返回 0x7fffffff)
+
+如果 '%' 的右邊為零，結果為 0。
+
+這些操作不適用於 |Funcref|。
+
+而 % 也不適用於浮點數。 *E804*
+
+
+expr7							*expr7*
+-----
+! expr7			邏輯非			*expr-!*
+- expr7			一元減法: 取反		*expr-unary--*
++ expr7			一元加法: 原值		*expr-unary-+*
+
+'!' 把非零變為零，零變為 1。
+'-' 改變數值的符號。
+'+' 保持原值。
+
+字符串會先轉化為數值。
+
+可以重複和混合這三種運算。例如:
+	!-1	    == 0
+	!!8	    == 1
+	--9	    == 9
+
+
+expr8							*expr8*
+-----
+expr8[expr1]		字符串或 |List| 的項目		*expr-[]* *E111*
+
+如果 expr8 是數值或字符串，結果是字符串，包含 expr8 裡第 expr1 個字節。expr8
+視作字符串，expr1 視作數值。這裡不識別多字節編碼，但可考慮使用 |byteidx()|。
+
+索引 0 給出第一個字符。這和 C 類同。要小心: 文本列號可是從 1 開始的！例如，要
+得到光標所在的字符: >
+	:let c = getline(line("."))[col(".") - 1]
+
+如果字符串的長度小於索引值，結果為空字符串。負索引總是給出空字符串 (原因: 反向
+兼容)。用 [-1:] 得到最後一個字節。
+
+如果 expr8 是 |List|，返回索引值為 expr1 的項目。可用的索引值見 |list-index|。
+如果索引越界，產生錯誤。例如: >
+	:let item = mylist[-1]		" 得到最後一個項目
+
+一般的，如果 |List| 索引大於等於 |List| 的長度，或者比 |List| 的長度更負，產生
+錯誤。
+
+
+expr8[expr1a : expr1b]	子字符串或子列表		*expr-[:]*
+
+如果 expr8 是數值或字符串，結果是子字符串，包含第 expr1a 到第 expr1b (包含) 個
+字節。expr8 視作字符串，expr1a 和 expr1b 視作數值。這裡不識別多字節編碼，需用
+|byteidx()| 來計算索引值。
+
+如果省略 expr1a，用零。如果省略 expr1b，用字符串的長度減一。
+
+可以用負數來從字符串尾部開始計算位置。-1 代表最後一個字符，-2 倒數第二個，依此
+類推。
+
+如果索引越界，忽略這些字符。如果 expr1b 小於 expr1a，結果是空字符串。
+
+例如: >
+	:let c = name[-1:]		" 字符串最後一個字節
+	:let c = name[-2:-2]		" 字符串倒數第二個字節
+	:let s = line(".")[4:]		" 從第五個字節到最後
+	:let s = s[:-3]			" 刪除最後兩個字節
+<
+							*sublist* *slice*
+如果 expr8 是 |List|，結果是新的 |List|，包含 expr1 和 expr1b 索引指定的項目。
+和上面描述的字符串情形類似，除了越界的索引會報錯以外。例如: >
+	:let l = mylist[:3]		" 前四個項目
+	:let l = mylist[4:4]		" 單個項目的列表
+	:let l = mylist[:]		" 列表的淺備份
+
+在 |Funcref| 上用 expr8[expr1] 或 expr8[expr1a : expr1b] 出錯。
+
+
+expr8.name		|Dictionary| 的項目		*expr-entry*
+
+如果 expr8 是一個 |Dictionary| 且後跟句號再跟一個名字，該名字用作 |Dictionary|
+的鍵。這相當於: expr8[name]。
+
+該名字必須由字母數字字符組成。這和變量名一樣，不過這裡可以用數字開始。但不能用
+花括號。
+
+句號前後不能用空白。
+
+例如: >
+	:let dict = {"one": 1, 2: "two"}
+	:echo dict.one
+	:echo dict .2
+
+注意 句號也用於字符串連接。要避免混淆，用於字符串連接的句號前後加上空白。
+
+
+expr8(expr1, ...)	|Funcref| 函數調用
+
+如果 expr8 是 |Funcref| 類型的變量，調用它指向的函數。
+
+
+
+						*expr9*
+number
+------
+number			數值常數		*expr-number*
+
+十進制、十六進制 (0x 或 0X 開始)、或八進制 (0 開始)。
+
+						*floating-point-format*
+浮點數可用兩種形式給出:
+
+	[-+]{N}.{M}
+	[-+]{N}.{M}e[-+]{exp}
+
+{N} 和 {M} 都是數值。{N} 和 {M} 都必須存在，且只能包含數位。
+[-+] 意味著有一個可選的正負號。
+{exp} 是指數部分，以 10 為基。
+只能接受小數點，逗號不行。這和當前的 locale 無關。
+{僅當編譯時加入 |+float| 特性才有效}
+
+示例:
+	123.456
+	+0.0001
+	55.0
+	-0.123
+	1.234e03
+	1.0E-6
+	-3.1416e+88
+
+下面的形式是_非法的_:
+	3.		{M} 為空
+	1e40		{M} 為空
+
+							*float-pi* *float-e*
+可以複製-粘貼的一些常用值: >
+	:let pi = 3.14159265359
+	:let e  = 2.71828182846
+
+邏輯:
+浮點數引入之前，文本 "123.456" 被解釋為兩個數值 "123" 和 "456"，轉換為字符串，
+然後進行連接而生成字符串 "123456"。這被認為沒有意義，也沒有找到有意使用此特性
+的 Vim 腳本，因此我們採納了這種普遍的浮點數記法，而接受其後向不兼容性。
+
+						*floating-point-precision*
+浮點數的精度和取值範圍取決於 Vim 編譯時使用的庫如何理解 "double"。運行時無法改
+變。
+
+浮點數 |Float| 的顯示缺省使用 6 位十進制位，類似於 printf("%g", f)。使用
+|printf()| 函數時可以指定其它位數。例如: >
+	:echo printf('%.15e', atan(1))
+<	7.853981633974483e-01
+
+
+
+string							*expr-string* *E114*
+------
+"string"		字符串常數		*expr-quote*
+
+注意 使用的是雙引號。
+
+字符串常數接受以下特殊字符:
+\...	三位八進制數 (例如，"\316")
+\..	兩位八進制數 (必須後跟非數字)
+\.	一位八進制數 (必須後跟非數字)
+\x..	兩位十六進制數指定的字節 (例如，"\x1f")
+\x.	一位十六進制數指定的字節 (必須後跟非十六進制數字)
+\X..	等同於 \x..
+\X.	等同於 \x.
+\u....  四位十六進制指定的字符。根據 'encoding' 的當前值決定的編碼進行存貯 (例
+	如，"\u02a4")
+\U....	等同於 \u.....
+\b	退格 <BS>
+\e	escape <Esc>
+\f	換頁 <FF>
+\n	換行 <NL>
+\r	回車 <CR>
+\t	製表 <Tab>
+\\	反斜槓
+\"	雙引號
+\<xxx>	"xxx" 命名的特殊字符，例如 "\<C-W>" 代表 CTRL-W。用於映射，0x80 字節被
+        轉義。不要用 <Char-xxxx> 來得到 utf-8 字符，用上面提到的 \uxxxxx。
+
+注意 "\xff" 保存為字節 255，在某些編碼中它是不合法的。使用 "\u00ff" 可以按照
+'encoding' 的當前值保存字符 255。
+
+注意 "\000" 和 "\x00" 強制字符串結束。
+
+
+literal-string						*literal-string* *E115*
+---------------
+'string'		字符串常數			*expr-'*
+
+注意 使用的是單引號。
+
+字符串這裡按原義出現。不去掉反斜槓，它也沒有特殊含義。唯一的特例是兩個單引號代
+表一個單引號。
+
+單引號字符串有助於模式的使用，因為反斜槓不再需要加倍。以下兩個命令等價: >
+	if a =~ "\\s*"
+	if a =~ '\s*'
+
+
+option						*expr-option* *E112* *E113*
+------
+&option			選項值，如有存在，使用局部值
+&g:option		全局選項值
+&l:option		局部選項值
+
+例如: >
+	echo "tabstop is " . &tabstop
+	if &insertmode
+
+這裡可以使用任何選項值。見 |options|。如果指定要使用局部值，但不存在局部於緩衝
+區或局部於窗口的選項，則還是使用全局值。
+
+
+register						*expr-register* *@r*
+--------
+@r			寄存器 'r' 的值
+
+結果是命名寄存器的內容，以單個字符串表達。換行符在需要時會被插入。要得到無名寄
+存器的內容，使用 @" 或 @@。可用寄存器的相關解釋可見 |registers|。
+
+如果用 '=' 寄存器，你得到表達式自身，而不是它計算的結果。用 |eval()| 來進行計
+算。
+
+
+nesting							*expr-nesting* *E110*
+-------
+(expr1)			嵌套表達式
+
+
+environment variable					*expr-env*
+--------------------
+$VAR			環境變量
+
+任何環境變量的字符串值。如果該環境變量沒有定義，結果為空字符串。
+						*expr-env-expand*
+注意 直接使用 $VAR 和使用 expand("$VAR") 有區別。直接使用的形式只能擴展當前
+Vim 會話所知的環境變量。使用 expand() 會先嘗試當前 Vim 會話所知的環境變量，如
+果不成功，則使用外殼擴展該變量。這會變慢，但可以用來擴展只有外殼知道的變量。
+例如: >
+	:echo $version
+	:echo expand("$version")
+前者可能不會回顯任何內容，後者會回顯 $version 變量 (如果你的外殼支持的話)。
+
+
+internal variable					*expr-variable*
+-----------------
+variable		內部變量
+見下面的 |internal-variables|。
+
+
+function call		*expr-function* *E116* *E118* *E119* *E120*
+-------------
+function(expr1, ...)	函數調用
+見下面的 |functions|。
+
+
+==============================================================================
+3. 內部變量					*internal-variables* *E121*
+									*E461*
+內部變量的名字由字母、數字和 '_' 組成。但不能由數字開始。可以使用花括號，見
+|curly-braces-names|。
+
+內部變量通過 ":let" 命令建立 |:let|。
+內部變量通過 ":unlet" 命令顯式刪除 |:unlet|。
+使用非內部變量的名字或引用已經刪除的內部變量會產生錯誤。
+
+變量有不同的命名空間，根據附加的前綴決定:
+
+		     (無) 函數內: 局部於函數；否則: 全局
+|buffer-variable|    b:	  局部於當前緩衝區。
+|window-variable|    w:	  局部於當前窗口。
+|tabpage-variable|   t:	  局部於當前標籤頁。
+|global-variable|    g:	  全局。
+|local-variable|     l:	  局部於函數。
+|script-variable|    s:	  局部於 |:source| 的 Vim 腳本。
+|function-argument|  a:	  函數參數 (只限於函數內使用)。
+|vim-variable|       v:	  Vim 預定義的全局變量。
+
+作用域本身可以用作 |Dictionary|。例如，要刪除所有局部於腳本的變量: >
+	:for k in keys(s:)
+	:    unlet s:[k]
+	:endfor
+<
+						*buffer-variable* *b:var*
+"b:" 開頭的變量名局部於當前緩衝區。這樣，你可以為每個緩衝區定義不同的 "b:foo"
+變量。這種變量在緩衝區被刪除時 (:bwipeout 或 :bdelete |:bdelete|) 同時被刪除。
+
+預定義了如下的緩衝區局部變量:
+					*b:changedtick-variable* *changetick*
+b:changedtick	當前緩衝區的改變次數。每次改變都會遞增。撤銷命令在此情形下也被
+		視作一次改變。這可用來在緩衝區發生改變時執行一些動作。比如: >
+		    :if my_changedtick != b:changedtick
+		    : let my_changedtick = b:changedtick
+		    : call My_Update()
+		    :endif
+<
+						*window-variable* *w:var*
+"w:" 開頭的變量名局部於當前窗口。窗口關閉時被刪除。
+
+						*tabpage-variable* *t:var*
+"t" 開始的變量名局部於當前標籤頁。標籤頁關閉時，這些變量被刪除。{僅當編譯時加
+入 |+windows| 特性才有效}
+
+						*global-variable* *g:var*
+函數內部，全局變量可以通過 "g:" 訪問。如果不提供前綴，會使用函數的局部變量。在
+其他地方，如果你想的話。也可以使用 "g:"。
+
+						*local-variable* *l:var*
+訪問函數的局部變量無需任何前綴。但如果你想要，可以使用 "l:"。不過，如果沒有
+"l:" 前綴，你可能會和保留的變量名衝突。例如 "count"。它本身指代 "v:count"。但
+使用了 "l:count" 你就可以使用同名的局部變量。
+
+
+						*script-variable* *s:var*
+Vim 腳本裡，可以使用 "s:" 開頭的變量。它們不能在腳本之外訪問，因而可以稱為局部
+於腳本的變量。
+
+它們可以用於:
+- 載入腳本時執行的命令
+- 腳本定義的函數
+- 腳本定義的自動命令
+- 腳本定義的函數和自動命令裡定義的函數和自動命令 (遞歸)
+- 腳本裡定義的用戶定義命令
+但不能用在:
+- 該腳本載入的其它腳本
+- 映射
+- 菜單
+- 等等
+
+腳本變量可以用來防止和全局變量名的衝突。看看這個例子: >
+
+	let s:counter = 0
+	function MyCounter()
+	  let s:counter = s:counter + 1
+	  echo s:counter
+	endfunction
+	command Tick call MyCounter()
+
+你可以從任何腳本裡啟動 "Tick"，但那個腳本裡的 "s:counter" 變量不會被改變，只有
+在 "Tick" 定義所在腳本的 "s:counter" 才會。
+
+另一個完成相同功能的例子: >
+
+	let s:counter = 0
+	command Tick let s:counter = s:counter + 1 | echo s:counter
+
+如果調用函數或者啟動用戶定義命令，腳本變量的上下文設置為函數和命令定義所在的腳
+本。
+
+腳本變量也可用於腳本裡定義的函數里定義的函數。例如: >
+
+	let s:counter = 0
+	function StartCounting(incr)
+	  if a:incr
+	    function MyCounter()
+	      let s:counter = s:counter + 1
+	    endfunction
+	  else
+	    function MyCounter()
+	      let s:counter = s:counter - 1
+	    endfunction
+	  endif
+	endfunction
+
+調用 StartCounting() 時，定義 MyCounter() 函數或者遞增或者遞減計數器。不管
+StartCounting() 在哪裡調用，s:counter 變量總可以在 MyCounter() 裡訪問。
+
+如果相同的腳本多次執行，使用的是同一個腳本變量。只要 Vim 還在運行，就保持有
+效。這可以用於維護計數: >
+
+	if !exists("s:counter")
+	  let s:counter = 1
+	  echo "腳本首次執行"
+	else
+	  let s:counter = s:counter + 1
+	  echo "腳本現在執行了 " . s:counter . " 次"
+	endif
+
+注意 這意味著 filetype 插件不能為每個緩衝區提供不同的腳本變量。這時應使用緩衝
+區的局部變量 |b:var|。
+
+
+預定義的 Vim 變量:				*vim-variable* *v:var*
+
+					*v:beval_col* *beval_col-variable*
+v:beval_col	鼠標指針所在的列號，即 |v:beval_lnum| 行中的字節位置。
+		僅當計算 'balloonexpr' 選項時有效。
+
+					*v:beval_bufnr* *beval_bufnr-variable*
+v:beval_bufnr	鼠標指針所在的緩衝區號。僅當計算 'balloonexpr' 選項時有效。
+
+					*v:beval_lnum* *beval_lnum-variable*
+v:beval_lnum	鼠標指針所在的行號。僅當計算 'balloonexpr' 選項時有效。
+
+					*v:beval_text* *beval_text-variable*
+v:beval_text	鼠標指針所在或之後的文本。通常是一個單詞，可用於調試 C 程序。
+		此處用到 'iskeyword'，但也包括此位置之前的句號和 "->"。如果在
+		']' 上，使用它之前的文本，包括匹配的 '[' 和它之前的單詞。如果
+		在單行的可視區域上，使用高亮文本。
+		僅當計算 'balloonexpr' 選項時有效。
+
+					*v:beval_winnr* *beval_winnr-variable*
+v:beval_winnr	鼠標指針所在的窗口號。僅當計算 'balloonexpr' 選項時有效。
+
+					*v:char* *char-variable*
+v:char		計算 'formatexpr' 時使用的參數和用於帶 <expr> 的縮寫中輸入的字
+		符 |:map-<expr>|。
+
+			*v:charconvert_from* *charconvert_from-variable*
+v:charconvert_from
+		要轉換的文件字符編碼名。只在計算 'charconvert' 選項時有效。
+
+			*v:charconvert_to* *charconvert_to-variable*
+v:charconvert_to
+		轉換後的文件字符編碼名。只在計算 'charconvert' 選項時有效。
+
+					*v:cmdarg* *cmdarg-variable*
+v:cmdarg	該變量有兩個目的:
+		1. 文件讀寫命令的額外參數。目前，它們包括 "++enc=" 和
+		   "++ff="。該變量在文件讀寫命令的自動命令事件激活之前設置。開
+		   頭有一個空格，以便直接把該變量附加到讀寫命令之後。注意: 這
+		   裡不包括 "+cmd" 參數，因為它總要被執行的。
+		2. 使用 ":hardcopy" 打印 PostScript 文件時，":hardcopy" 命令的
+		   參數。在 'printexpr' 裡用得到。
+
+					*v:cmdbang* *cmdbang-variable*
+v:cmdbang	文件讀寫命令時，和 v:cmdarg 設置的時間類似。如果使用了 "!"，其
+		值為 1，不然為 0。注意 它只能用於自動命令。用戶命令裡可以用
+		|<bang>|。
+
+					*v:count* *count-variable*
+v:count		最近的普通模式命令使用的計數。在映射前可用於得到計數。只讀。
+		例如: >
+	:map _x :<C-U>echo "計數為 " . v:count<CR>
+<		注意: <C-U> 是必要的，它刪除緊跟在計數之後 ':' 所給出的行范
+		圍。
+		如果有兩個計數，如 "3d2w"，它們進行相乘，如同命令行實際發生的
+		那樣，等同於 "d6w"。
+		也用於計算 'formatexpr' 選項。
+		為了後向兼容，這裡也可以用 "count"。
+
+					*v:count1* *count1-variable*
+v:count1	類似於 "v:count"，但沒有給出計數時，缺省為 1。
+
+						*v:ctype* *ctype-variable*
+v:ctype		運行環境當前的字符 locale 設置。它使得 Vim 腳本能得到當前的
+		locale 編碼。技術細節: 這就是 LC_CTYPE 的值。如果沒有使用
+		locale，其值為 "C"。
+		該變量不能直接設置，請使用 |:language| 命令。
+		見 |multi-lang|。
+
+					*v:dying* *dying-variable*
+v:dying		通常為零。如果捕獲到某個 "致命" 的 signal，設為 1。如果同時捕
+		獲到多個 signal，其值相應增加。在自動命令裡可以用來檢查 Vim
+		是否被異常終止。{僅限於 Unix}
+		例如: >
+	:au VimLeave * if v:dying | echo "\nAAAAaaaarrrggghhhh!!!\n" | endif
+<		備註: 如果 v:dying 為一而同時又捕捉到另一個致命的 signal，不執
+		行 VimLeave 自動命令。
+
+					*v:errmsg* *errmsg-variable*
+v:errmsg	最近給出的錯誤信息。該變量可以設置。
+		例如: >
+	:let v:errmsg = ""
+	:silent! next
+	:if v:errmsg != ""
+	:  ... handle error
+<		為了後向兼容，這裡也可以用 "errmsg"。
+
+					*v:exception* *exception-variable*
+v:exception	最近捕獲且沒有完成的例外的值。見 |v:throwpoint| 和
+		|throw-variables|。
+		例如: >
+	:try
+	:  throw "oops"
+	:catch /.*/
+	:  echo "caught" v:exception
+	:endtry
+<		輸出: "caught oops"。
+
+					*v:fcs_reason* *fcs_reason-variable*
+v:fcs_reason	激活 |FileChangedShell| 事件的原因。
+		可以在自動命令裡用來決定該做什麼和/或如何設置 v:fcs_choice。可
+		能的值是:
+			deleted		文件不再存在
+			conflict	文件內容、模式或修改時間被改變，而緩衝
+					區同時被修改
+			changed		文件內容被改變
+			mode		文件模式被改變
+			time		文件修改時間被改變
+
+					*v:fcs_choice* *fcs_choice-variable*
+v:fcs_choice	|FileChangedShell| 事件激活後該做什麼。可以在自動命令裡用來告
+		訴 Vim 如何處理涉及的緩衝區:
+			reload		重新載入緩衝區 (如果文件已刪除，不能工
+					作)。
+			ask		詢問用戶該做什麼，就像沒有自動命令一
+					樣。不過，如果只有修改時間被改變，不做
+					任何事。
+			<空>		不做任何事。自動命令應該已經處理完畢。
+		缺省為空。如果使用別的 (非法的) 值，Vim 的行為就像它為空一樣。
+		不會有警告信息。
+
+					*v:fname_in* *fname_in-variable*
+v:fname_in	輸入文件名。在計算以下選項時合法:
+			選項		用於 ~
+			'charconvert'	要轉換的文件
+			'diffexpr'	原始文件
+			'patchexpr'	原始文件
+			'printexpr'	要打印的文件
+		|SwapExists| 裡設為交換文件名。
+
+					*v:fname_out* *fname_out-variable*
+v:fname_out	輸出文件名。只有在計算以下選項時才合法:
+			選項		用於 ~
+			'charconvert'	生成的轉換完成的文件 (*)
+			'diffexpr'	diff 的結果
+			'patchexpr'	產生的補丁文件
+		(*) 如果用於為寫入命令進行轉換 (比如，":w file")，等價於
+		v:fname_in。如果用於為讀入命令進行轉換 (比如，":e file")，它是
+		一個臨時文件名，和 v:fname_in 不同。
+
+					*v:fname_new* *fname_new-variable*
+v:fname_new	文件新版本的名字。只有在計算 'diffexpr' 的時候才有效。
+
+					*v:fname_diff* *fname_diff-variable*
+v:fname_diff	比較結果 (或補丁) 的文件名。只有在計算 'patchexpr' 的時候才有
+		效。
+
+					*v:folddashes* *folddashes-variable*
+v:folddashes	用於 'foldtext': 反映關閉的折疊的折疊級別的連字符。
+		|sandbox| 裡只讀。|fold-foldtext|
+
+					*v:foldlevel* *foldlevel-variable*
+v:foldlevel	用於 'foldtext': 關閉的折疊的折疊級別。
+		|sandbox| 裡只讀。|fold-foldtext|
+
+					*v:foldend* *foldend-variable*
+v:foldend	用於 'foldtext': 關閉的折疊的最後一行。
+		|sandbox| 裡只讀。|fold-foldtext|
+
+					*v:foldstart* *foldstart-variable*
+v:foldstart	用於 'foldtext': 關閉的折疊的第一行。
+		|sandbox| 裡只讀。|fold-foldtext|
+
+					*v:insertmode* *insertmode-variable*
+v:insertmode	用於 |InsertEnter| 和 |InsertChange| 自動命令事件。取值:
+			i	插入模式
+			r	替換模式
+			v	虛擬替換模式
+
+						*v:key* *key-variable*
+v:key		|Dictionary| 裡當前項目的鍵。只有在 |map()| 和 |filter()| 裡計
+		算表達式時有效。
+		只讀。
+
+						*v:lang* *lang-variable*
+v:lang		運行環境當前的消息 locale 設置。它使得 Vim 腳本能得到當前使用
+		的語言。技術細節: 這就是 LC_MESSAGES 的值。該值和系統有關。
+		該變量不能直接設置，請使用 |:language| 命令。
+		它和 |v:ctype| 不同，因為消息可能使用不同於字符編碼的語言。見
+		|multi-lang|。
+
+						*v:lc_time* *lc_time-variable*
+v:lc_time	運行環境當前的時間消息 locale 設置。它使得 Vim
+		腳本能得到當前使用的語言。技術細節: 這就是 LC_TIME 的值。
+		該變量不能直接設置，請使用 |:language| 命令。見 |multi-lang|。
+
+						*v:lnum* *lnum-variable*
+v:lnum		'foldexpr' |fold-expr|、'formatexpr' 和 'indentexpr' 表達式中
+		的行號和 'guitablevel' 和 'guitabtooltip' 中的標籤頁號。只有在
+		計算這些表達式時才合法。在 |sandbox| 裡時只讀。
+
+					*v:mouse_win* *mouse_win-variable*
+v:mouse_win	用 |getchar()| 得到鼠標點擊時所在的窗口號。首個窗口的編號為
+		1 ，就像 |winnr()| 那樣。如果那時沒有鼠標點擊，該值為零。
+
+					*v:mouse_lnum* *mouse_lnum-variable*
+v:mouse_lnum	用 |getchar()| 得到鼠標點擊時所在的行號。這是文本行號，不是屏
+		幕行號。如果那時沒有鼠標點擊，該值為零。
+
+					*v:mouse_col* *mouse_col-variable*
+v:mouse_col	用 |getchar()| 得到鼠標點擊時所在的列號。這是屏幕列號，就像
+		|virtcol()| 那樣。如果那時沒有鼠標點擊，該值為零。
+
+					*v:oldfiles* *oldfiles-variable*
+v:oldfiles	啟動時從 |viminfo| 文件載入的文件名列表。Vim 記住的位置標記所
+		在的就是這些文件。列表長度的上限由 'viminfo' 選項的 ' 參數定義
+		(缺省是 100)。
+		另見 |:oldfiles| 和 |c_#<|。
+		此列表可修改，但並不影響之後 |viminfo| 文件保存什麼。同時，如
+		果使用非字符串的值，會有問題。
+		{僅當編譯時加入 |+viminfo| 特性才有效}
+
+					*v:operator* *operator-variable*
+v:operator	普通模式給出的最近的操作符。除了 <g> 或 <z> 開始的命令是兩個
+		字符外，這是單個字符。最好和 |v:prevcount| 和 |v:register| 一
+		起使用。常常，先中止操作符等待模式，然後使用操作符，例如: >
+			:omap O <Esc>:call MyMotion(v:operator)<CR>
+<		直到輸入下一個操作符之前，該值保持不變。因此不要期待該值會為
+		空。
+		|:delete|、|:yank| 或其它 Ex 命令不改變 v:operator。
+		只讀。
+
+					*v:prevcount* *prevcount-variable*
+v:prevcount	倒數第二次的普通模式命令使用的計數，也就是再上一個命令用的
+		v:count 的值。可以用來先中止可視模式或操作符等待模式，然後使用
+		計數。 >
+			:vmap % <Esc>:call MyFilter(v:prevcount)<CR>
+<		只讀。
+
+					*v:profiling* *profiling-variable*
+v:profiling	通常為零。開始用 ":profile start" 之後設為一。見 |profiling|。
+
+					*v:progname* *progname-variable*
+v:progname	包含 Vim 啟動時使用的名字 (路徑已被去掉)。可以用來為 "view"、
+		"evim" 等符號鏈接到 Vim 的名字提供特殊的設置。
+		只讀。
+
+					*v:register* *register-variable*
+v:register	最近的普通模式命令使用的寄存器名字。如果沒有使用過，為空。
+		|getreg()| |setreg()|
+
+					*v:scrollstart* *scrollstart-variable*
+v:scrollstart	指示使屏幕上滾的腳本或函數的字符串。只有在原來為空時才設置，因
+		此只記住第一個原因。如果來自輸入的命令，設為 "Unknown"。
+		可以用來發現你的腳本為什麼產生 hit-enter 提示。
+
+					*v:servername* *servername-variable*
+v:servername	如果有的話，註冊過的 |x11-clientserver| 名字。
+		只讀。
+
+		
+v:searchforward			*v:searchforward* *searchforward-variable*
+		搜索方向: 正向搜索後為 1，反向搜索後為 0。直接設置最近搜索模式
+		會復位此值為正向，見 |quote/|。
+		注意 從函數返回時該值被復原 |function-search-undo|。
+		可讀寫。
+
+					*v:shell_error* *shell_error-variable*
+v:shell_error	最近一次外殼命令的返回值。如果非零，最近一次外殼命令有錯。如果
+		為零，則該命令成功返回。這只有在外殼把錯誤代碼返回給 Vim 的時
+		候才工作。-1 通常用來告知該命令無法執行。只讀。
+		例如: >
+	:!mv foo bar
+	:if v:shell_error
+	:  echo '不能把 "foo" 換名為 "bar"!'
+	:endif
+<		為了後向兼容，這裡也可以用 "shell_error"。
+
+					*v:statusmsg* *statusmsg-variable*
+v:statusmsg	最近給出的狀態消息。可以設置該變量。
+
+					*v:swapname* *swapname-variable*
+v:swapname	只有在執行 |SwapExists| 自動命令時才合法: 找到的交換文件名。只
+		讀。
+
+					*v:swapchoice* *swapchoice-variable*
+v:swapchoice	|SwapExists| 自動命令可以設置此值，以選擇如何處理已有交換文件:
+			'o'	以只讀方式打開
+			'e'	仍然編輯
+			'r'	恢復
+			'd'	刪除交換文件
+			'q'	退出
+			'a'	中止
+		該值應是單個字符的字符串。如果為空，用戶會被詢問，就像沒有
+		SwapExists 自動命令那樣。缺省為空。
+
+					*v:swapcommand* *swapcommand-variable*
+v:swapcommand	打開文件後執行的普通模式命令。可以用於 |SwapExists| 自動命令，
+		用以讓另一個 Vim 打開文件並跳轉到合適的位置。例如，要跳轉到某
+		標籤，用的值是 ":tag tagname\r"。":edit +cmd file" 用的值是
+		":cmd\r"。
+
+				*v:termresponse* *termresponse-variable*
+v:termresponse	使用 |t_RV| termcap 項目返回的終端的轉義序列。Vim 收到 ESC [
+		或者 CSI 開始，以一個 'c' 結束，並且其間只包含數字，';' 和 '.'
+		的轉義序列的時候，會設置該值。
+		如果設置該選項，會激活 TermResponse 自動命令事件，這樣你就可以
+		對終端的應答做出反應。
+		新的 xterm 的應答是: "<Esc>[ Pp ; Pv ; Pc c"。 Pp 是終端類型:
+		0 代表 vt100，而 1 代表 vt220。 Pv 是補丁號 (因為這是 patch 95
+		引入的，補丁號應該總是 95 會更高)。Pc 總是零。
+		{僅當編譯時加入 |+termresponse| 特性才有效}
+
+				*v:this_session* *this_session-variable*
+v:this_session	最近載入或者保存的會話文件的文件名 |:mksession|。可以設置該變
+		量。如果沒有保存過會話文件，該變量為空。
+		為了後向兼容，這裡也可以用 "this_session"。
+
+					*v:throwpoint* *throwpoint-variable*
+v:throwpoint	最近捕獲且未完成的例外的拋出位置。輸入的命令不會設置此變量。另
+		見 |v:exception| 和 |throw-variables|。
+		例如: >
+	:try
+	:  throw "oops"
+	:catch /.*/
+	:  echo "Exception from" v:throwpoint
+	:endtry
+<		輸出: "Exception from test.vim, line 2"
+
+						*v:val* *val-variable*
+v:val		|List| 或 |Dictionary| 當前項目的值。只有在計算 |map()| 和
+		|filter()| 裡的表達式時才有效。只讀。
+
+					*v:version* *version-variable*
+v:version	Vim 的版本號: 主版本號乘以 100 加上副版本號。5.0 版本對應的是
+		500。5.1 版本 (5.01) 則是 501。只讀。為了後向兼容，這裡也可以
+		用 "version"。
+		用 |has()| 可以檢查是否包含某補丁，例如: >
+			if has("patch123")
+<		注意 補丁號和版本有關，5.0 和 5.1 版本都有補丁號 123，但完全不
+		同。
+
+					*v:warningmsg* *warningmsg-variable*
+v:warningmsg	最近給出的警告消息。該變量可以設置。
+
+==============================================================================
+4. 內建函數						*functions*
+
+|function-list| 提供了按功能分組的一個函數列表。
+
+(在函數名上使用 CTRL-] 跳轉到完整的功能說明。)
+
+用法				結果	描述	~
+
+abs( {expr})			浮點或數值  {expr} 的絕對值
+acos( {expr})			浮點	{expr} 的反餘弦值
+add( {list}, {item})		列表	在 |List| {list} 最後附加 {item}
+append( {lnum}, {string})	數值	在第 {lnum} 行下附加字符串 {string}
+append( {lnum}, {list})		數值	在第 {lnum} 行下附加行 {list}
+argc()				數值	參數列表的文件數目
+argidx()			數值	參數列表的當前索引
+argv( {nr})			字符串	參數列表第 {nr} 個參數
+argv( )				列表	參數列表
+asin( {expr})			浮點	{expr} 的反正弦值
+atan( {expr})			浮點	{expr} 的反正切值
+atan2( {expr}, {expr})		浮點	{expr1} / {expr2} 的反正切值
+browse( {save}, {title}, {initdir}, {default})
+				字符串	啟動文件請求窗口
+browsedir( {title}, {initdir})	字符串	啟動目錄請求窗口
+bufexists( {expr})		數值	如果緩衝區 {expr} 存在則為真
+buflisted( {expr})		數值	如果緩衝區 {expr} 在列表內則為真
+bufloaded( {expr})		數值	如果緩衝區 {expr} 被載入則為真
+bufname( {expr})		字符串	緩衝區 {expr} 的名字
+bufnr( {expr})			數值	緩衝區 {expr} 的數目
+bufwinnr( {expr})		數值	緩衝區 {expr} 的窗口號
+byte2line( {byte})		數值	第 {byte} 個字節所在的行號
+byteidx( {expr}, {nr})		數值	{expr} 裡第 {nr} 個字符的字節位置
+call( {func}, {arglist} [, {dict}])
+				可變	調用函數 {func}，使用參數 {arglist}
+ceil( {expr})			浮點	{expr} 向上取整
+changenr()			數值	當前改變號
+char2nr( {expr})		數值	{expr} 裡第一個字符串的 ASCII 值
+cindent( {lnum})		數值	第 {lnum} 行的 C 縮進
+clearmatches()			無	清除所有的匹配
+col( {expr})			數值	光標或位置標記的列號
+complete( {startcol}, {matches}) 無	設置插入模式補全
+complete_add( {expr})		數值	增加補全匹配
+complete_check()		數值	補全時檢查輸入的鍵
+confirm( {msg} [, {choices} [, {default} [, {type}]]])
+				數值	用戶選擇的序號
+copy( {expr})			可變	提供 {expr} 的淺備份
+cos( {expr})			浮點	{expr} 的餘弦值
+cosh( {expr})			浮點	{expr} 的雙曲餘弦值
+count( {list}, {expr} [, {start} [, {ic}]])
+				數值	計算 {list} 裡有多少個 {expr}
+cscope_connection( [{num} , {dbpath} [, {prepend}]])
+				數值	檢查 cscope 連接是否存在
+cursor( {lnum}, {col} [, {coladd}])
+				數值	移動光標到 {lnum}，{col}，{coladd}
+cursor( {list})			數值	移動光標到 {list} 裡的位置
+deepcopy( {expr})		可變	提供 {expr} 的完整備份
+delete( {fname})		數值	刪除文件 {fname}
+did_filetype()			數值	如果使用過 FileType 自動命令事件則為真
+diff_filler( {lnum})		數值	{lnum} 行之上的 diff 填充行數
+diff_hlID( {lnum}, {col})	數值	{lnum}/{col} 位置的 diff 高亮
+empty( {expr})			數值	如果 {expr} 為空則為真
+escape( {string}, {chars})	字符串	在 {string} 裡用 '\' 轉義 {chars}
+eval( {string})			可變	計算 {string}，返回結果
+eventhandler( )			數值	如果在事件處理中則為真
+executable( {expr})		數值	如果可執行文件 {expr} 存在則為 1
+exists( {expr})			數值	如果 {expr} 存在則為真
+extend( {expr1}, {expr2} [, {expr3}])
+				列表/字典 把 {expr2} 裡的項目插入 {expr1}
+exp( {expr})			浮點	{expr} 的指數函數值 
+                                        (譯者注: 以 e 為底)
+expand( {expr} [, {flag}])	字符串	擴展 {expr} 裡的特殊關鍵字
+feedkeys( {string} [, {mode}])	數值	給預輸入緩衝區加入鍵序列
+filereadable( {file})		數值	如果 {file} 是個可讀文件則為真
+filewritable( {file})		數值	如果 {file} 是個可寫文件則為真
+filter( {expr}, {string})	列表/字典 刪除 {expr} 裡 {string} 為 0 的項目
+finddir( {name}[, {path}[, {count}]])
+				字符串	在 {path} 裡尋找目錄 {name}
+findfile( {name}[, {path}[, {count}]])
+				字符串	在 {path} 裡尋找文件 {name}
+float2nr( {expr})		數值	轉換浮點數 {expr} 為數值
+floor( {expr})			浮點	{expr} 向下取整
+fmod( {expr1}, {expr2})		浮點	{expr1} / {expr2} 的浮點餘數
+fnameescape( {fname})		字符串  轉義 {fname} 中的特殊字符
+fnamemodify( {fname}, {mods})	字符串	修改文件名
+foldclosed( {lnum})		數值	{lnum} 所在折疊的首行，如果是關閉的話
+foldclosedend( {lnum})		數值	{lnum} 所在折疊的末行，如果是關閉的話
+foldlevel( {lnum})		數值	{lnum} 的折疊級別
+foldtext( )			字符串	關閉的折疊顯示的行
+foldtextresult( {lnum})		字符串	{lnum} 所在的關閉的折疊的文本
+foreground( )			數值	把 Vim 窗口帶到前台
+function( {name})		函數引用  函數 {name} 的引用
+garbagecollect( [at_exit])	無	釋放內存，打破循環引用
+get( {list}, {idx} [, {def}])	可變	得到 {list} 或 {def} 的項目 {idx}
+get( {dict}, {key} [, {def}])	可變	得到 {dict} 或 {def} 的項目 {idx}
+getbufline( {expr}, {lnum} [, {end}])
+				列表	緩衝區 {expr} 第 {lnum} 到 {end} 行
+getbufvar( {expr}, {varname})	可變	緩衝區 {expr} 的變量 {varname}
+getchar( [expr])		數值	讓用戶輸入一個字符
+getcharmod( )			數值	最近輸入字符的修飾符
+getcmdline()			字符串	返回當前命令行
+getcmdpos()			數值	返回命令行的光標位置
+getcmdtype()			字符串	返回當前命令行類型
+getcwd()			字符串	當前工作目錄
+getfperm( {fname})		字符串	文件 {fname} 的文件權限
+getfsize( {fname})		數值	字節計算的文件 {fname} 大小
+getfontname( [{name}])		字符串	使用的字體名
+getftime( {fname})		數值	文件的最新修改時間
+getftype( {fname})		字符串	文件 {fname} 類型的描述
+getline( {lnum})		字符串	當前緩衝區的第 {lnum} 行
+getline( {lnum}, {end})		列表	當前緩衝區第 {lnum} 到 {end} 行
+getloclist( {nr})		列表	位置列表項目的列表
+getmatches()			列表	當前匹配的列表
+getpid()			數值	Vim 的進程號
+getpos( {expr})			列表	光標、位置標記等的位置
+getqflist()			列表	quickfix 項目的列表
+getreg( [{regname} [, 1]])	字符串	寄存器內容
+getregtype( [{regname}])	字符串	寄存器類型
+gettabvar( {nr}, {varname})	可變	{tabnr} 標籤頁的 {varname} 變量
+gettabwinvar( {tabnr}, {winnr}, {name})
+				可變	{tabnr} 標籤頁 {winnr} 窗口的 {name}
+getwinposx()			數值	GUI Vim 窗口以像素計的 X 坐標
+getwinposy()			數值	GUI Vim 窗口以像素計的 Y 坐標
+getwinvar( {nr}, {varname})	可變	窗口 {expr} 的變量 {varname}
+glob( {expr} [, {flag}])	字符串	擴展 {expr} 裡的文件通配符
+globpath( {path}, {expr} [, {flag}])
+				字符串	在 {path} 所有目錄下執行 glob({expr})
+has( {feature})			數值	如果支持特性 {feature} 則為真
+has_key( {dict}, {key})		數值	如果 {dict} 有項目 {key} 則為真
+haslocaldir()			數值	如果當前窗口執行過 |:lcd|
+hasmapto( {what} [, {mode} [, {abbr}]])
+				數值	如果 {what} 的映射存在則為真
+histadd( {history},{item})	字符串	在歷史裡增加項目
+histdel( {history} [, {item}])	字符串	從歷史裡刪除項目
+histget( {history} [, {index}])	字符串	得到歷史的第 {index} 項
+histnr( {history})		數值	歷史裡最高的項目號
+hlexists( {name})		數值	如果高亮組 {name} 存在則為真
+hlID( {name})			數值	高亮組 {name} 的語法 ID
+hostname()			字符串	Vim 運行的機器名字
+iconv( {expr}, {from}, {to})	字符串	轉換 {expr} 的編碼
+indent( {lnum})			數值	第 {lnum} 行的縮進
+index( {list}, {expr} [, {start} [, {ic}]])
+				數值	{list} 列表裡出現 {expr} 的項目的索引
+input( {prompt} [, {text} [, {completion}]])
+				字符串	從用戶得到輸入
+inputdialog( {p} [, {t} [, {c}]]) 字符串  類似於 input()，但使用 GUI 對話框
+inputlist( {textlist})		數值	讓用戶從選擇列表裡挑選
+inputrestore()			數值	恢復預輸入
+inputsave()			數值	保存和清除預輸入
+inputsecret( {prompt} [, {text}]) 字符串  類似於 input()，但隱藏文本
+insert( {list}, {item} [, {idx}]) 列表	在 {list} 裡插入 {item} [{idx} 之前]
+isdirectory( {directory})	數值	如果 {directory} 是目錄則為真
+islocked( {expr})		數值	如果 {expr} 被鎖住則為真
+items( {dict})			列表	{dict} 裡的鍵-值組對
+join( {list} [, {sep}])		字符串	連接 {list} 的項目成為一個字符串
+keys( {dict})			列表	{dict} 的所有鍵
+len( {expr})			數值	{expr} 的長度
+libcall( {lib}, {func}, {arg})	字符串	調用庫 {lib} 的函數 {func}，使用參數
+					{arg}
+libcallnr( {lib}, {func}, {arg})  數值	同上，但返回數值
+line( {expr})			數值	光標所在、末行或者位置標記所在的行號
+line2byte( {lnum})		數值	行 {lnum} 的字節位置
+lispindent( {lnum})		數值	行 {lnum} 的 Lisp 縮進
+localtime()			數值	當前時間
+log( {expr})			浮點	{expr} 的自然對數 (以 e 為底) 
+log10( {expr})			浮點	{expr} 以 10 為底的對數
+map( {expr}, {string})		列表/字典  {expr} 的每個項目改變為 {string}
+maparg( {name}[, {mode} [, {abbr}]])
+				字符串	模式 {mode} 的映射 {name} 的右邊
+mapcheck( {name}[, {mode} [, {abbr}]])
+				字符串	檢查匹配 {name} 的映射
+match( {expr}, {pat}[, {start}[, {count}]])
+				數值	{expr} 裡 {pat} 的匹配位置
+matchadd( {group}, {pattern}[, {priority}[, {id}]])
+				數值	用 {group} 高亮 {pattern}
+matcharg( {nr})			列表	|:match| 的參數
+matchdelete( {id})		數值	刪除 {id} 指定的匹配
+matchend( {expr}, {pat}[, {start}])
+				數值	{expr} 裡 {pat} 的結束位置
+matchlist( {expr}, {pat}[, {start}[, {count}]])
+				列表	{expr} 裡 {pat} 的匹配和子匹配
+matchstr( {expr}, {pat}[, {start}[, {count}]])
+				字符串	第 {count} 個 {expr} 裡 {pat} 的匹配文
+					本
+max( {list})			數值	{list} 的項目的最大值
+min( {list})			數值	{list} 的項目的最小值
+mkdir( {name} [, {path} [, {prot}]])
+				數值	建立目錄 {name}
+mode( [expr])			字符串	當前編輯模式
+mzeval( {expr})			可變	計算 |MzScheme| 表達式
+nextnonblank( {lnum})		數值	第一個 >= {lnum} 的非空白行的行號
+nr2char( {expr})		字符串	ASCII 值為 {expr} 的單個字符
+pathshorten( {expr})		字符串	縮短路徑裡的目錄名
+pow( {x}, {y})			浮點	{x} 的 {y} 次方
+prevnonblank( {lnum})		數值	最後一個 <= {lnum} 的非空白行的行號
+printf( {fmt}, {expr1}...)	字符串	排版文本
+pumvisible()			數值	彈出窗口是否可見
+range( {expr} [, {max} [, {stride}]])
+				列表	從 {expr} 到 {max} 的序列
+readfile( {fname} [, {binary} [, {max}]])
+				列表	得到文件 {fname} 的行列表
+reltime( [{start} [, {end}]])	列表	得到時間值
+reltimestr( {time})		字符串	把時間值轉化為字符串
+remote_expr( {server}, {string} [, {idvar}])
+				字符串	發送表達式
+remote_foreground( {server})	數值	把 Vim 服務器帶到前台
+remote_peek( {serverid} [, {retvar}])
+				數值	檢查應答字符串
+remote_read( {serverid})	字符串	讀入應答字符串
+remote_send( {server}, {string} [, {idvar}])
+				字符串	發送鍵序列
+remove( {list}, {idx} [, {end}])  可變	從 {list} 裡刪除項目 {idx}-{end}
+remove( {dict}, {key})		可變	從 {dict} 裡刪除項目 {key}
+rename( {from}, {to})		數值	換名 (移動) 文件，從 {from} 到 {to}
+repeat( {expr}, {count})	字符串	重複 {expr} {count} 次
+resolve( {filename})		字符串	解析快捷方式對應的文件名
+reverse( {list})		列表	反轉 {list}，直接修改 {list}
+round( {expr})			浮點	{expr} 四捨五入
+search( {pattern} [, {flags} [, {stopline} [, {timeout}]]])
+				數值	搜索 {pattern}
+searchdecl( {name} [, {global} [, {thisblock}]])
+				數值	搜索變量聲明
+searchpair( {start}, {middle}, {end} [, {flags} [, {skip} [...]]])
+				數值	搜索 start/end 對的另一側
+searchpairpos( {start}, {middle}, {end} [, {flags} [, {skip} [...]]])
+				列表	搜索 start/end 隊的另一側
+searchpos( {pattern} [, {flags} [, {stopline} [, {timeout}]]])
+				列表	搜索 {pattern}
+server2client( {clientid}, {string})
+				數值	發送應答字符串
+serverlist()			字符串	得到可用的服務器列表
+setbufvar( {expr}, {varname}, {val})	設置緩衝區 {expr} 的 {varname} 為
+					{val}
+setcmdpos( {pos})		數值	設置命令行的光標位置
+setline( {lnum}, {line})	數值	設置第 {lnum} 行的內容為 {line}
+setloclist( {nr}, {list}[, {action}])
+				數值	用 {list} 修改位置列表
+setmatches( {list})		數值	還原匹配列表
+setpos( {expr}, {list})		數值	設置 {expr} 的位置為 {list}
+setqflist( {list}[, {action}])	數值	用 {list} 修改 quickfix 列表
+setreg( {n}, {v}[, {opt}])	數值	設置寄存器的值和類型
+settabvar( {nr}, {varname}, {val})
+				無	設置標籤頁 {nr} 的 {varname} 變量為
+					{val}
+settabwinvar( {tabnr}, {winnr}, {varname}, {val})
+				無	設置標籤頁 {tabnr} 窗口 {winnr} 的
+					{varname} 變量為 {val}
+setwinvar( {nr}, {varname}, {val})	設置窗口 {expr} 的 {varname} 為 {val}
+shellescape( {string} [, {special}])
+				字符串	轉義 {string} 以便用作外殼命令的參數
+simplify( {filename})		字符串	盡可能簡化文件名
+sin( {expr})			浮點	{expr} 的正弦值
+sinh( {expr})			浮點	{expr} 的雙曲正弦值
+sort( {list} [, {func}])	列表	排序 {list}，用比較函數 {func}
+soundfold( {word})		字符串	按發音折疊 {word}
+spellbadword()			字符串	光標所在的拼寫錯誤的單詞
+spellsuggest( {word} [, {max} [, {capital}]])
+				列表	拼寫建議
+split( {expr} [, {pat} [, {keepempty}]])
+				列表	從 {pat} 分割的 {expr} 裡構造 |List|
+sqrt( {expr}			浮點	{expr} 的平方根
+str2float( {expr})		浮點	轉換字符串為浮點數
+str2nr( {expr} [, {base}])	數值	把字符串轉換為數值
+strchars( {expr})		數值	{expr} 字符串的字符長度
+strdisplaywidth( {expr} [, {col}]) 數值	{expr} 字符串的顯示長度
+strftime( {format}[, {time}])	字符串	指定格式的時間
+stridx( {haystack}, {needle}[, {start}])
+				數值	{haystack} 裡 {needle} 的位置
+string( {expr})			字符串	{expr} 值得字符串表示
+strlen( {expr})			數值	字符串 {expr} 的長度
+strpart( {src}, {start}[, {len}])
+				字符串	{src} 從 {start} 開始的 {len} 個字節
+strridx( {haystack}, {needle} [, {start}])
+				數值	{haystack} 裡最後一個 {needle} 的位置
+strtrans( {expr})		字符串	翻譯字符串，使之可以顯示
+strwidth( {expr})		數值	{expr} 字符串的顯示單元長度
+submatch( {nr})			字符串	":substitute" 的特定匹配
+substitute( {expr}, {pat}, {sub}, {flags})
+				字符串	{expr} 裡的所有 {pat} 被 {sub} 替代
+synID( {lnum}, {col}, {trans})	數值	{lnum} 行 {col} 列所在的語法 ID
+synIDattr( {synID}, {what} [, {mode}])
+				字符串	syntax ID {synID} 的 {what} 屬性
+synIDtrans( {synID})		數值	{synID} 經過翻譯的語法 ID
+synstack( {lnum}, {col})	列表	{lnum} 行 {col} 列所在的語法 ID 堆棧
+system( {expr} [, {input}])	字符串	外殼命令/過濾 {expr} 的輸出
+tabpagebuflist( [{arg}])	列表	標籤頁裡的緩衝區號列表
+tabpagenr( [{arg}])		數值	當前或最後標籤頁的編號
+tabpagewinnr( {tabarg}[, {arg}])
+				數值	標籤頁裡當前窗口的編號
+taglist( {expr})		列表	匹配 {expr} 的標籤列表
+tagfiles()			列表	使用的標籤文件
+tan( {expr})			浮點	{expr} 的正切值
+tanh( {expr})			浮點	{expr} 的雙曲正切值
+tempname()			字符串	臨時文件的文件名
+tolower( {expr})		字符串	字符串 {expr} 變為小寫
+toupper( {expr})		字符串	字符串 {expr} 變為大寫
+tr( {src}, {fromstr}, {tostr})	字符串	把 {src} 裡的 {fromstr} 字符翻譯為
+					{tostr} 字符
+trunc( {expr}			浮點	浮點數 {expr} 截斷小數點
+type( {name})			數值	變量 {name} 的類型
+undofile( {name})		字符串	對應 {name} 的撤銷文件名
+undotree()			列表	撤銷文件樹
+values( {dict})			列表	{dict} 的所有值
+virtcol( {expr})		數值	光標或位置標記的屏幕列
+visualmode( [expr])		字符串	最近使用的可視模式
+winbufnr( {nr})			數值	窗口 {nr} 的緩衝區號
+wincol()			數值	光標所在的窗口列
+winheight( {nr})		數值	窗口 {nr} 的高度
+winline()			數值	光標所在的窗口行
+winnr( [{expr}])		數值	當前窗口的編號
+winrestcmd()			字符串	返回恢復窗口大小的命令
+winrestview( {dict})		無	恢復當前窗口的視圖
+winsaveview()			字典	保存當前窗口的視圖
+winwidth( {nr})			數值	窗口 {nr} 的寬度
+writefile( {list}, {fname} [, {binary}])
+				數值	把行列表寫到文件 {fname}
+
+abs({expr})							*abs()*
+		返回 {expr} 的絕對值。如果 {expr} 計算結果為浮點數，abs() 返回
+		浮點數。如果 {expr} 可以轉換為數值，abs() 返回數值。否則報錯並
+		返回 -1。
+		示例: >
+			echo abs(1.456)
+<			1.456  >
+			echo abs(-5.456)
+<			5.456  >
+			echo abs(-4)
+<			4
+		{僅當編譯時加入 |+float| 特性才有效}
+
+acos({expr})							*acos()*
+		返回以弧度表示的 {expr} 的反餘弦值，返回值為 [0, pi] 區間內的
+		浮點數。
+		{expr} 的計算結果必須是 [-1, 1] 區間內的浮點數或數值。
+		示例: >
+			:echo acos(0)
+<			1.570796 >
+			:echo acos(-0.5)
+<			2.094395
+		{僅當編譯時加入 |+float| 特性才有效}
+
+add({list}, {expr})					*add()*
+		在 |List| {list} 最後附加項目 {expr}。返回新產生的 |List|。例
+		如: >
+			:let alist = add([1, 2, 3], item)
+			:call add(mylist, "woodstock")
+<		注意 如果 {expr} 是 |List|，它被作為單個項目附加進去。
+		|extend()| 可以用來連接 |List|。
+		|insert()| 可以用來把一個項目加到其它的位置上。
+
+append({lnum}, {expr})					*append()*
+		當 {expr} 為 |List|: 把每個 |List| 項目作為文本行，附加到當前
+		緩衝區第 {lnum} 行之下。
+		否則，把 {expr} 作為單個文本行，附加於當前緩衝區第 {lnum} 行之
+		下。
+		{lnum} 可以為零，用於在第一行前插入一行。如果失敗 ({lnum} 越
+		界)，返回 1，成功則返回 0。例如: >
+			:let failed = append(line('$'), "# THE END")
+			:let failed = append(0, ["Chapter 1", "the beginning"])
+<
+							*argc()*
+argc()		返回當前窗口參數列表的文件數目。見 |arglist|。
+
+							*argidx()*
+argidx()	返回參數列表的當前索引。0 是第一個文件。argc() - 1 是最後一
+		個。見 |arglist|。
+
+							*argv()*
+argv([{nr}])	返回當前窗口參數列表第 {nr} 個參數。見 |arglist|。"argv(0)" 是
+		第一個參數。
+		例如: >
+	:let i = 0
+	:while i < argc()
+	:  let f = escape(fnameescape(argv(i)), '. ')
+	:  exe 'amenu Arg.' . f . ' :e ' . f . '<CR>'
+	:  let i = i + 1
+	:endwhile
+<		如果沒有 {nr} 參數，返回完整的 {arglist} 的 |List|。
+
+asin({expr})						*asin()*
+		返回以弧度表示的 {expr} 的反正弦值，返回值為 [-pi/2, pi/2] 區
+		間內的浮點數。
+		{expr} 的計算結果必須是 [-1, 1] 區間內的浮點數或數值。
+		示例: >
+			:echo asin(0.8)
+<			0.927295 >
+			:echo asin(-0.5)
+<			-0.523599
+		{僅當編譯時加入 |+float| 特性才有效}
+
+
+atan({expr})						*atan()*
+		返回 {expr} 反正切的主值，返回值為 [-pi/2, +pi/2] 區間內的弧度
+		值浮點數。
+		{expr} 計算結果必須為浮點數或數值。
+		示例: >
+			:echo atan(100)
+<			1.560797 >
+			:echo atan(-4.01)
+<			-1.326405
+		{僅當編譯時加入 |+float| 特性才有效}
+
+atan2({expr1}, {expr2})					*atan2()*
+		返回 {expr1} / {expr2} 的反正切值，以弧度計算，返回值為 [-pi,
+		+pi] 區間內的浮點數。
+		{expr1} 和 {expr2} 計算結果必須為浮點數或數值。
+		示例: >
+			:echo atan2(-1, 1)
+<			-0.785398 >
+			:echo atan2(1, -1)
+<			2.356194
+		{僅當編譯時加入 |+float| 特性才有效}
+
+
+							*browse()*
+browse({save}, {title}, {initdir}, {default})
+		啟動文件請求窗口。只有在 "has("browse")" 返回非零時 (只有在一
+		些 GUI 版本裡) 才可以。
+		輸入的字段包括:
+		    {save}	非零時，選擇要寫入的文件
+		    {title}	請求窗口的標題
+		    {initdir}	開始瀏覽的目錄
+		    {default}	缺省文件名
+		如果按了 "Cancel" 按鈕、出錯、或者無法瀏覽，返回空字符串。
+
+							*browsedir()*
+browsedir({title}, {initdir})
+		啟動目錄請求窗口。只有在 "has("browse")" 返回非零時 (只有在一
+		些 GUI 版本裡) 才能工作。
+		有的系統上不支持目錄瀏覽器，這時使用文件瀏覽器。此時: 選擇要用
+		的目錄裡的文件。
+		輸入的字段包括:
+		    {title}	請求窗口的標題
+		    {initdir}	開始瀏覽的目錄
+		如果按了 "Cancel" 按鈕、出錯、或者無法瀏覽，返回空字符串。
+
+bufexists({expr})					*bufexists()*
+		返回數值，如果名為 {expr} 的緩衝區存在的話，返回非零。
+		如果 {expr} 參數是數值，指定緩衝區號。
+		如果 {expr} 參數是字符串，緩衝區的名字必須與其完全匹配。該名字
+		可以是:
+		- 相對於當前目錄。
+		- 完整路徑。
+		- 'buftype' 設為 "nofile" 的緩衝區名。
+		- URL 名。
+		列表外緩衝區也會被找到。
+		注意 幫助文件在 |:buffers| 裡列出的是它們的短名字。但
+		bufexists() 需要它們的長名字才能找到它們。
+		bufexists() 可能報告緩衝區存在，但要使其名字可用於 |:buffer|
+		命令，可能需用到 |expand()|。尤其 MS-Windows 8.3 名字可能形
+		如 "c:\DOCUME~1"。
+		使用 "bufexists(0)" 可以測試是否存在輪換文件名。
+
+							*buffer_exists()*
+		已廢棄的名字: buffer_exists()。
+
+buflisted({expr})					*buflisted()*
+		返回數值，如果名為 {expr} 的緩衝區在列表內的話 (置位了
+		'buflisted' 選項)，返回非零。
+		{expr} 參數用法同 |bufexists()|。
+
+bufloaded({expr})					*bufloaded()*
+		返回數值，如果名為 {expr} 的緩衝區存在且已載入的話 (在窗口顯
+		示，或者至少被隱藏)，返回非零。
+		{expr} 參數用法同 |bufexists()|。
+
+bufname({expr})						*bufname()*
+		返回緩衝區的名字，如同 ":ls" 命令顯示的那樣。	
+		如果 {expr} 參數是數值，指定緩衝區號。數值零代表當前窗口的輪換
+		緩衝區。
+		如果 {expr} 參數是字符串，它用作 |file-pattern| 來匹配緩衝區名
+		字。這裡總假設置位 'magic' 而 'cpoptions' 為空。如果有超過一個
+		匹配，返回空字符串。
+		"" 或 "%" 可用來指定當前緩衝區，"#" 指定輪換緩衝區。
+		完整的匹配優先，如果沒有，也接受在緩衝區名的開始，結束和中間的
+		匹配。如果你只願意接受完整的匹配，在模式的開始放上 "^"，在結尾
+		放上 "$"。
+		先查找列表內緩衝區。如果列出緩衝區有唯一的匹配，返回之。不然，
+		再查找列表外的緩衝區。
+		如果 {expr} 是字符串，但你想用作緩衝區號，給它加零可以強制轉化
+		為數值型: >
+			:echo bufname("3" + 0)
+<		如果緩衝區不存在，或者沒有名字，返回空字符串。 >
+	bufname("#")		輪換緩衝區名
+	bufname(3)		緩衝區 3 的名字
+	bufname("%")		當前緩衝區名
+	bufname("file2")	匹配 "file2" 的緩衝區名。
+<							*buffer_name()*
+		已廢棄的名字: buffer_name()。
+
+							*bufnr()*
+bufnr({expr} [, {create}])
+		返回緩衝區的編號，如同 ":ls" 命令顯示的那樣。關於 {expr} 的使
+		用，見上 |bufname()|。
+		如果不存在符合的緩衝區，返回 -1。或者，如果提供了 {create} 參
+		數而且非零，建立一個新的列表外緩衝區，並返回其編號。
+		bufnr("$") 是最後一個緩衝區: >
+	:let last_buffer = bufnr("$")
+<		返回數值，即最大的已有的緩衝區的編號。注意 較小的編號不一定都
+		對應存在的緩衝區，因為 ":bwipeout" 可能永久地刪除了部分的緩衝
+		區。用 bufexists() 可以測試緩衝區是否存在。
+							*buffer_number()*
+		已廢棄的名字: buffer_number()。
+							*last_buffer_nr()*
+		bufnr("$") 已廢棄的名字: last_buffer_nr()。
+
+bufwinnr({expr})					*bufwinnr()*
+		返回數值，即緩衝區 {expr} 對應的第一個窗口的編號。{expr} 的使
+		用方式見上 |bufname()|。如果緩衝區 {expr} 不存在或者沒有對應的
+		窗口，返回 -1。例如: >
+
+	echo "包含緩衝區 1 的窗口是 " . (bufwinnr(1))
+
+<		該編號可用於 |CTRL-W_w| 和 ":wincmd w" |:wincmd|。
+		只處理當前標籤頁。
+
+
+byte2line({byte})					*byte2line()*
+		返回當前緩衝區第 {byte} 個字節所在的行號。取決於當前緩衝區的
+		'fileformat' 選項，這可以包括不同的換行符。第一個字符的字節編
+		號為 1。
+		另見 |line2byte()|、|go| 和 |:goto|。
+		{僅當編譯時加入 |+byte_offset| 特性才有效}
+
+byteidx({expr}, {nr})					*byteidx()*
+		返回字符串 {expr} 裡第 {nr} 個字符的字節位置。零代表第一個字
+		符，此時返回零。
+		該函數只對多字節字符有用，不然返回值總是等於 {nr}。
+		合成用字符作為單個字符計算。
+		例如: >
+			echo matchstr(str, ".", byteidx(str, 3))
+<		顯示第四個字符。另一個方法也能達到相同的效果: >
+			let s = strpart(str, byteidx(str, 3))
+			echo strpart(s, 0, byteidx(s, 1))
+<		如果字符數不足 {nr}，返回 -1。
+		如果剛好 {nr} 個字符，返回字符串的長度。
+
+call({func}, {arglist} [, {dict}])			*call()* *E699*
+		調用函數 {func}，使用 |List| {arglist} 項目作為參數。
+		{func} 可以是 |Funcref| 或函數名。
+		a:firstline 和 a:lastline 設為當前行。
+		返回調用的函數的結果。
+		{dict} 用於為函數指定 "dict" 屬性。其目的是設置局部變量
+		"self"。|Dictionary-function|
+
+ceil({expr})							*ceil()*
+		返回浮點數，即大於等於 {expr} 的最小整數 (向上取整)。
+		{expr} 的計算結果必須是浮點數或數值。
+		示例: >
+			echo ceil(1.456)
+<			2.0  >
+			echo ceil(-5.456)
+<			-5.0  >
+			echo ceil(4.0)
+<			4.0
+		{僅當編譯時加入 |+float| 特性才有效}
+
+changenr()						*changenr()*
+		返回最近改變的編號。這和 |:undolist| 顯示的編號相同，可用於
+		|:undo| 命令。
+		如果發生了改變，返回的是此改變的編號。在重做以後，返回的是重做
+		的改變的編號。在撤銷以後，返回撤銷的改變的編號減一。
+
+char2nr({expr})						*char2nr()*
+		返回 {expr} 第一個字符的數值結果。例如: >
+			char2nr(" ")		返回 32
+			char2nr("ABC")		返回 65
+<		使用當前的 'encoding'。比如對 "utf-8" 來說: >
+			char2nr("á")		返回 225
+			char2nr("á"[0])		返回 195
+<		|nr2char()| 是它的逆操作。
+
+cindent({lnum})						*cindent()*
+		得到第 {lnum} 行根據 C 縮進規則應有的縮進距離，見 'cindent'。
+		縮進的計算以空格計，因而和 'tabstop' 的值是有關係的。{lnum} 的
+		使用方式和 |getline()| 相同。
+		如果 {lnum} 非法或者 Vim 編譯時不帶 |+cindent| 特性，返回 -1。
+		見 |C-indenting|。
+
+clearmatches()						*clearmatches()*
+		清除之前 |matchadd()| 和 |:match| 命令定義的匹配。
+
+							*col()*
+col({expr})	返回數值，即 {expr} 給定的列位置的字節索引。可接受的位置是:
+		    .	    光標位置
+		    $	    光標行的行尾 (返回光標行的字符數加 1)
+		    'x	    位置標記 x 的位置 (如果該位置標記沒有設置，返回 0)
+		另外，{expr} 可以是 [lnum, col]: 包含行號和列號的 |List|。常用
+		於指定列號為 "$" 以得到特定行的末列列號。如果 "lnum" 或 "col"
+		超出範圍，col() 返回零。
+		要得到行號用 |line()|。兩者都要用 |getpos()|。
+		要得到屏幕列的位置，用 |virtcol()|。
+		注意 只能使用當前文件的位置標記。
+		例如: >
+			col(".")		光標所在列
+			col("$")		光標行的長度加 1
+			col("'t")		位置標記 t 的列號
+			col("'" . markname)	等於 markname 的位置標記的列號
+<		第一列為 1。0 用來返回錯誤。
+		大寫位置標記的對應列可能在另一個緩衝區中。
+		如果激活了 'virtualedit' 並且如果光標在行尾之後的話，計算光標
+		位置得到的列號比實際的多 1。可用來在插入模式得到列數: >
+			:imap <F2> <C-O>:let save_ve = &ve<CR>
+				\<C-O>:set ve=all<CR>
+				\<C-O>:echo col(".") . "\n" <Bar>
+				\let &ve = save_ve<CR>
+<
+
+complete({startcol}, {matches})			*complete()* *E785*
+		設置插入模式補全的匹配。
+		只能用於插入模式。需要使用 CTRL-R = 的映射 |i_CTRL-R|。不能在
+		CTRL-O 之後或者在表達式映射裡使用。
+		{startcol} 是行內待補全文本開始的字節偏移。直到光標為止的文本
+		就是原始的文本，它將要被匹配所替代。用 col('.') 會得到空串。而
+		"col('.') - 1" 將用匹配替換單個字符。
+		{matches} 必須是 |List|。每個 |List| 項目是一個匹配。
+		|complete-items| 說明可能的項目類型。
+		注意 調用此函數後，你不應插入任何使補全停止的內容。
+		用 CTRL-N 和 CTRL-P 選擇匹配，就像普通的插入模式補全那樣。如果
+		指定，會出現彈出菜單，見 |ins-completion-menu|。
+		示例: >
+	inoremap <F5> <C-R>=ListMonths()<CR>
+
+	func! ListMonths()
+	  call complete(col('.'), ['January', 'February', 'March',
+		\ 'April', 'May', 'June', 'July', 'August', 'September',
+		\ 'October', 'November', 'December'])
+	  return ''
+	endfunc
+<		此例並不很有用，但可以說明功能。注意這裡返回空串，以免插入零。
+
+complete_add({expr})				*complete_add()*
+		把 {expr} 加到匹配的列表裡。只能用於 'completefunc' 選項指定的
+		函數里。
+		返回 0 代表失敗 (空字符串或者內存不足)，1 代表加入了匹配，2 代
+		表匹配已經在列表裡。
+		|complete-functions| 解釋 {expr}。它和 'omnifunc' 應該返回的列
+		表中單個項目相同。
+
+complete_check()				*complete_check()*
+		尋找補全匹配時，檢查輸入的鍵。如果尋找匹配需要一定時間時有用。
+		如果匹配的搜索被中止，返回非零。否則返回零。
+		只能用於 'completefunc' 選項指定的函數里。
+
+						*confirm()*
+confirm({msg} [, {choices} [, {default} [, {type}]]])
+		confirm() 提供用戶一個對話框，從中可以作出選擇。返回選擇的序
+		號。第一個選擇為 1。
+		注意: confirm() 只有在編譯時加入對話框支持才存在，見
+		|+dialog_con| 和 |+dialog_gui|。
+		在 |dialog| 裡顯示 {msg} 消息，並提供可能的選擇 {choices}。如
+		果 {choices} 不存在或者為空，使用 "&OK" (經過翻譯)。
+		{msg} 是字符串，'\n' 用來包含換行符。在有些系統上該字符串在放
+		不下時被迴繞，但並非所有系統都如此。
+		{choices} 是一個字符串，用 '\n' 分隔各個選擇，例如 >
+			confirm("Save changes?", "&Yes\n&No\n&Cancel")
+<		'&' 之後的字符提供該選擇的快捷鍵。這樣，你可以輸入 'c' 來選擇
+		"Cancel"。快捷鍵不一定是第一個字符: >
+			confirm("file has been modified", "&Save\nSave &All")
+<		控制台裡，每個選擇的第一個字符用作缺省的快捷鍵。
+		可選的 {default} 參數是用戶按 <CR> 使用的選擇號。設定 1 使得第
+		一個選項成為缺省，如果是 0，則不設定任何缺省。如果不提供
+		{default}，假設為 1。
+
+		可選的 {type} 參數指定對話框的類型。只有在 GTK、Mac、Motif 和
+		Win32 GUI 上才用得上，它用以指定圖標。可以取的值是: "Error"、
+		"Question"、 "Info"、 "Warning" 或 "Generic"。只有第一個字符是
+		重要的。如果忽略 {type}，使用 "Generic"。
+
+		如果用戶用 <Esc>、CTRL-C 或者別的合法的中斷鍵中止對話框，
+		confirm() 返回 0。
+
+		一個例子: >
+   :let choice = confirm("你要吃什麼？", "&蘋果\n&桔子\n&香蕉", 2)
+   :if choice == 0
+   :	echo "快下定決心！"
+   :elseif choice == 3
+   :	echo "好吃"
+   :else
+   :	echo "我本人喜歡香蕉。"
+   :endif
+<		GUI 的對話框使用按鈕。按鈕的排放方式取決於 'guioptions' 裡的
+		'v' 標誌位。如果包含該標誌位，按鈕總是豎排的。不然，confirm()
+		試圖把按鈕放在一行裡。如果放不下，那麼還是使用豎排的方式。在有
+		的系統上，無論如何總是使用橫排。
+
+							*copy()*
+copy({expr})	構造 {expr} 的備份。對數值和字符串而言，這和直接使用 {expr}
+		並無不同。
+		如果 {expr} 是 |List|，建立一個淺備份。這意味著，原來的 |List|
+		可以被改變，而不會影響新建的備份。反之亦然。不過，其中的項目只
+		有一份，所以修改項目同時修改兩個 |List| 的內容。另見
+		|deepcopy()|。
+
+cos({expr})						*cos()*
+		返回浮點數，即以弧度測量的 {expr} 的餘弦值。
+		{expr} 的計算結果必須是浮點數或數值。
+		示例: >
+			:echo cos(100)
+<			0.862319 >
+			:echo cos(-4.01)
+<			-0.646043
+		{僅當編譯時加入 |+float| 特性才有效}
+
+
+cosh({expr})						*cosh()*
+		返回 {expr} 的雙曲餘弦值，返回值為 [1, inf] 區間內的浮點數。
+		{expr} 的計算結果必須是浮點數或數值。
+		示例: >
+			:echo cosh(0.5)
+<			1.127626 >
+			:echo cosh(-0.5)
+<			-1.127626
+		{僅當編譯時加入 |+float| 特性才有效}
+
+
+count({comp}, {expr} [, {ic} [, {start}]])			*count()*
+		返回 |List| 或 |Dictionary| {comp} 裡值為 {expr} 的項目出現的
+		次數。
+		如果給出 {start}，從該索引指定的項目開始。{start} 只能用於
+		|List|。
+		如果給出 {ic} 並且非零，忽略大小寫。
+
+
+							*cscope_connection()*
+cscope_connection([{num} , {dbpath} [, {prepend}]])
+		檢查 |cscope| 連接是否存在。如果沒有參數，則函數返回:
+			0，如果 cscope 不存在 (編譯沒有帶該特性)，或者不存在
+			   cscope 連接；
+			1，如果至少有一個 cscope 連接。
+
+		如果指定了參數，那麼 {num} 的值指定如何檢查 cscope 連接存在與
+		否的方式:
+
+		{num}	存在檢查的方式描述 ~
+		-----	------------------------------
+		0	等同於無參數 (例如，"cscope_connection()")。
+		1	忽略 {prepend}，使用 {dbpath} 的字符串部分匹配。
+		2	忽略 {prepend}，使用 {dbpath} 的字符串完整匹配。
+		3	使用 {prepend}，使用 {dbpath} 和 {prepend} 的字符串部
+			分匹配。
+		4	使用 {prepend}，使用 {dbpath} 和 {prepend} 的字符串完
+			整匹配。
+
+		注意: 所有的字符串比較都對大小寫敏感！
+
+		示例。假定我們有如下設置 (":cs show" 的輸出): >
+
+  # pid    database name			prepend path
+  0 27664  cscope.out				/usr/local
+<
+		啟動方式					   返回值 ~
+		----------					---------- >
+		cscope_connection()					1
+		cscope_connection(1, "out")				1
+		cscope_connection(2, "out")				0
+		cscope_connection(3, "out")				0
+		cscope_connection(3, "out", "local")			1
+		cscope_connection(4, "out")				0
+		cscope_connection(4, "out", "local")			0
+		cscope_connection(4, "cscope.out", "/usr/local")	1
+<
+cursor({lnum}, {col} [, {off}])				*cursor()*
+cursor({list})
+		把光標定位在第 {lnum} 行的第 {col} 列 (字節計數)。第一列為 1。
+		如果只有一個參數 {list}，它被看作帶兩個或三個參數 {lnum}、
+		{col} 和 {off} 的 |List|。和 |getpos()| 的返回值類似，但沒有第
+		一項。
+		不改變跳轉表。
+		如果 {lnum} 超過緩衝區的行數，光標定位在緩衝區的末行。
+		如果 {lnum} 為零，光標留在當前行。
+		如果 {col} 超過該行的字節數，光標定位在該行的最後一個字符上。
+		如果 {col} 為零，光標留在當前列。
+		如果使用 'virtualedit'，{off} 指定從該字符開始以屏幕列計算的偏
+		移。例如，在製表裡或者在最後一個字符之後的某個位置。
+		如果定位成功，返回 0，否則返回 -1。
+
+
+deepcopy({expr}[, {noref}])				*deepcopy()* *E698*
+		構造 {expr} 的備份。對數值和字符串而言，這和直接使用 {expr}
+		並無不同。
+		如果 {expr} 是 |List|，建立一個完整的備份。這意味著，原來的
+		|List| 可以被改變，而不會影響新建的備份。反之亦然。如果某個項
+		目是 |List|，遞歸地建立它的備份。這樣，備份裡項目的修改也不會
+		影響到原來 |List| 的內容。
+		如果省略 {noref} 或為零，包含的 |List| 或 |Dictionary| 只複製
+		一次。所有指向它的引用指向此一備份。如果 {noref} 設為 1，每次
+		|List| 或 |Dictionary| 的出現會導致建立一個新的備份。這意味著
+		循環引用會使得 deepcopy() 失敗。
+								*E724*
+		嵌套可達 100 層。如果有指向較高層的引用，{noref} 為 1 的深備份
+		會失敗。
+		另見 |copy()|。
+
+delete({fname})							*delete()*
+		刪除名為 {fname} 的文件。返回類型為數值。如果成功刪除文件，返
+		回 0，如果刪除失敗，返回非零。
+		從 |List| 裡刪除項目請用 |remove()|。
+
+							*did_filetype()*
+did_filetype()	如果執行自動命令時，激活 FileType 事件至少一次，則返回非零。可
+		以用於防止在檢測文件類型的腳本裡再次激活 FileType 事件。
+		|FileType|
+		如果編輯另外一個文件，該計數被復位，因而這只能檢查 FileType 事
+		件是否在當前緩衝區裡激活過。它允許開始編輯另一個緩衝區的自動命
+		令設置 'filetype' 並載入語法文件。
+
+diff_filler({lnum})					*diff_filler()*
+		返回第 {lnum} 行之上的填充行的數目。
+		這些是在另一個進行比較的窗口裡在此位置插入的行。這些填充行在屏
+		幕上顯示，但緩衝區裡並不存在。
+		{lnum} 的用法類似於 |getline()|。所以 "." 是當前行，"'m" 是位
+		置標記 m，等等。
+		如果當前窗口不處於 diff 模式，返回 0。
+
+diff_hlID({lnum}, {col})				*diff_hlID()*
+		返回 diff 模式行 {lnum} 和列 {col} (字節位置) 所在的高亮 ID。
+		如果當前行沒有差異，返回零。
+		{lnum} 的用法類似於 |getline()|。所以 "." 是當前行，"'m" 是位
+		置標記 m，等等。
+		最左列的 {col} 為 1，第一行的 {lnum} 為 1。
+		高亮 ID 可以用於 |synIDattr()|，以得到高亮對應的語法信息。
+
+empty({expr})						*empty()*
+		如果 {expr} 為空，返回數值 1，否則返回 0。
+		|List| 或 |Dictionary| 沒有項目時為空。數值的值為零時為空。
+		如果 |List| 很大，這比把長度和零比較要快得多。
+
+escape({string}, {chars})				*escape()*
+		在 {string} 裡用反斜槓轉義 {chars} 裡的字符。例如: >
+			:echo escape('c:\program files\vim', ' \')
+<		返回: >
+			c:\\program\ files\\vim
+<		另見 |shellescape()|。
+
+							*eval()*
+eval({string})	計算 {string} 並返回其結果。這對把 |string()| 的結果轉換為原來
+		的值尤其有用。適用於數值、浮點數、字符串和兩者的復合類型。也可
+		用於指向已有函數的 |Funcref|。
+
+eventhandler()						*eventhandler()*
+		如果在事件處理中則返回 1。此時，Vim 在等待用戶輸入一個字符的時
+		候被中斷，比如，在 Vim 上拖放了一個文件。這也意味著此時不能使
+		用交互的命令。如果不是，返回零。
+
+executable({expr})					*executable()*
+		本函數檢查名字由 {expr} 指定的可執行文件存在與否。{expr} 必須
+		是程序不帶任何參數的名字。
+		executable() 使用 $PATH 的值和/或程序的普通的搜索路徑。
+							*PATHEXT*
+		MS-DOS 和 MS-Windows 上，可以可選地包含 ".exe"、".bat" 等。為
+		此，$PATHEXT 裡的擴展名會被嘗試。這樣，如果 "foo.exe" 不存在，
+		可能會找到 "foo.exe.bat"。如果沒有設置 $PATHEXT，使用的是
+		".exe;.com;.bat;.cmd"。$PATHEXT 裡可以使用單獨的句號，以嘗試沒
+		有擴展名的名字。如果 'shell' 看起來像 Unix 外殼，那麼也嘗試沒
+		有擴展名的名字。
+		MS-DOS 和 MS-Windows 上，只檢查是否文件存在且不是目錄，並不檢
+		查它是否真的可以執行。
+		MS-Windows 上，和 Vim 在同一目錄的可執行文件總能找到。因為這個
+		目錄加到了 $PATH 裡，執行應該也沒有問題 |win32-PATH|。
+		返回數值:
+			1	存在
+			0	不存在
+			-1	此系統中沒有實現
+
+							*exists()*
+exists({expr})	返回數值，如果 {expr} 被定義，返回非零，不然返回零。{expr} 參
+		數是字符串，可以使用以下選擇之一:
+			&option-name	Vim 選項 (只檢查是否存在，而不是是否工
+					作)
+			+option-name	能工作的 Vim 選項。
+			$ENVNAME	環境變量 (也可以通過和空字符串比較完
+					成)
+			*funcname	內建函數 (見 |functions|) 或者用戶定義
+					的函數 (見 |user-functions|)。
+			varname		內部變量 (見 |internal-variables|)。也
+					適用於 |curly-braces-names|、
+					|Dictionary| 項目、|List| 項目等等。
+					小心計算索引時可能會因為非法的表達式產
+					生錯誤信息。例如: >
+					   :let l = [1, 2, 3]
+					   :echo exists("l[5]")
+<					   0 >
+					   :echo exists("l[xx]")
+<					   E121: Undefined variable: xx
+					   0
+
+			:cmdname	Ex 命令: 內建命令、用戶命令或者命令修
+					飾符 |:command|。
+					返回:
+					1  匹配命令的開始
+					2  完整匹配命令
+					3  匹配多個用戶命令
+					要檢查命令是否支持，檢查返回值是否為
+					2。
+			:2match		|:2match| 命令。
+			:3match		|:3match| 命令。
+			#event		符合此事件的自動命令
+			#event#pattern	符合此事件和此模式的自動命令 (模式按本
+					義出現，和自動命令的模式逐字符比較)
+			#group		存在自動命令組
+			#group#event	在該組裡定義並符合此事件的自動命令。
+			#group#event#pattern
+					為該組定義、符合事件和模式的自動命令。
+			##event		支持此事件的自動命令。
+		要檢查某特性是否支持，用 |has()|。
+
+		例如: >
+			exists("&shortname")
+			exists("$HOSTNAME")
+			exists("*strftime")
+			exists("*s:MyFunc")
+			exists("bufcount")
+			exists(":Make")
+			exists("#CursorHold")
+			exists("#BufReadPre#*.gz")
+			exists("#filetypeindent")
+			exists("#filetypeindent#FileType")
+			exists("#filetypeindent#FileType#*")
+			exists("##ColorScheme")
+<		符號 (&/$/*/#) 和名字之間不能有空格。
+		名字之後不能有附加字符，雖然現在有一些情況下會忽略這些字符，但
+		將來的檢查可能更嚴格。所以不要依賴此行為！
+		可以通過的例子: >
+			exists(":make")
+<		_不_能通過的例子: >
+			exists(":make install")
+
+<		注意 參數必須是字符串，不是變量的名字本身。例如: >
+			exists(bufcount)
+<		不檢查 "bufcount" 變量是否存在，而是提取 "bufcount" 的值，並檢
+		查其 (根據此處的語法) 是否存在。
+
+exp({expr})						*exp()*
+		返回 {expr} 的指數函數值，返回值為 [0, inf] 區間內的浮點數。
+		{expr} 的計算結果必須是浮點數或數值。
+		示例: >
+			:echo exp(2)
+<			7.389056 >
+			:echo exp(-1)
+<			0.367879
+		{僅當編譯時加入 |+float| 特性才有效}
+
+
+expand({expr} [, {flag}])				*expand()*
+		擴展 {expr} 裡的通配符和下列特殊關鍵字。返回的是字符串。
+
+		如果返回多個匹配，以 <NL> 字符分隔 [備註: 5.0 版本使用空格。但
+		是文件名如果也包含空格就會有問題]。
+
+		如果擴展失敗，返回空字符串。這不包括不存在文件的名字。
+
+		如果 {expr} 以 '%'、'#' 或 '<' 開始，以類似於
+		|cmdline-special| 變量的方式擴展，包括相關的修飾符。這裡是一個
+		簡短的小結:
+
+			%		當前文件名
+			#		輪換文件名
+			#n		輪換文件名 n
+			<cfile>		光標所在的文件名
+			<afile>		自動命令文件名
+			<abuf>		自動命令緩衝區號 (以字符串形式出現！)
+			<amatch>	自動命令匹配的名字
+			<sfile>		載入的腳本文件名
+			<cword>		光標所在的單詞
+			<cWORD>		光標所在的字串 (WORD)
+			<client>	最近收到的消息的 {clientid}
+					|server2client()|
+		修飾符:
+			:p		擴展為完整的路徑
+			:h		頭部 (去掉最後一個部分)
+			:t		尾部 (只保留最後一個部分)
+			:r		根部 (去掉一個擴展名)
+			:e		只有擴展名
+
+		例如: >
+			:let &tags = expand("%:p:h") . "/tags"
+<		注意 擴展 '%'、'#' 或者 '<' 開頭的字符串的時候，其後的文本被忽
+		略。這樣_不_行: >
+			:let doesntwork = expand("%:h.bak")
+<		應該這樣: >
+			:let doeswork = expand("%:h") . ".bak"
+<		還要 注意  擴展 "<cfile>" 和其它形式只能返回被引用的文件名，而
+		不會進一步擴展。如果 "<cfile>" 是 "~/.cshrc"，你需要執行另一個
+		expand() 把 "~/" 擴展為主目錄的路徑: >
+			:echo expand(expand("<cfile>"))
+<
+		變量名和其後的修飾符之間不能有空白。|fnamemodify()| 函數可以用
+		來修改普通的文件名。
+
+		使用 '%' 或 '#' 但當前或輪換文件名沒有定義的時候，使用空字符
+		串。在無名緩衝區使用 "%:p"  生成當前目錄，後加一個 '/'。
+
+		如果 {expr} 不以 '%'、'#' 或 '<' 開始，它以命令行上的文件名那
+		樣被擴展。使用 'suffixes' 和 'wildignore'，除非給出可選的
+		{flag} 參數而且非零。這裡可以有不存在的文件的名字。"**" 項目可
+		以用來在目錄樹裡查找。例如，要尋找當前目錄及其下目錄的所有的
+		"README": >
+			:echo expand("**/README")
+<
+		expand() 也可用來擴展變量和只有外殼知道的環境變量。但這會很
+		慢，因為需要啟動外殼。見 |expr-env-expand|。擴展後的變量還是被
+		當作文件名的列表處理。如果不能擴展環境變量，保留其不變。這樣，
+		":echo expand('$FOOBAR')" 返回的還是 "$FOOBAR"。
+
+		|glob()| 說明如何找到存在的文件。|system()| 說明如何得到外部命
+		令的原始輸出。
+
+extend({expr1}, {expr2} [, {expr3}])			*extend()*
+		{expr1} 和 {expr2} 必須都是 |List| 或者都是 |Dictionary|。
+
+		如果都是 |List|: 把 {expr2} 附加到 {expr1} 之後。
+		如果給出 {expr3}，把 {expr2} 裡的項目加到 {expr1} 的第 {expr3}
+		個項目之前。如果 {expr3} 為零，插在第一個項目之前。如果
+		{expr3} 等於 len({expr1})，那麼 {expr2} 會附加在最後。
+		例如: >
+			:echo sort(extend(mylist, [7, 5]))
+			:call extend(mylist, [2, 3], 1)
+<		如果 {expr1} 和 {expr2} 是同一個列表，複製的項目數等於列表原來
+		的長度。例如，如果 {expr} 為 1，則複製列表首值 N 次 (N 是列表
+		原來的長度)。
+		用 |add()| 把一個項目加入列表。要連接兩個列表成為一個新列表，
+		用 + 操作符: >
+			:let newlist = [1, 2, 3] + [4, 5]
+<
+		如果都是 |Dictionary|: 把 {expr2} 裡的所有項目加入 {expr1}。
+		如果 {expr1} 和 {expr2} 包含相同的鍵，那麼 {expr3} 決定應該怎
+		麼做:
+		{expr3} = "keep": 保持 {expr1} 的值
+		{expr3} = "force": 使用 {expr2} 的值
+		{expr3} = "error": 給出錯誤信息				*E737*
+		如果省略 {expr3}，假設使用 "force"。
+
+		只要 {expr2} 非空，{expr1} 就被改變。如果需要，給 {expr1} 先做
+		個備份。
+		{expr2} 保持不變。
+		返回 {expr1}。
+
+
+feedkeys({string} [, {mode}])				*feedkeys()*
+		將 {string} 裡的字符放在隊列裡等候處理，就像它們來自映射或者用
+		戶輸入一樣。它們加在預輸入 (typeahead) 緩衝區的尾端，所以如果
+		仍然在執行映射，這些字符出現在映射內容之後。
+		該函數不會等待 {string} 包含的鍵處理完畢。
+		{string} 如果要包含特殊鍵，可以使用雙引號和 "\..." 記法
+		|expr-quote|。例如，feedkeys("\<CR>") 會模擬 <Enter> 鍵擊。但
+		feedkeys('\<CR>') 卻實際壓入五個字符。
+		如果不給出 {mode}，這些鍵會經過重映射。
+		{mode} 是字符串，包含以下字符標誌位:
+		'm'	對鍵重映射。缺省。
+		'n'	不對鍵重映射。
+		't'	像用戶輸入那樣處理鍵；如果不包含，像來自映射一樣處理。
+			這會影響撤銷、打開折疊等行為。
+		返回值總為 0。
+
+filereadable({file})					*filereadable()*
+		返回數值，如果名為 {file} 的文件存在且可讀，則為真。如果
+		{file} 不存在，或者是一個目錄，返回假。{file} 可以是任何返回字
+		符串的表達式。
+		如果你不關心文件是否可讀，可用 |glob()|。
+							*file_readable()*
+		已廢棄的名字: file_readable()。
+
+
+filewritable({file})					*filewritable()*
+		返回數值，如果名為 {file} 的文件存在且可寫，則為 1。如果
+		{file} 不存在，或者不可寫，返回 0。如果 {file} 是一個目錄但是
+		可寫，返回 2。
+
+
+filter({expr}, {string})					*filter()*
+		{expr} 必須是 |List| 或者 |Dictionary|。
+		對 {expr} 裡的每個項目計算 {string}，如果結果為零，從該 |List|
+		或 |Dictionary| 裡刪除該項目。
+		{string} 計算時，|v:val| 包含當前項目的值。
+		|Dictionary| 中 |v:key| 也包含當前項目的鍵。
+		例如: >
+			:call filter(mylist, 'v:val !~ "OLD"')
+<		刪除所有出現 "OLD" 的項目。 >
+			:call filter(mydict, 'v:key >= 8')
+<		刪除所有鍵小於 8 的值。 >
+			:call filter(var, 0)
+<		刪除所有的值，從而清除該 |List| 或 |Dictionary|。
+
+
+finddir({name}[, {path}[, {count}]])				*finddir()*
+		在 {path} 裡查找目錄 {name}。支持向下和向上的遞歸目錄搜索。
+		{path} 的語法參見 |file-searching|。
+		返回第一個找到的路徑。如果找到的
+		路徑在當前目錄之下，返回相對路徑。否則，返回完整路徑。
+		如果省略 {path}，使用 'path'。
+		如果給出可選的 {count}，尋找 {path} 裡 {name} 第 {count} 次出
+		現，而不是第一次。
+		如果 {count} 為負，返回所有的匹配的列表。
+		這和 ex 命令 |:find| 非常類似。
+		{僅當編譯時加入 |+file_in_path| 特性才有效}
+
+findfile({name}[, {path}[, {count}]])				*findfile()*
+		類似於 |finddir()|，不過尋找文件而不是目錄。
+		使用 'suffixesadd'。
+		例如: >
+			:echo findfile("tags.vim", ".;")
+<		從當前文件所在的目錄開始往上搜索，直到找到文件 "tags.vim" 為
+		止。
+
+float2nr({expr})					*float2nr()*
+		返回數值，即 {expr} 省略小數點部分的結果。
+		{expr} 的計算結果必須是浮點數或數值。
+		如果 {expr} 的值超出 |Number| 的範圍，結果為 0x7fffffff 或
+		-0x7fffffff。而 NaN 轉換為 -0x80000000。
+		示例: >
+			echo float2nr(3.95)
+<			3  >
+			echo float2nr(-23.45)
+<			-23  >
+			echo float2nr(1.0e100)
+<			2147483647  >
+			echo float2nr(-1.0e150)
+<			-2147483647  >
+			echo float2nr(1.0e-100)
+<			0
+		{僅當編譯時加入 |+float| 特性才有效}
+
+
+floor({expr})							*floor()*
+		返回浮點數，即小於等於 {expr} 的最大整數 (向下取整)。
+		{expr} 的計算結果必須是浮點數或數值。
+		示例: >
+			echo floor(1.856)
+<			1.0  >
+			echo floor(-5.456)
+<			-6.0  >
+			echo floor(4.0)
+<			4.0
+		{僅當編譯時加入 |+float| 特性才有效}
+
+
+fmod({expr1}, {expr2})					*fmod()*
+		返回 {expr1} / {expr2} 的餘數，該除法可能實際無法表達出來。選
+		擇某整數 i，返回 {expr1} - i * {expr2}，使得如果 {expr2} 非
+		零，結果和 {expr1} 同號而絕對值小於 {expr2} 的絕對值。如果
+		{expr2} 為零，返回零。返回值為浮點數。
+		{expr1} 和 {expr2} 的計算結果必須是浮點數或數值。
+		示例: >
+			:echo fmod(12.33, 1.22)
+<			0.13 >
+			:echo fmod(-12.33, 1.22)
+<			-0.13
+		{僅當編譯時加入 |+float| 特性才有效}
+
+
+fnameescape({string})					*fnameescape()*
+		轉義 {string} 以便用作命令的文件名參數。有特殊意義的字符，如
+		'%' 和 '|'，會用反斜槓轉義。
+		多數系統上，會轉義的字符是 " \t\n*?[{`$\\%#'\"|!<"。在反斜槓可
+		以出現在文件名中的系統上，此字符集取決於 'isfname'。
+		也轉義出現在開頭的 '+' 和 '>' 字符 (|:edit| 和 |:write| 之後有
+		特殊意義)，還有單個出現的 "-" (|:cd| 之後有特殊意義)。
+		示例: >
+			:let fname = '+some str%nge|name'
+			:exe "edit " . fnameescape(fname)
+<		則會執行: >
+			edit \+some\ str\%nge\|name
+
+fnamemodify({fname}, {mods})				*fnamemodify()*
+		根據 {mods} 修改文件名 {fname}。{mods} 是一個字符序列組成的字
+		符串，就像命令行上使用的文件名那樣。見 |filename-modifiers|。
+		例如: >
+			:echo fnamemodify("main.c", ":p:h")
+<		返回: >
+			/home/mool/vim/vim/src
+<		注意: 環境變量不能用於 {fname}，需要先用 |expand()| 擴展。
+
+foldclosed({lnum})					*foldclosed()*
+		返回數值，如果行 {lnum} 在關閉的折疊中，返回該折疊開始的行號。
+		如果行 {lnum} 不在關閉的折疊中，返回 -1。
+
+foldclosedend({lnum})					*foldclosedend()*
+		返回數值，如果行 {lnum} 在關閉的折疊中，返回該折疊結束的行號。
+		如果行 {lnum} 不在關閉的折疊中，返回 -1。
+
+foldlevel({lnum})					*foldlevel()*
+		返回數值，當前緩衝區第 {lnum} 行的折疊級別。如果在嵌套的折疊
+		裡，返回最深的那層。如果行 {lnum} 沒有折疊，返回零。這和折疊是
+		打開還是關閉無關。在更新折疊時 (在 'foldexpr' 裡)，如果折疊還
+		在更新而相應的折疊級別未知，返回 -1。一個特例是前一行的級別通
+		常總是知道的。
+
+							*foldtext()*
+foldtext()	返回關閉的折疊所顯示的行。這是 'foldtext' 選項使用的缺省函數，
+		而且也只應該在計算 'foldtext' 時使用。它使用 |v:foldstart|、
+		|v:foldend| 和 |v:folddashes| 變量。
+		返回的字符串看起來像: >
+			+-- 45 lines: abcdef
+<		連字符的數目取決於折疊級別。"45" 是折疊的行數。"abcdef" 是折疊
+		第一個非空白行的文本。開頭的空白、"//" 和 "/*" 還有
+		'foldmarker' 和 'commentstring' 選項的文本都被去除。
+		{僅當編譯時加入 |+folding| 特性才有效}
+
+foldtextresult({lnum})					*foldtextresult()*
+		返回行 {lnum} 所在的關閉的折疊顯示的文本。在合適的上下文裡計算
+		'foldtext'。
+		如果 {lnum} 沒有關閉的折疊，返回空字符串。
+		{lnum} 的用法類似於 |getline()|。所以 "." 是當前行，"'m" 是位
+		置標記 m，等等。
+		可用於輸出折疊文本，例如，到 HTML 格式。
+		{僅當編譯時加入 |+folding| 特性才有效}
+
+							*foreground()*
+foreground()	把 Vim 窗口帶到前台。用於從客戶發送到 Vim 服務器的時候。
+		|remote_send()|
+		在 Win32 系統上，可能不行，操作系統並不總能允許窗口把自己帶到
+		前台。這時應使用 |remote_foreground()|。
+		{僅當使用 Win32、Athena、Motif 和 GTK GUI 版本和 Win32 控制台
+		版本時才有效}
+
+
+function({name})					*function()* *E700*
+		返回指向函數 {name} 的 |Funcref| 變量。{name} 可以是用戶定義的
+		函數或者內部函數。
+
+
+garbagecollect([at_exit])				*garbagecollect()*
+		清理不再使用但有循環引用的 |List| 和 |Dictionary|。幾乎沒有需
+		要調用這個函數，因為 Vim 內存不足或者 'updatetime' 之後等待用
+		戶按鍵時會自動執行此功能。沒有循環引用的項目總是在不再使用的時
+		候就被立即釋放了。
+		可用於刪除很大的 |List| 和/或 |Dictionary| 而且有循環引用的時
+		候，尤其是在要運行很長時間的腳本裡。
+		如果可選的 "at_exit" 參數為一，並且之前還沒做過的話，Vim 即使
+		在退出時也會執行垃圾回收。可用於檢查內存洩漏。
+
+get({list}, {idx} [, {default}])			*get()*
+		獲取 |List| {list} 的第 {idx} 個項目。如果不存在此項目，返回
+		{default}。如果省略 {default}，返回零。
+get({dict}, {key} [, {default}])
+		獲取 |Dictionary| {dict} 鍵為 {key} 的項目。如果不存在此項目，
+		返回 {default}。如果省略 {default}，返回零。
+
+							*getbufline()*
+getbufline({expr}, {lnum} [, {end}])
+		返回 {expr} 緩衝區的第 {lnum} 到 {end} (包含) 行的 |List|。如
+		果省略 {end}，返回只有一行 {lnum} 的 |List|。
+
+		關於 {expr} 的用法，見上 |bufname()|。
+
+		{lnum} 和 {end} 可以使用 "$" 來表示緩衝區的最後一行。除此以
+		外，必須用數值。
+
+		如果 {lnum} 小於 1 或大於緩衝區的行數，返回空 |List|。
+
+		如果 {end} 大於緩衝區的行數，就把它當成緩衝區的行數。如果
+		{end} 在 {lnum} 之前，返回空 |List|。
+
+		此函數只能用於已經載入的緩衝區。未載入或不存在的緩衝區總是返回
+		空 |List|。
+
+		例如: >
+			:let lines = getbufline(bufnr("myfile"), 1, "$")
+
+getbufvar({expr}, {varname})				*getbufvar()*
+		返回緩衝區 {expr} 裡的選項或者局部變量 {varname} 的值。注意 必
+		須使用不帶 "b:" 的名字。
+		如果 {varname} 為空，返回包含所有局部於緩衝區變量的字典。
+		也可用於全局或者局部於緩衝區的選項，但不能用於全局或者局部於窗
+		口的變量，還有局部於窗口的選項。
+		關於 {expr} 的使用方式，見上 |bufname()|。
+		如果緩衝區或者變量不存在，返回空字符串。不會有錯誤消息。
+		示例: >
+			:let bufmodified = getbufvar(1, "&mod")
+			:echo "todo myvar = " . getbufvar("todo", "myvar")
+<
+getchar([expr])						*getchar()*
+		從用戶或輸入流中提取單個字符。
+		如果忽略 [expr]，等待直到有字符輸入為止。
+		如果 [expr] 為 0，只有在有字符可用時才取得字符，否則返回零。
+		如果 [expr] 為 1，只檢查是否有字符可用，並不消耗該字符。如果沒
+				  有字符，返回零。
+
+		如果沒有 {expr} 或者 {expr} 為零，返回整個字符或者特殊鍵。如果
+		是 8 位字符，以數值形式返回。用 nr2char() 把它轉化成字符串。否
+		則返回經過編碼的字符構成的字符串。如果是特殊鍵，返回一串字節，
+		以 0x80 (十進制: 128) 開始。它和字符串 "\<Key>" 等值，例如
+		"\<Left>"。如果用帶修飾符 (Shift，Control， Alt) 的字符而字符
+		本身不包含該修飾符時，返回值也用字符串類型。
+
+		如果 {expr} 為 1，只返回第一個字節。如果是單字節字符，返回的就
+		是該字符自身的數值形式。用 nr2char() 把它轉化為字符串。
+
+		用戶點擊鼠標時，返回鼠標事件。所在的位置可以在 |v:mouse_col|、
+		|v:mouse_lnum| 和 |v:mouse_win| 裡找到。下例用通常的處理方法定
+		位鼠標: >
+			let c = getchar()
+		  	if c == "\<LeftMouse>" && v:mouse_win > 0
+			  exe v:mouse_win . "wincmd w"
+			  exe v:mouse_lnum
+			  exe "normal " . v:mouse_col . "|"
+			endif
+<
+		There is no prompt, you will somehow have to make clear to the
+		user that a character has to be typed.
+		There is no mapping for the character.
+		Key codes are replaced, thus when the user presses the <Del>
+		key you get the code for the <Del> key, not the raw character
+		sequence.  Examples: >
+			getchar() == "\<Del>"
+			getchar() == "\<S-Left>"
+<		This example redefines "f" to ignore case: >
+			:nmap f :call FindChar()<CR>
+			:function FindChar()
+			:  let c = nr2char(getchar())
+			:  while col('.') < col('$') - 1
+			:    normal l
+			:    if getline('.')[col('.') - 1] ==? c
+			:      break
+			:    endif
+			:  endwhile
+			:endfunction
+
+		這裡沒有提示，你需要想辦法告訴用戶，需要輸入一個字符。
+		字符不通過映射。
+		鍵碼被替換。因而，用戶輸入 <Del> 鍵時，你得到 <Del> 的鍵碼，而
+		不是原始的字符序列。比如: >
+			getchar() == "\<Del>"
+			getchar() == "\<S-Left>"
+<		下例重新定義 "f"，使它忽略大小寫: >
+			:nmap f :call FindChar()<CR>
+			:function FindChar()
+			:  let c = nr2char(getchar())
+			:  while col('.') < col('$') - 1
+			:    normal l
+			:    if getline('.')[col('.') - 1] ==? c
+			:      break
+			:    endif
+			:  endwhile
+			:endfunction
+
+getcharmod()						*getcharmod()*
+		返回數值，反映最近用 getchar() 或其它方式輸入字符的修飾符狀
+		態。這些值可以相加:
+			2	Shift
+			4	Control
+			8	Alt (Meta)
+			16	鼠標雙擊
+			32	鼠標三擊
+			64	鼠標四擊
+			128	僅限於 Macintosh: command
+		只有沒有包含字符本身的修飾符被返回。因而，Shift-a 產生沒有修飾
+		符的 "A"。
+
+getcmdline()						*getcmdline()*
+		返回當前命令行。只有在編輯命令行時有效，所以必須在
+		|c_CTRL-\_e| 或 |c_CTRL-R_=| 裡使用。
+		例如: >
+			:cmap <F7> <C-\>eescape(getcmdline(), ' \')<CR>
+<		另見 |getcmdtype()|、|getcmdpos()| 和 |setcmdpos()|。
+
+getcmdpos()					*getcmdpos()*
+		返回命令行的字節計算的光標位置。第一列為 1。
+		只有在編輯命令行時有效，所以必須在 |c_CTRL-\_e| 或
+		|c_CTRL-R_=| 裡使用。不然，返回 0。
+		另見 |getcmdtype()|、|setcmdpos()| 和 |getcmdline()|。
+
+getcmdtype()						*getcmdtype()*
+		返回當前命令行類型。可能的返回值是:
+		    :	普通 Ex 命令
+		    >	調試模式命令 |debug-mode|
+		    /	正向搜索命令
+		    ?	反向搜索命令
+		    @	|input()| 命令
+		    -	|:insert| 或 |:append| 命令
+		只能在編輯命令行時調用，因而必須在 |c_CTRL-\_e| 或
+		|c_CTRL-R_=| 裡使用。否則，返回空字符串。
+		另見 |getcmdpos()|、|setcmdpos()| 和 |getcmdline()|。
+
+							*getcwd()*
+getcwd()	返回字符串，當前工作目錄的名字。
+
+getfsize({fname})					*getfsize()*
+		返回數值，文件 {fname} 以字節數計算的大小。
+		如果 {fname} 是目錄，返回 0。
+		如果找不到文件 {fname}，返回 -1。
+		如果 {fname} 文件過大，超出了 Vim 的數值的範圍，返回 -2。
+
+getfontname([{name}])					*getfontname()*
+		如果沒有參數，返回使用的正常字體的名字，也就是 Normal 高亮組
+		|hl-Normal| 使用的。
+		如果帶了參數，檢查 {name} 是否合法的字體名。如果不是，返回空字
+		符串。否則，返回實際的字體名，或者如果 GUI 不支持取得真正的名
+		字，返回 {name}。
+		只有在 GUI 運行的時候才能用，所以不能用於你的 vimrc 和 gvimrc
+		文件。用 |GUIEnter| 自動命令可以在 GUI 剛開始之後使用此函數。
+		注意 GTK 2 GUI 接受任何字體名，所以不會檢查名字是否合法。
+
+getfperm({fname})					*getfperm()*
+		返回字符串，給定文件 {fname} 的讀、寫、執行權限。
+		如果 {fname} 不存在或者它所在的目錄無法讀取，返回空字符串。
+		返回值的形式是 "rwxrwxrwx"，其中每組 "rwx" 標誌位分別代表文件
+		所有者、文件所屬組和其它用戶的權限。如果用戶沒有某權限，相應的
+		標誌位被字符串 "-" 代替。例如: >
+			:echo getfperm("/etc/passwd")
+<		希望它會 (從安全角度而言) 顯示字符串 "rw-r--r--" 或者甚至
+		"rw-------"。
+
+getftime({fname})					*getftime()*
+		返回數值，給定文件 {fname} 的最新修改時間。該時間為 1970 年 1
+		月 1 日開始計算的秒數，可以傳給 strftime()。
+		另見 |localtime()| 和 |strftime()|。
+		如果找不到文件 {fname}，返回 -1。
+
+getftype({fname})					*getftype()*
+		返回字符串，給定文件 {fname} 的文件類型的描述。
+		如果 {fname} 不存在，返回空字符串。
+		下表列出各種不同文件類型的返回值:
+			普通文件		"file"
+			目錄			"dir"
+			符號鏈接		"link"
+			塊設備			"bdev"
+			字符設備		"cdev"
+			套接字			"socket"
+			FIFO			"fifo"
+			其它			"other"
+		例如: >
+			getftype("/home")
+<		注意 只有在能支持的系統上才會返回 "link" 這樣的類型。有的系統
+		只支持 "dir" 和 "file"。
+
+							*getline()*
+getline({lnum} [, {end}])
+		如果沒有 {end}，返回字符串，即當前緩衝區第 {lnum} 行文本。
+		例如: >
+			getline(1)
+<		如果 {lnum} 是不以數字開始的字符串，調用 line() 來把該字符串轉
+		化成數值。要得到光標所在的行: >
+			getline(".")
+<		如果 {lnum} 小於 1 或者大於緩衝區的總行數，返回空字符串。
+
+		如果給出 {end}，返回 |List|，其中每個項目是當前緩衝區從 {lnum}
+		到 {end} (包含) 範圍的一行。
+		{end} 的用法同 {lnum}。
+		安靜地忽略不存在的行。
+		如果 {end} 在 {lnum} 之前，返回空 |List|。
+		例如: >
+			:let start = line('.')
+			:let end = search("^$") - 1
+			:let lines = getline(start, end)
+
+<		要獲取其它緩衝區的文本行，見 |getbufline()|。
+
+getloclist({nr})					*getloclist()*
+		返回列表，包含窗口 {nr} 的位置列表的所有項目。如果 {nr} 為 0，
+		使用當前窗口。
+		如果是位置列表窗口，返回其顯示的位置列表。如果窗口號 {nr} 非
+		法，返回空列表。其它的情況和 |getqflist()| 相同。
+
+getmatches()						*getmatches()*
+		返回之前 |matchadd()| 和 |:match| 命令定義的所有匹配組成的列表
+		|List|。 |getmatches()| 常和 |setmatches()| 組合使用，因為
+		|setmatches()| 可以恢復 |getmatches()| 保存的匹配列表。
+		示例: >
+			:echo getmatches()
+<			[{'group': 'MyGroup1', 'pattern': 'TODO',
+			'priority': 10, 'id': 1}, {'group': 'MyGroup2',
+			'pattern': 'FIXME', 'priority': 10, 'id': 2}] >
+			:let m = getmatches()
+			:call clearmatches()
+			:echo getmatches()
+<			[] >
+			:call setmatches(m)
+			:echo getmatches()
+<			[{'group': 'MyGroup1', 'pattern': 'TODO',
+			'priority': 10, 'id': 1}, {'group': 'MyGroup2',
+			'pattern': 'FIXME', 'priority': 10, 'id': 2}] >
+			:unlet m
+<
+
+getqflist()						*getqflist()*
+		返回列表，包含所有當前 quickfix 錯誤。列表的每個項目是包含以下
+		項目的字典:
+			bufnr	有此文件名的緩衝區號，bufname() 得到緩衝區名
+			lnum	緩衝區裡的行號 (第一行是 1)
+			col	列號 (第一列是 1)
+			vcol	非零: "col" 是可視列
+				零: "col" 是字節位置
+			nr	錯誤號
+			pattern	用於定位錯誤的搜索模式
+			text	錯誤描述
+			type	錯誤類型，'E'、'1' 等。
+			valid	非零: 能識別該錯誤信息
+
+		如果沒有錯誤列表或者它為空，返回空列表。quickfix 列表項目如果
+		包含不存在的緩衝區號，返回的 "bufnr" 置為零。
+
+		應用: 在多個文件裡尋找模式的匹配，並對之進行處理: >
+			:vimgrep /theword/jg *.c
+			:for d in getqflist()
+			:   echo bufname(d.bufnr) ':' d.lnum '=' d.text
+			:endfor
+
+
+getreg([{regname} [, 1]])				*getreg()*
+		返回字符串，寄存器 {regname} 的內容。例如: >
+			:let cliptext = getreg('*')
+<		getreg('=') 返回最近一次表達式寄存器計算的返回值 (用於映射)。
+		getreg('=', 1) 返回表達式自身，以便用 |setreg()| 恢復。對於其
+		它寄存器，這個額外的參數被忽略，所以給出此參數總是無妨。
+		如果沒有指定 {regname}，使用 |v:register|。
+
+
+getregtype([{regname}])					*getregtype()*
+		返回字符串，寄存器 {regname} 的類型。
+		該值會是以下可能之一:
+		    "v"			|characterwise| (面向字符) 的文本
+		    "V"			|linewise| (面向行) 的文本
+		    "<CTRL-V>{width}"	|blockwise-visual| (面向列塊) 的文本
+		    0			空或者未知的寄存器
+		<CTRL-V> 是一個字符，其值為 0x16。
+		如果沒有指定 {regname}，使用 |v:register|。
+
+gettabvar({tabnr}, {varname})				*gettabvar()*
+		得到標籤頁 {tabnr} 的標籤頁局部變量 {varname} 的值。|t:var|
+		標籤頁的編號從一開始。
+		注意 必須使用不帶 "t:" 的名字。
+
+gettabwinvar({tabnr}, {winnr}, {varname})		*gettabwinvar()*
+		得到標籤頁 {tabnr} 的窗口 {winnr} 的窗口局部變量 {varname} 的
+		值。
+		如果 {varname} 以 "&" 打頭，得到窗口局部選項的值。
+		標籤頁的編號從一開始。|getwinvar()| 總是使用當前標籤頁。
+		如果 {winnr} 為零，使用當前窗口。
+		也可用於全局或者局部於緩衝區或局部於窗口的選項，但不能用於全局
+		或者局部於緩衝區的變量。
+		如果 {varname} 為空，返回一個包含所有窗口局部變量的字典。
+		注意 {varname} 必須為不帶 "w:" 的名字。
+		例如: >
+			:let list_is_on = gettabwinvar(1, 2, '&list')
+			:echo "myvar = " . gettabwinvar(3, 1, 'myvar')
+<
+							*getwinposx()*
+getwinposx()	返回數值，即 GUI Vim 窗口以像素計從左起算的 X 坐標。如果該信息
+		得不到，返回 -1。
+
+							*getwinposy()*
+getwinposy()	返回數值，即 GUI Vim 窗口以像素計從頂部起算的 Y 坐標。如果該信
+		息得不到，返回 -1。
+
+getwinvar({nr}, {varname})				*getwinvar()*
+		類似於 |gettabwinvar()|，只用當前標籤頁。
+		例如: >
+			:let list_is_on = getwinvar(2, '&list')
+			:echo "myvar = " . getwinvar(1, 'myvar')
+<
+glob({expr} [, {flag}])					*glob()*
+		擴展 {expr} 裡的文件通配符。|wildcards| 說明其中特殊字符的使用
+		方法。
+		結果是字符串。
+		如果返回多個匹配，以 <NL> 字符分隔。
+		除非給出可選的 {flag} 參數且非零，應用 'suffixes' 和
+		'wildignore' 選項: 跳過匹配任何 'wildignore' 模式的名字，而
+		'suffixes' 影響匹配結果的排序。
+		如果擴展失敗，返回空字符串。
+		擴展結果不包含不存在文件的名字。
+
+		多數系統上，可以用反引號從外部命令得到文件名。例如: >
+			:let tagfiles = glob("`find . -name tags -print`")
+			:let &tags = substitute(tagfiles, "\n", ",", "g")
+<		反引號包圍的程序的輸出結果必須每個項目一行。項目內部可以使用空
+		格。
+
+		特殊 Vim 變量的擴展見 |expand()|。|system()| 說明如何得到外部
+		命令的原始輸出。
+
+globpath({path}, {expr} [, {flag}])			*globpath()*
+		在 {path} 的所有目錄下執行 glob() 並連接所有的返回結果。例
+		如: >
+			:echo globpath(&rtp, "syntax/c.vim")
+<		{path} 是逗號分隔的目錄名的列表。每個目錄名都附加在 {expr} 之
+		前，然後如同 |glob()| 那樣被擴展。必要的話，插入路徑分隔符。
+		要在目錄名字裡加上逗號，可以使用反斜槓轉義。注意 在 MS-Windows
+		上目錄的最後可能有一個反斜槓。如果你要在後面加上逗號進行分隔，
+		先把反斜槓去掉。
+		如果某個目錄下的擴展失敗，不會有錯誤信息。
+		除非給出可選的 {flag} 參數且非零，應用 'suffixes' 和
+		'wildignore' 選項: 跳過匹配任何 'wildignore' 模式的名字，而
+		'suffixes' 影響匹配結果的排序。
+
+		可以用 "**" 項目來搜索目錄樹。例如，尋找在 'runtimepath' 和它
+		之下所有目錄裡的 "README.txt" 文件: >
+			:echo globpath(&rtp, "**/README.txt")
+<		不支持向上搜索和 "**" 的深度限制，所以 'path' 的使用不一定總能
+		正確工作。
+
+							*has()*
+has({feature})	返回數值，如果支持特性 {feature} 則為 1，不然為零。
+		{feature} 參數是字符串。見下面的 |feature-list|。
+		另見 |exists()|。
+
+
+has_key({dict}, {key})					*has_key()*
+		返回數值，如果 |Dictionary| {dict} 有鍵為 {key} 的項目則為 1，
+		不然為零。
+
+haslocaldir()						*haslocaldir()*
+		返回數值，如果當前窗口用 |:lcd| 設置過本地路徑則為 1，不然為
+		零。
+
+hasmapto({what} [, {mode} [, {abbr}]])			*hasmapto()*
+		返回數值，如果存在某映射，其右邊的表達式 (被映射到的部分) 的某
+		處包含 {what}，並且該映射在 {mode} 指定的模式下存在，返回 1。
+		如果提供 {abbr} 且非零，使用縮寫而不是映射。不要忘記指定插入
+		和/或命令行模式。
+		同時檢查全局映射和局部於當前緩衝區的映射以尋找匹配。
+		如果沒有匹配的映射，返回 0。
+		{mode} 識別下列字符:
+			n	普通模式
+			v	可視模式
+			o	操作符等待模式
+			i	插入模式
+			l	Language-Argument ("r"、 "f"、"t" 等等) 模式
+			c	命令行模式
+		如果沒有提供 {mode}，使用 "nvo"。
+
+		該函數可用於檢查是否存在映射到 Vim 腳本的某個函數的映射。例
+		如: >
+			:if !hasmapto('\ABCdoit')
+			:   map <Leader>d \ABCdoit
+			:endif
+<		這樣，到 "\ABCdoit" 的映射只有在到 "\ABCdoit" 的映射還不存在的
+		時候才會進行。
+
+histadd({history}, {item})				*histadd()*
+		把字符串 {item} 加到歷史 {history} 裡。後者可以是:
+							*hist-names*
+			"cmd"	 或 ":"	  命令行歷史
+			"search" 或 "/"   搜索模式歷史
+			"expr"   或 "="   輸入表達式歷史
+			"input"  或 "@"	  輸入行歷史
+		如果 {item} 已經在歷史裡存在，它會被調整位置，從而成為最新的一
+		項。
+		返回結果為數值: 如果操作成功則為 1，不然返回 0。
+
+		例如: >
+			:call histadd("input", strftime("%Y %b %d"))
+			:let date=input("Enter date: ")
+<		該函數在沙盤裡不可用 |sandbox|。
+
+histdel({history} [, {item}])				*histdel()*
+		清除 {history}，換而言之，刪除它所有的項目。|hist-names| 解釋
+		{history} 的所有可能值。
+
+		如果 {item} 計算結果為字符串，它被看作正規表達式。從歷史裡刪除
+		所有匹配該模式的項目 (如果有的話)。
+		必須匹配大小寫，除非使用 "\c" |/\c|。
+		如果 {item} 的計算結果為數值，它被解釋為索引值，見
+		|:history-indexing|。如果該索引存在，刪除相應的項目。
+
+		返回結果為數值: 如果操作成功則為 1，不然返回 0。
+
+		例如:
+		清除表達式寄存器歷史: >
+			:call histdel("expr")
+<
+		刪除所有 "*" 開始的搜索歷史: >
+			:call histdel("/", '^\*')
+<
+		下面三者是等價的: >
+			:call histdel("search", histnr("search"))
+			:call histdel("search", -1)
+			:call histdel("search", '^'.histget("search", -1).'$')
+<
+		要刪除最後的搜索模式，並在 "n" 命令和 'hlsearch' 裡使用倒數第
+		二個模式: >
+			:call histdel("search", -1)
+			:let @/ = histget("search", -1)
+
+histget({history} [, {index}])				*histget()*
+		返回字符串，即 {history} 歷史的第 {index} 項。|hist-names| 解
+		釋 {history} 的所有可能值，而 |:history-indexing| 解釋
+		{index}。如果沒有這個項目，返回空字符串。如果忽略 {index}，返
+		回歷史裡最近使用的項目。
+
+		例如:
+		重做歷史裡的倒數第二個搜索 >
+			:execute '/' . histget("search", -2)
+
+<		定義 Ex 命令 ":H {num}"，以重新執行 |:history| 輸出的第 {num}
+		項。 >
+			:command -nargs=1 H execute histget("cmd", 0+<args>)
+<
+histnr({history})					*histnr()*
+		返回當前項目在 {history} 裡的編號。|hist-names| 解釋 {history}
+		的所有可能值。
+		如果有錯，返回 -1。
+
+		例如: >
+			:let inp_index = histnr("expr")
+<
+hlexists({name})					*hlexists()*
+		返回數值。只要名為 {name} 的高亮組用某種方法定義過，返回非零。
+		不一定要為該組定義過高亮屬性。一些語法項目可能已經使用該組。
+							*highlight_exists()*
+		已廢棄的名字: highlight_exists()。
+
+							*hlID()*
+hlID({name})	返回數值，即名為 {name} 的高亮組的 ID。如果該高亮組不存在，返
+		回零。
+		可用於提取高亮組的信息。比如，要得到 "Comment" 組的背景顏色: >
+	:echo synIDattr(synIDtrans(hlID("Comment")), "bg")
+<							*highlightID()*
+		已廢棄的名字: highlightID()。
+
+hostname()						*hostname()*
+		返回字符串，即 Vim 運行的機器名字。超過 256 字符串長度的機器名
+		被截短。
+
+iconv({expr}, {from}, {to})				*iconv()*
+		返回字符串，即文本 {expr} 從 {from} 編碼轉到 {to} 編碼以後的文
+		本。
+		如果轉換完全失敗，返回空字符串。如果部分字符無法轉換，以 "?"
+		代替之。
+		編碼名字可以是任何 iconv() 庫函數接受的名字，見
+		":!man 3 iconv"。
+		大多數轉換需要 Vim 編譯時加入 |+iconv| 特性。不然，只支持
+		UTF-8 和 latin1 的相互轉換。
+		這可以用來顯示包含特殊字符的消息。不管 'encoding' 設為何值，總
+		可以用 UTF-8 書寫消息，然後使用: >
+			echo iconv(utf8_str, "utf-8", &enc)
+<		注意 Vim 使用 UTF-8 進行所有的 Unicode 編碼，從/到 UCS-2 的轉
+		換都自動轉為 UTF-8。你不能在字符串裡使用 UCS-2，因為那裡有 NUL
+		字節。
+		{僅當編譯時加入 |+multi_byte| 特性才有效}
+
+							*indent()*
+indent({lnum})	返回數值，第 {lnum} 行的縮進距離。縮進的計算以空格計，因而它和
+		'tabstop' 的值是有關係的。{lnum} 的使用方式和 |getline()| 相
+		同。
+		如果 {lnum} 非法，返回 -1。
+
+
+index({list}, {expr} [, {start} [, {ic}]])			*index()*
+		返回 |List| {list} 裡值等於 {expr} 的最小項目索引。這裡不進行
+		自動轉換，字符串 "4" 不同於數值 4，數值 4 也不等同於浮點數
+		4.0。'ignorecase' 的值此處也不適用，大小寫不忽略。
+		如果給出 {start}，從索引為 {start} 的項目開始尋找 (可以為負，
+		指定相對於尾部的項目)。
+		如果給出 {ic} 且非零，忽略大小寫。否則，必須匹配大小寫。
+		如果在 {list} 裡找不到 {expr}，返回 -1。
+		示例: >
+			:let idx = index(words, "the")
+			:if index(numbers, 123) >= 0
+
+
+input({prompt} [, {text} [, {completion}]])		*input()*
+		返回字符串，即用戶在命令行上的輸入內容，可以為任何值。參數
+		{prompt} 或者是一個提示字符串，或者是一個空白字符串 (沒有提
+		示)。'\n' 可以在提示裡使用，以開始新行。
+		該提示使用 |:echohl| 設置的高亮。
+		輸入方法和命令行相似，也使用相同的編輯命令和映射。但 input()
+		輸入的行使用另外的歷史。
+		示例: >
+			:if input("咖啡還是啤酒？") == "啤酒"
+			:  echo "乾杯！"
+			:endif
+<
+		如果給出可選的 {text} 參數，它被用作缺省的回答，就像是用戶輸入
+		的那樣。例如: >
+			:let color = input("Color? ", "white")
+
+<		可選的 {completion} 參數指定輸入支持的補全類型。如果不給出，不
+		使用補全。支持的補全類型和用戶定義命令用 "-complete=" 參數能給
+		出的類型相同。詳情見 |:command-completion|。例如: >
+			let fname = input("File: ", "", "file")
+<
+		注意: 在只能運行於 GUI 模式的版本裡 (比如 Win32 GUI)，此函數不
+		能在啟動文件裡使用。
+		注意: input() 在映射裡調用時，它會消耗該映射餘下的字符，因為映
+		射的處理就像那些字符被鍵盤輸入一樣。在 input() 前使用
+		|inputsave()| 然後在 input() 輸入之後 |inputrestore()| 可以避
+		免這一點。另一個方法是避免在映射的後面提供任何字符，比如，使用
+		|:execute| 或 |:normal|。
+
+		使用映射的例子: >
+			:nmap \x :call GetFoo()<CR>:exe "/" . Foo<CR>
+			:function GetFoo()
+			:  call inputsave()
+			:  let g:Foo = input("enter search pattern: ")
+			:  call inputrestore()
+			:endfunction
+
+inputdialog({prompt} [, {text} [, {cancelreturn}]])		*inputdialog()*
+		類似於 |input()|，但如果運行 GUI 且支持文本對話框，彈出一個對
+		話框窗口來輸入文本。
+		例如: >
+			:let n = inputdialog("value for shiftwidth", &sw)
+			:if n != ""
+			:  let &sw = n
+			:endif
+<		如果對話框被取消，返回 {cancelreturn}。如果忽略，返回空字符
+		串。
+		輸入 <Enter> 和按 OK 按鈕相同。按 <Esc> 和按 Cancel 按鈕相同。
+		備註: 不支持命令行補全。
+
+inputlist({textlist})					*inputlist()*
+		{textlist} 必須是字符串的 |List|。顯示此 |List|，每個字符串一
+		行。用戶得到提示要輸入一個數值，返回此值。
+		用戶也可以用鼠標點擊項目來進行選擇。第一個字符串返回 0。在第一
+		個項目之上點擊返回負數。在提示行上點擊返回 {textlist} 的長度加
+		一。
+		確保 {textlist} 不超過 'lines' 個項目，否則無法使用。建議把項
+		目編號放在每個字符串的開始處，並在第一項上加上提示。例如: >
+			let color = inputlist(['Select color:', '1. red',
+				\ '2. green', '3. blue'])
+
+inputrestore()						*inputrestore()*
+		恢復前一個 |inputsave()| 保存的預輸入。應該和 |inputsave()| 調
+		用的次數相同，不過調用更多次也無妨。
+		如果沒有可以恢復的，返回 1，不然返回 0。
+
+inputsave()						*inputsave()*
+		保存預輸入 (也包括映射的) 並清除之，使得下一個提示能從用戶得到
+		輸入。在提示之後應該跟上配套的 inputrestore()。可以多次使用，
+		此時應該有同樣多次的 inputrestore() 調用。
+		如果內存不足，返回 1，不然返回 0。
+
+inputsecret({prompt} [, {text}])			*inputsecret()*
+		該函數和 |input()| 函數類似，但有兩個例外:
+		a) 用戶的應答顯示為一串星號 ("*")，從而輸入可以保密，還有
+		b) 用戶的應答不會記錄在輸入 |history| 棧中。
+		返回字符串，即用戶在命令行上根據提示輸入的應答。
+		備註: 不支持命令行補全。
+
+insert({list}, {item} [, {idx}])			*insert()*
+		在 |List| {list} 的開始處插入 {item}。
+		如果指定 {idx}，{item} 的插入位置在索引 {idx} 之前。如果
+		{idx} 為零，插入在第一個項目之前，和省略 {idx} 效果相同。也可
+		用負的 {idx}，見 |list-index|。-1 插入在最後一個項目之前。
+		返回新產生的 |List|。例如: >
+			:let mylist = insert([2, 3, 5], 1)
+			:call insert(mylist, 4, -1)
+			:call insert(mylist, 6, len(mylist))
+<		用 |add()| 可以更簡單的完成最後一個例子。
+		注意 如 {item} 是 |List|，它被作為單個項目來插入。 |extend()|
+		用來連接多個 |List|。
+
+isdirectory({directory})				*isdirectory()*
+		返回數值，如果名為 {directory} 的目錄存在，返回非零。如果
+		{directory} 不存在或者不是目錄，返回假值。{directory} 可以是任
+		何表達式，最終用作字符串。
+
+islocked({expr})					*islocked()* *E786*
+		返回數值，如果 {expr} 是某個加鎖的變量名，返回非零。
+		{expr} 必須是變量名、|List| 項目，或 |Dictionary| 項目，不是變
+		量本身！例如: >
+			:let alist = [0, ['a', 'b'], 2, 3]
+			:lockvar 1 alist
+			:echo islocked('alist')		" 1
+			:echo islocked('alist[1]')	" 0
+
+<		如果 {expr} 是不存在的變量，得到錯誤信息。用 |exists()| 可以檢
+		查它是否存在。
+
+items({dict})						*items()*
+		返回 |List|，{dict} 的所有鍵-值組對。每個 |List| 項目是兩個項
+		目的列表: {dict} 項目的鍵和此項目的值。|List| 項目的順序不定。
+
+
+join({list} [, {sep}])					*join()*
+		連接所有 {list} 項目成為字符串。
+		如果指定 {sep}，該分隔符出現在項目之間。如果省略 {sep}，用單個
+		空格。
+		注意 尾部不加 {sep}。如果你堅持要加入: >
+			let lines = join(mylist, "\n") . "\n"
+<		字符串項目照原樣使用。用類似 |string()| 的方式把 |List| 和
+		|Dictionary| 轉化為字符串。
+		逆函數是 |split()|。
+
+keys({dict})						*keys()*
+		返回 |List|，{dict} 的所有鍵。|List| 項目的順序不定。
+
+							*len()* *E701*
+len({expr})	返回數值，參數的長度。
+		如果 {expr} 為字符串或數值，返回它使用的字節數，和 |strlen()|
+		相同。
+		如果 {expr} 為 |List|，返回 |List| 的項目數量。
+		如果 {expr} 為 |Dictionary|，返回 |Dictionary| 的項目數量。
+		否則給出錯誤。
+
+						*libcall()* *E364* *E368*
+libcall({libname}, {funcname}, {argument})
+		在運行庫 {libname} 裡調用函數 {funcname} 並給出單個參數
+		{argument}。
+		這可以用於調用庫裡的函數，尤其是 Vim 裡用到的那些。因為只能使
+		用單個參數，所以可以調用的標準庫函數相當有限。
+		結果是函數返回的字符串。如果函數返回 NULL，在 Vim 裡會以空字符
+		串 "" 出現。
+		如果函數返回數值，請使用 |libcallnr()|！
+		如果 {argument} 是數值，它以 int 類型傳給函數；如果 {argument}
+		是字符串，它以 null 結尾的字符串類型傳入。
+		在 |restricted-mode| 裡，該函數不能運行。
+
+		libcall() 允許你寫自己的 Vim '插件' 擴展，而無須重新編譯程序。
+		它並_不_是用來調用系統函數的一個方法！如果你試圖這麼做，Vim 很
+		有可能會崩潰。
+
+		Win32 上，你寫的函數必須在 DLL 裡提供，而且必須使用普通的 C 調
+		用慣例 (_不是_ Windows 系統 DLL 使用的 Pascal 慣例)。函數必須
+		只能接受單個參數，或者是字符指針，或者是長整數，而且必須返回字
+		符指針或者 NULL。返回的字符指針必須指向在函數返回之後仍然指向
+		合法的內存 (比如 DLL 的靜態區域)。如果指向分配的區域，那麼內存
+		會發生洩漏。在函數里使用靜態緩衝區應該可以，在 DLL 卸載時會被
+		釋放。
+
+		警 告: 如果函數返回不合法的指針，Vim 會崩潰！如果函數返回數值
+		也會發生同樣的問題，因為 Vim 把它當作指針看待。
+		Win32 系統上，{libname} 必須是不帶 ".DLL" 後綴的 DLL 文件名。
+		只有 DLL 不在常見的位置的時候，才需要指定完整的路徑名。
+		Unix 上: 如果編譯你自己的插件，記住目標代碼必須生成位置無關代
+		碼 ('PIC')。
+		{僅當使用 Win32 和一些 Unix 版本且帶有 |+libcall| 特性時才有
+		效}
+		例如: >
+			:echo libcall("libc.so", "getenv", "HOME")
+<
+							*libcallnr()*
+libcallnr({libname}, {funcname}, {argument})
+		和 |libcall()| 類似，但函數返回 int，而不是字符串。
+		{僅當使用 Win32 和一些 Unix 版本且帶有 |+libcall| 特性時才有
+		效}
+		例如: >
+			:echo libcallnr("/usr/lib/libc.so", "getpid", "")
+			:call libcallnr("libc.so", "printf", "Hello World!\n")
+			:call libcallnr("libc.so", "sleep", 10)
+<
+							*line()*
+line({expr})	返回數值，即 {expr} 給定的文件位置的行號。可接受的位置是:
+		    .	    光標位置
+		    $	    緩衝區的最後一行
+		    'x	    位置標記 x 的位置 (如果該位置標記沒有設置，返回 0)
+		    w0	    當前窗口可見部分的首行
+		    w$	    當前窗口可見部分的末行
+		    v	    可視模式下: 可視區域的起始行 (光標在尾部)。如果不
+			    在可視模式下，返回光標位置。不同於 |'<|，可以得到
+			    立即的更新。
+		注意 可以使用其它文件的位置標記。此時行號應用於那個緩衝區。
+		要得到列號用 |col()|。兩者都要可用 |getpos()|。
+		例如: >
+			line(".")		光標所在的行號
+			line("'t")		位置標記 t 的行號
+			line("'" . marker)	名為 marker 的位置標記的行號
+<							*last-position-jump*
+		如果設置了 '" 位置標記的話，下面的自動命令在打開文件後跳轉到最
+		後已知的文件位置: >
+	:au BufReadPost * if line("'\"") > 1 && line("'\"") <= line("$") | exe "normal! g`\"" | endif
+<
+line2byte({lnum})					*line2byte()*
+		返回當前緩衝區第 {lnum} 行從緩衝區開始計算的字節數。這裡包括換
+		行符，但它具體的值取決於當前緩衝區的 'fileformat' 選項，第一行
+		返回 1。
+		這也可以用來得到最後一行之後的 "那行" 的字節計數: >
+			line2byte(line("$") + 1)
+<		這就等於文件大小加 1。
+		如果 {lnum} 非法或者編譯時關閉了 |+byte_offset| 特性，返回
+		-1。另見 |byte2line()|、|go| 和 |:goto|。
+
+lispindent({lnum})					*lispindent()*
+		得到第 {lnum} 行根據 lisp 縮進規則應有的縮進距離，見 'lisp'。
+		縮進的計算以空格計，因而和 'tabstop' 的值是有關係的。
+		{lnum} 的使用方式和 |getline()| 相同。
+		如果 {lnum} 非法或者 Vim 編譯時不帶 |+lispindent| 特性，返回
+		-1。
+
+localtime()						*localtime()*
+		返回當前時間，以 1970 年 1 月 1 日開始的秒數計算。另見
+		|strftime()| 和 |getftime()|。
+
+log({expr})						*log()*
+		返回浮點數，即浮點數 {expr} 的自然對數 (即以 e 為底)。
+		{expr} 計算結果必須為 (0, inf] 區間內的浮點數或數值。
+		示例: >
+			:echo log(10)
+<			2.302585 >
+			:echo log(exp(5))
+<			5.0
+		{僅當編譯時加入 |+float| 特性才有效}
+
+log10({expr})						*log10()*
+		返回浮點數，即浮點數 {expr} 以 10 為底的對數。
+		{expr} 計算結果必須為浮點數或數值。
+		示例: >
+			:echo log10(1000)
+<			3.0 >
+			:echo log10(0.01)
+<			-2.0
+		{僅當編譯時加入 |+float| 特性才有效}
+
+
+map({expr}, {string})					*map()*
+		{expr} 必須是 |List| 或 |Dictionary|。
+		{expr} 裡的每個項目被 {string} 的計算結果替代。
+		在 {string} 裡，|v:val| 包含當前項目的值。
+		對 |Dictionary| 而言，|v:key| 也包含當前項目的鍵。
+		對 |List| 而言，|v:key| 包含當前項目的索引。
+		例如: >
+			:call map(mylist, '"> " . v:val . " <"')
+<		"mylist" 裡的每個項目之前放上 "> "，而之後放上 " <"。
+
+		注意 {string} 是表達式的計算結果，而它本身又用作表達式。通常，
+		最好用 |literal-string| 來避免反斜槓加倍。當然，你仍然需要加倍
+		' 引號。
+
+		本操作直接修改輸入。如果你不希望修改 |List| 或 |Dictionary|，
+		先構建一個備份: >
+			:let tlist = map(copy(mylist), ' & . "\t"')
+
+<		返回 {expr}，過濾過的 |List| 或 |Dictionary|。
+		如果 {string} 計算時有錯誤，{expr} 的其餘項目不再處理。
+
+
+maparg({name}[, {mode} [, {abbr}]])			*maparg()*
+		返回模式 {mode} 名為 {name} 的映射的右邊。如果沒有名為 {name}
+		的映射，返回空字符串。
+		{mode} 可以使用下列字符串之一:
+			n	普通模式
+			v	可視模式
+			o	操作符等待模式
+			i	插入模式
+			c	命令行模式
+			l	Language-Argument ("r"、 "f"、"t" 等等) 模式
+			""	普通、可視和操作符等待模式。
+		如果沒有提供 {mode}，使用 "" 指定的模式。
+		如果提供 {abbr} 且非零，使用縮寫而不是映射。
+		{name} 可以使用特殊鍵名，如同 ":map" 命令那樣。返回的字符串會
+		把特殊的字符翻譯成和 ":map" 命令所列出輸出結果一樣的格式。
+		先檢查局部於當前緩衝區的映射，然後再檢查全局映射。
+		此函數可以用來給鍵映射。如果已經映射過，還可以使用原來映射的內
+		容。大意: >
+			exe 'nnoremap <Tab> ==' . maparg('<Tab>', 'n')
+
+
+mapcheck({name}[, {mode} [, {abbr}]])			*mapcheck()*
+		檢查是否有模式 {mode} 下匹配 {name} 的映射。|maparg()| 說明
+		{mode} 和 {name} 裡的特殊鍵名。
+		如果提供 {abbr} 且非零，使用縮寫而不是映射。
+		匹配在映射名以 {name} 開始或者映射名等於 {name} 的開始部分時候
+		發生。
+
+			匹配映射	"a"     "ab"    "abc" ~
+		   mapcheck("a")	是	是	 是
+		   mapcheck("abc")	是	是	 是
+		   mapcheck("ax")	是	否	 否
+		   mapcheck("b")	否	否	 否
+
+		和 maparg() 的差別是，mapcheck() 查找匹配 {name} 的映射，而
+		maparg() 只查找名字完全符合 {name} 的映射。
+		如果沒有 {name} 開始的映射，返回空字符串。如果有一個，返回該映
+		射的右邊。如果有多個，返回其中某一個的右邊。
+		    先檢查局部於當前緩衝區的映射，然後再檢查全局映射。
+		該函數用於檢查是否可以無二義性地添加映射。例如: >
+	:if mapcheck("_vv") == ""
+	:   map _vv :set guifont=7x13<CR>
+	:endif
+<		就避免了在已有 "_v" 或者 "_vvv" 映射的時候添加 "_vv" 映射。
+
+match({expr}, {pat}[, {start}[, {count}]])			*match()*
+		如果 {expr} 是 |List|，返回匹配 {pat} 的第一個項目的索引。每個
+		項目用作字符串，|List| 和 |Dictionary| 使用回顯的形式。
+		否則，{expr} 用作字符串。返回數值，給出 {expr} 裡 {pat} 匹配的
+		(字節計算的偏移量) 位置。
+		在第一個字符或 |List| 項目上的匹配返回零。若無匹配，返回 -1。
+		例如: >
+			:echo match("testing", "ing")	" 返回 4
+			:echo match([1, 'x'], '\a')	" 返回 1
+<		|string-match| 說明如何使用 {pat}。
+								*strpbrk()*
+		Vim 沒有 strpbrk() 函數。但你可以這麼做: >
+			:let sepidx = match(line, '[.,;: \t]')
+<								*strcasestr()*
+		Vim 沒有 strcasestr() 函數。但你可以在模式裡加入 "\c" 以忽略大
+		小寫: >
+			:let idx = match(haystack, '\cneedle')
+<
+		如果給出 {start}，搜索從字符串的字節位置 {start} 或 |List| 索
+		引為 {start} 的項目開始。
+		不過，結果仍然從第一個字符/項目開始算起。比如: >
+			:echo match("testing", "ing", 2)
+<		返回結果是 "4"。 >
+			:echo match("testing", "ing", 4)
+<		返回結果還是 "4"。 >
+			:echo match("testing", "t", 2)
+<		返回 "3"。
+		對字符串而言，如果 {start} > 0，其行為就像該字符串在 {start}
+		個字節後開始，因而 "^" 會從 {start} 開始匹配。如果給出 {count}
+		時則不是如此，此時忽略 {start} 字節前的匹配 (有一點複雜，這是
+		為了後向兼容)。
+		對字符串而言，如果 {start} < 0，它被置為 0。對列表而言，此索引
+		從尾部起算。
+		如果 {start} 越界 (字符串 {start} > strlen({expr})，而 |List|
+		{start} > len({expr}))，返回 -1。
+
+		如果給出 {count}，使用第 {count} 個匹配。如果字符串裡找到一個
+		匹配，下一匹配從此匹配之後一個字符開始尋找。所以下例返回 1: >
+			echo match("testing", "..", 0, 2)
+<		|List| 裡，搜索從下一個項目開始。
+		注意 如果加入 {count}，{start} 使用的方式有所改變。見上。
+
+		|pattern| 說明可以接受的模式。
+		'ignorecase' 選項用來設定模式是否忽略大小寫。_不_使用
+		'smartcase'。匹配總是假定置位了 'magic' 而 'cpoptions' 為空。
+
+					*matchadd()* *E798* *E799* *E801*
+matchadd({group}, {pattern}[, {priority}[, {id}]])
+		定義模式 (一個 "匹配")， 在當前窗口用高亮組 {group} 高亮。返回
+		標識號 (ID)，|matchdelete()| 可用該 ID 來刪除匹配。
+
+		可選的 {priority} 參數指定匹配的優先級。高優先級的匹配的高亮會
+		否決低優先級匹配的高亮。優先級用整數指定 (負整數也無不可)。如
+		果未指定 {priority} 參數，缺省優先級為 10。'hlsearch' 的優先級
+		為零，這樣所有正優先級的匹配都可以否決它。語法高亮 (見
+		'syntax') 採用不同的機制，無論選擇的優先級如何，匹配總會否決語
+		法的高亮。
+
+		可選的 {id} 參數請求特定的匹配 ID。如果指定的 ID 已用，報錯，
+		並不加入該匹配。ID 用正整數指定 (不含零)。ID 1、2 和 3 分別為
+		|:match|、|:2match| 和 |:3match| 命令保留。如果 {id} 未指定，
+		|matchadd()| 自動選擇一個可用的 ID。
+
+		匹配的數目不限，|:match| 諸命令則有此局限。
+
+		示例: >
+			:highlight MyGroup ctermbg=green guibg=green
+			:let m = matchadd("MyGroup", "TODO")
+<		要刪除該模式: >
+			:call matchdelete(m)
+
+<		用 |getmatches()| 可以得到 |matchadd()| 和 |:match| 定義的匹配
+		列表。|clearmatches()| 可一次刪除所有的匹配。
+
+matcharg({nr})							*matcharg()*
+		選擇 {nr} 號匹配的項目，它們分別用 |:match|、|:2match| 或
+		|:3match| 命令設置。
+		返回兩個項目的 |List|:
+			使用的高亮組名
+			使用的模式。
+		如果 {nr} 不是 1、2 或 3，返回空 |List|。
+		如果沒有匹配的項目，返回 ['', '']。
+		這用來保存和恢復 |:match|。
+		用 |:match| 命令高亮的匹配限於三個。|matchadd()| 無此限制。
+
+matchdelete({id})			       *matchdelete()* *E802* *E803*
+		刪除之前用 |matchadd()| 或 |:match| 諸命令定義的 ID 為 {id} 的
+		匹配。如果成功，返回 0，不然返回 -1。示例見 |matchadd()|。
+		|clearmatches()| 可一次刪除所有的匹配。
+
+matchend({expr}, {pat}[, {start}[, {count}]])			*matchend()*
+		和 |match()| 相同，但返回匹配之後的第一個字符的位置。比如: >
+			:echo matchend("testing", "ing")
+<		返回 "7"。
+							*strspn()* *strcspn()*
+		Vim 沒有 strspn() 或 strcspn() 函數，但可用 matchend() 實現: >
+			:let span = matchend(line, '[a-zA-Z]')
+			:let span = matchend(line, '[^a-zA-Z]')
+<		不過沒有匹配時，它返回 -1。
+
+		如果給出 {start}，和 |match()| 裡的用法相同。 >
+			:echo matchend("testing", "ing", 2)
+<		返回 "7"。 >
+			:echo matchend("testing", "ing", 5)
+<		返回 "-1"。
+		如果 {expr} 是 |List|，結果和 |match()| 相同。
+
+matchlist({expr}, {pat}[, {start}[, {count}]])			*matchlist()*
+		和 |match()| 相同，但返回 |List|。列表第一項是匹配的字符串，和
+		|matchstr()| 返回值相同。其後的項目是子匹配，類似
+		|:substitute| 的 "\1"、"\2" 等。如果某個可選的子匹配不匹配，用
+		空字符串代替。例如: >
+			echo matchlist('acd', '\(a\)\?\(b\)\?\(c\)\?\(.*\)')
+<		返回: ['acd', 'a', '', 'c', 'd', '', '', '', '', '']
+		如果沒有匹配，返回空列表。
+
+matchstr({expr}, {pat}[, {start}[, {count}]])			*matchstr()*
+		和 |match()| 相同，但返回匹配的字符串。例如: >
+			:echo matchstr("testing", "ing")
+<		返回 "ing"。
+		如果沒有匹配，返回 ""。
+		如果給出 {start}，它和 |match()| 裡的用法相同。 >
+			:echo matchstr("testing", "ing", 2)
+<		返回 "ing"。 >
+			:echo matchstr("testing", "ing", 5)
+<		返回 ""。
+		如果 {expr} 是 |List|，返回匹配的項目。其類型不改變，因而不一
+		定是字符串。
+
+							*max()*
+max({list})	返回 {list} 所有項目的最大值。
+		如果 {list} 不是列表，或者其中某個項目不能用作數值，出錯。
+		空 |List| 返回零。
+
+							*min()*
+min({list})	返回 {list} 所有項目的最小值。
+		如果 {list} 不是列表，或者其中某個項目不能用作數值，出錯。
+		空 |List| 返回零。
+
+							*mkdir()* *E739*
+mkdir({name} [, {path} [, {prot}]])
+		建立目錄 {name}。
+		如果 {path} 為 "p"，必要時建立中間的目錄。否則它必須是 ""。
+		如果給出 {prot}，它用於設置新目錄的權限。缺省為 0755
+		(rwxr-xr-x: 用戶自己可讀寫，其它人可讀)。用 0700 使其它人不可
+		讀。這只用於 {name} 的最後部分。所以，如果建立 /tmp/foo/bar，
+		/tmp/foo 創建時的權限是 0755。
+		示例: >
+			:call mkdir($HOME . "/tmp/foo/bar", "p", 0700)
+<		該函數在沙盤裡不可用 |sandbox|。
+		不一定在所有系統上都可用。要檢查這一點，使用: >
+			:if exists("*mkdir")
+<
+							*mode()*
+mode([expr])	返回指示當前模式的字符串。
+		如果指定 [expr] 並且其值為非零的數值或非空的字符串
+		(|non-zero-arg|)，返回完整模式，不然，返回第一個字母。注意 " "
+		和 "0" 都是非空字符串。
+
+			n	普通模式
+			no	操作符等待模式
+			v	面向字符的可視模式
+			V	面向行的可視模式
+			CTRL-V	面向列塊的可視模式
+			s	面向字符的選擇模式
+			S	面向行的選擇模式
+			CTRL-S	面向列塊的選擇模式
+			i	插入模式
+			R	替換模式 |R|
+			Rv	虛擬替換模式 |gR|
+			c	命令行模式
+			cv	Vim Ex 模式 |gQ|
+			ce	普通 Ex 模式 |Q|
+			r	輸入回車的提示
+			rm	-- more -- 提示
+			r?	|:confirm| 等等的詢問
+			!	執行外殼或外部命令時
+		可用於 'statusline' 選項或 |remote_expr()|。在其它的多數地方，
+		它總是返回 "c" 或 "n"。
+		另見 |visualmode()|。
+
+mzeval({expr})							*mzeval()*
+		計算 MzScheme 表達式 {expr} 並返回計算結果，轉換為 Vim 本身的
+		數據結構。
+		數值和字符串返回本身。
+		組對 (pair) (包含列表 (list) 和非常規列表 (improper list)) 和
+		向量 (vector) 以 Vim |List| 形式返回。
+		哈希表 (hash table) 以 Vim |Dictionary| 形式返回，其鍵轉換成字
+		符串。
+		所有其它類型依 display 函數調用的結果轉換為字符串。
+		示例: >
+		    :mz (define l (list 1 2 3))
+		    :mz (define h (make-hash)) (hash-set! h "list" l)
+		    :echo mzeval("l")
+		    :echo mzeval("h")
+<
+		{僅當編譯時帶 |+mzscheme| 特性才有效}
+
+nextnonblank({lnum})					*nextnonblank()*
+		返回第一個從 {lnum} 開始的非空白行的行號。例如: >
+			if getline(nextnonblank(1)) =~ "Java"
+<		如果 {lnum} 非法或者在從該行開始都沒有非空白行，返回零。
+		另見 |prevnonblank()|。
+
+nr2char({expr})						*nr2char()*
+		返回單個字符組成的字符串，該字符的數值為 {expr}。例如: >
+			nr2char(64)		返回 "@"
+			nr2char(32)		返回 " "
+<		使用當前的 'encoding'。比如對 "utf-8" 來說: >
+			nr2char(300)		返回帶有弓形的 I
+<		注意 文件裡的 NUL 字符須用 nr2char(10) 指定。因為 Vim 用換行符
+		來表示 NUL。真正的 NUL 是 nr2char(0)，而它會終結字符串，因而返
+		回空串。
+
+							*getpid()*
+getpid()	返回數值，即 Vim 進程的進程號。Unix 和 MS-Windows 上這是個唯一
+		的數值，直到 Vim 退出為止。MS-DOS 上該值總為零。
+
+							*getpos()*
+getpos({expr})	得到 {expr} 的位置。可用的 {expr} 的值見 |line()|。
+		返回 |List|，包含四個數值:
+		    [bufnum, lnum, col, off]
+		"bufnum" 為零，除非使用了 '0 或 'A 這樣的位置標記，這時它是此
+		位置標記所在的緩衝區號。
+		"lnum" 和 "col" 是緩衝區裡的位置。第一列為 1。
+		除非使用了 'virtualedit'。"off" 值為零，這是從對應字符開始位置
+		計算的屏幕列。例如，在製表之中或最後一個字符之後的某個位置。可
+		以用來保存和恢復光標位置: >
+			let save_cursor = getpos(".")
+			移動光標
+			call setpos('.', save_cursor)
+<		另見 |setpos()|。
+
+pathshorten({expr})					*pathshorten()*
+		縮短路徑 {expr} 裡的目錄名，返回其結果。路徑的尾部，即文件名，
+		保持不變。路徑的其餘部分被縮短為單個字符。保持每個部分引導的
+		'~' 和 '.' 字符不變。例如: >
+			:echo pathshorten('~/.vim/autoload/myfile.vim')
+<			~/.v/a/myfile.vim ~
+		該路徑實際存在與否並不相干。
+
+pow({x}, {y})						*pow()*
+		返回浮點數，即 {x} 的 {y} 次方。
+		{x} 和 {y} 的計算結果必須是浮點數或數值。
+		示例: >
+			:echo pow(3, 3)
+<			27.0 >
+			:echo pow(2, 16)
+<			65536.0 >
+			:echo pow(32, 0.20)
+<			2.0
+		{僅當編譯時加入 |+float| 特性才有效}
+		
+prevnonblank({lnum})					*prevnonblank()*
+		返回第一個 {lnum} 所在或之上的非空白行的行號。例如: >
+			let ind = indent(prevnonblank(v:lnum - 1))
+<		如果 {lnum} 非法或者在該行和它之前都沒有非空白行，返回零。
+		另見 |nextnonblank()|。
+
+
+printf({fmt}, {expr1} ...)				*printf()*
+		返回 {fmt} 指定的字符串，其中每個 "%" 項目被它們對應的參數排版
+		後的形式取代。例如: >
+			printf("%4d: E%d %.30s", lnum, errno, msg)
+<		可能的返回結果:
+			"  99: E42 asdfasdfasdfasdfasdfasdfasdfas" ~
+
+		常用的項目有:
+		  %s	字符串
+		  %6s	右對齊到 6 個字節的字符串
+		  %.9s  截短到 9 個字節的字符串
+		  %c    單個字節
+		  %d    十進制數
+		  %5d   十進制數，用空格補足到 5 個字符
+		  %x    十六進制數
+		  %04x  十六進制數，用 0 補足到 4 個字符
+		  %X    十六進制數，用大寫字母的十六進制字母
+		  %o    八進制數
+		  %f	浮點數，形如 123.456
+		  %e    浮點數，形如 1.234e3
+		  %E    浮點數，形如 1.234E3
+		  %g    浮點數，根據不同的值，使用合適的 %f 或 %e
+		  %G    浮點數，根據不同的值，使用合適的 %f 或 %E
+		  %%    % 字符本身
+
+		轉換規格說明以 '%' 開始，以轉換類型結束。所有其它的字符按原樣
+		複製到結果中。
+
+		"%" 開始轉換規格說明。其後的參數依序如下:
+
+			%  [flags]  [field-width]  [.precision]  type
+
+		flags
+			零或多個下面的標誌位:
+
+		    #	      轉換值為 "替換形式"。對 c、d 和 s 轉換，此選項無
+		              效。對 o 轉換，增加數值的精度，使得輸出字符串的
+			      第一個字符總是 0 (除非打印零值，且顯式地使用精度
+			      0)。
+			      對 x 和 X 轉換，非零值在前面加上字符串 "0x" (X
+			      轉換用 "0X")。
+
+		    0 (零)    以 0 填充。對所有的轉換，左側用 0 而非空格填充。
+		              如果對數值的轉換給出精度 (d、o、x 和 X)，忽略 0
+			      標誌位。
+
+		    -	      負域寬度標誌位；轉換後的值被左對齊到域邊界上。該
+			      值右側用空格填充，而不是在左側用空格或 0 填充。
+			      如果兩個標誌位同時給出，- 否決 0。
+
+		    ' ' (空格)  帶符號轉換 (d) 產生的正數左側加上空格。
+
+		    +	      帶符號轉換產生的數值之前總加上符號。如果兩個標誌
+		              位同時給出，+ 否決空格。
+
+		field-width
+			可選的十進制數位字符串，指定最小的字段寬度。如果轉換後
+			的值的字節數小於字段寬度，在左側 (或右側，如果給定左對
+			齊標誌位的話) 用空格填充到字段寬度。
+
+		.precision
+			可選的精度，形式為句號 '.' 後跟一個可選的數位字符串。
+			如果省略了數位字符串，假設精度為零。
+			它給出 d、o、x 和 X 轉換顯示的最小數位數量，或 s 轉換
+			顯示的字符串的字節的最大數量。
+			對浮點數而言，指定小數點後的數位個數。
+
+		type
+			指定要進行的轉換類型的單個字符，見下。
+
+		字段寬度、精度 (兩者都有亦可) 可以用星號 '*' 代替數位字符串。
+		此情形下，一個數值參數指定字段寬度或精度。負的字段寬度被理解為
+		帶左對齊的標誌位後跟一個正數字段寬度；負的精度被理解為就像不存
+		在一樣。例如: >
+			:echo printf("%d: %.*s", nr, width, line)
+<		限制 "line" 文本的長度為 "width" 個字節。
+
+		轉換標識符和它們的含義如下:
+
+				*printf-d* *printf-o* *printf-x* *printf-X*
+		doxX    數值參數被轉換為帶符號十進制 (d)，無符號八進制 (o) 或
+		        無符號十六進制 (x 和 X) 記法。x 轉換用字母 "abcdef"；X
+			轉換用 "ABCDEF" 字母。
+			如果提供了精度，它給出必須出現的數位的最少數目；如果轉
+			換後的值需要更少的數位，左側用 0 填充。
+			任何情況下數值字段都不會被不存在或者更小的字段寬度所截
+			短；如果轉換的結果寬於字段寬度，字段被擴展，以包含轉換
+			後的結果。
+
+							*printf-c*
+		c	數值參數被轉換為字節，寫入產生的字符。
+
+							*printf-s*
+		s	使用字符串參數的文本。如果指定精度，使用不多於給定數目
+		        的字節數。
+
+							*printf-f* *E807*
+                f	浮點數參數被轉換為形如 123.456 的字符串。精度指定小數
+			點後面的位數。如果精度為零，則省略小數點本身。如果未指
+			定精度，缺省為 6。那個很大很大的數 (超出返回或除以零的
+			結果) 顯示 "inf"。
+			"0.0 / 0.0" 顯示 "nan"。
+			示例: >
+				echo printf("%.2f", 12.115)
+<				12.12
+			注意 截斷方式取決於系統庫。如不確定，使用 |round()|。
+
+							*printf-e* *printf-E*
+		e E	浮點數參數被轉換為形如 1.234e+03 或用 'E' 的話
+			1.234E+03 的字符串。精度指定小數點後面的位數，和 'f'
+			一樣。
+
+							*printf-g* *printf-G*
+		g G	如果浮點數參數在 0.001 (含) 和 10000000.0 (不含) 之
+			間，則其轉換同 'f'，不然，'g' 同 'e' 而 'G' 同 'E'。如
+			果未指定精度，除了小數點之後的那個零以外，不顯示多餘的
+			零和 '+' 負號。因而，10000000.0 顯示為 1.0e7。
+
+							*printf-%*
+		%	寫入 '%'。不轉換參數。這裡完整的轉換規格說明是 "%%"。
+
+		如果期待數值參數，字符串參數也被接受並自動轉換。
+		如果期待浮點數或字符串參數，數值參數也被接受並自動轉換。
+		其它參數類型產生錯誤信息。
+
+							*E766* *E767*
+		{exprN} 參數的數量必須和 "%" 項目的數量完全匹配。不論參數不足
+		還是過多，都會給出錯誤。至多可用 18 個參數。
+
+
+pumvisible()						*pumvisible()*
+		如果彈出菜單可見，返回非零，不然返回零。見
+		|ins-completion-menu|。
+		可以用來避免一些會刪除彈出菜單的動作。
+
+							*E726* *E727*
+range({expr} [, {max} [, {stride}]])				*range()*
+		返回數值的 |List|:
+		- 如果只有指定 {expr}: [0, 1, ..., {expr} - 1]
+		- 如果指定了 {max}: [{expr}, {expr} + 1, ..., {max}]
+		- 如果指定了 {stride}: [{expr}, {expr} + {stride}, ...,
+		  {max}] (每次給 {expr} 遞增 {stride}，但不會產生超過 {max} 的
+		  值)。
+		如果最大值比開始值小一，返回空列表。如果更小，報錯。
+		例如: >
+			range(4)		" [0, 1, 2, 3]
+			range(2, 4)		" [2, 3, 4]
+			range(2, 9, 3)		" [2, 5, 8]
+			range(2, -2, -1)	" [2, 1, 0, -1, -2]
+			range(0)		" []
+			range(2, 0)		" 出錯！
+<
+							*readfile()*
+readfile({fname} [, {binary} [, {max}]])
+		讀入文件 {fname} 並返回 |List|。，文件每行一項。在 NL 字符處斷
+		開行。以 CR 分隔的 Macintosh 文件會返回單個長行 (除非某處出現
+		了 NL)。
+		所有的 NUL 字符被 NL 字符替代。
+		如果 {binary} 等於 "b"，使用二進制模式:
+		- 如果末行以 NL 結尾，附加額外的一個空列表項。
+		- 不刪除 CR 字符。
+		否則:
+		- NL 之前的 CR 字符被刪除。
+		- 末行是否以 NL 結尾沒有影響。
+		- 'encoding' 如是 Unicode 編碼，刪除文本可能有的 UTF-8 字節順
+		  序標識。
+		如果給出 {max}，指定讀入的最大行數。可用於只想檢查文件開始十行
+		這樣的場合: >
+			:for line in readfile(fname, '', 10)
+			:  if line =~ 'Date' | echo line | endif
+			:endfor
+<		如果 {max} 為負，返回從文件尾部起算 -{max} 行，有多少算多少。
+		如果 {max} 為零，返回空列表。
+		注意 如果沒有 {max}，把整個文件讀到內存。
+		也要 注意 這裡不識別編碼。如果需要，把文件讀到緩衝區裡。
+		如果文件不能打開，給出錯誤信息，並返回空列表。
+		另見 |writefile()|。
+
+reltime([{start} [, {end}]])				*reltime()*
+		返回代表時間值的項目。項目的格式取決於不同的系統。可以把它傳遞
+		給 |reltimestr()| 來轉換為字符串。
+		沒有參數，返回當前時間。
+		帶一個參數，返回參數指定的時間以來的時間。
+		帶兩個參數，返回 {start} 和 {end} 之間跨越的時間。
+		{start} 和 {end} 參數必須是 reltime() 返回的值。
+		{僅當編譯時加入 |+reltime| 特性才有效}
+
+reltimestr({time})				*reltimestr()*
+		返回字符串，代表 {time} 的時間值。
+		形式是秒數、句號和毫秒數。例如: >
+			let start = reltime()
+			call MyFunction()
+			echo reltimestr(reltime(start))
+<		注意 命令本身額外的開銷也計算在時間裡。時間的準確度取決於系
+		統。
+		返回結果包含引導的空格，使字符串能很好地對齊。如果你不需要，用
+		split() 可以刪掉。 >
+			echo split(reltimestr(reltime(start)))[0]
+<		另見 |profiling|。
+		{僅當編譯時加入 |+reltime| 特性才有效}
+
+							*remote_expr()* *E449*
+remote_expr({server}, {string} [, {idvar}])
+		發送 {string} 到 {server}。該發送的字符串是一個表達式，而返回
+		的是遠端執行的結果。這個結果必然是字符串或 |List|。|List| 被轉
+		換成字符串，轉換方法是把項目用換行符連接起來 (末項之後沒有)，
+		就像用 join(expr, "\n") 那樣。
+		如果給出 {idvar}，將 {serverid} 保存在以它命令的變量裡，此後的
+		remote_read() 需要使用此值。
+		另見 |clientserver| |RemoteReply|。
+		該函數在沙盤裡不可用 |sandbox|。
+		{僅當編譯時加入 |+clientserver| 特性才有效}
+		注意: 任何錯誤會在本地產生錯誤信息，但返回的結果只是一個空字符
+		串。
+		例如: >
+			:echo remote_expr("gvim", "2+2")
+			:echo remote_expr("gvim1", "b:current_syntax")
+<
+
+remote_foreground({server})				*remote_foreground()*
+		把名為 {server} 的 Vim 服務器帶到前台。
+		這類似於: >
+			remote_expr({server}, "foreground()")
+<		Win32 系統除外。那裡，客戶端完成實際的工作。因為操作系統不
+		總能允許服務器把自己帶到前台。
+		注意: 如果窗口最小化，並不恢復之，foreground() 會這麼做。
+		該函數在沙盤裡不可用 |sandbox|。
+		{僅可用在 Win32、Athena、Motif 和 GTK 的 GUI 版本和 Win32 的控
+		制台版本}
+
+
+remote_peek({serverid} [, {retvar}])		*remote_peek()*
+		如果 {serverid} 有可用的字符串，返回正數。如果指定了
+		{retvar}，複製任何應答字符串到 {retvar} 指定的變量。{retvar}
+		必須是一個用來指定變量名的字符串。
+		如果沒有可用的應答，返回 0。
+		如果出錯，返回 -1。
+		另見 |clientserver|。
+		該函數在沙盤裡不可用 |sandbox|。
+		{僅當編譯時加入 |+clientserver| 特性才有效}
+		示例: >
+			:let repl = ""
+			:echo "PEEK: ".remote_peek(id, "repl").": ".repl
+
+remote_read({serverid})				*remote_read()*
+		返回從 {serverid} 發送的存在時間最長的應答，並刪除之。該調用會
+		等待直到有應答為止。
+		另見 |clientserver|。
+		該函數在沙盤裡不可用 |sandbox|。
+		{僅當編譯時加入 |+clientserver| 特性才有效}
+		例如: >
+			:echo remote_read(id)
+<
+							*remote_send()* *E241*
+remote_send({server}, {string} [, {idvar}])
+		發送 {string} 到 {server}。發送的字符串是輸入鍵的序列。函數立
+		即返回。Vim 的服務器端不對鍵進行映射 |:map|。
+		如果給出 {idvar}，將 {serverid} 保存在以它命令的變量裡，此後的
+		remote_read() 需要使用此值。
+		另見 |clientserver| |RemoteReply|。
+		該函數在沙盤裡不可用 |sandbox|。
+		{僅當編譯時加入 |+clientserver| 特性才有效}
+		注意: 任何錯誤會在服務器端報告，從而影響那裡的顯示。
+		例如: >
+		:echo remote_send("gvim", ":DropAndReply ".file, "serverid").
+		 \ remote_read(serverid)
+
+		:autocmd NONE RemoteReply *
+		 \ echo remote_read(expand("<amatch>"))
+		:echo remote_send("gvim", ":sleep 10 | echo ".
+		 \ 'server2client(expand("<client>"), "HELLO")<CR>')
+<
+remove({list}, {idx} [, {end}])				*remove()*
+		沒有 {end}: 刪除 |List| {list} 裡索引為 {idx} 的項目並返回之。
+		有 {end}: 刪除從 {idx} 到 {end} (包含) 的項目，並返回這些項目
+		的列表。如果 {idx} 指向和 {end} 相同的項目，返回單個項目的列
+		表。如果 {end} 指向 {idx} 之前的項目，報錯。
+		|list-index| 說明 {idx} 和 {end} 可能的取值。
+		例如: >
+			:echo "last item: " . remove(mylist, -1)
+			:call remove(mylist, 0, 9)
+remove({dict}, {key})
+		刪除 {dict} 裡鍵為 {key} 的項目。例如: >
+			:echo "removed " . remove(dict, "one")
+<		如果 {dict} 裡沒有鍵 {key}，報錯。
+
+		|delete()| 用來刪除文件。
+
+rename({from}, {to})					*rename()*
+		把文件名 {from} 換成 {to}。這也可用來在文件系統間移動文件。返
+		回數值，如果文件成功換名，返回零，如果換名失敗，返回非零。
+		注意 如果 {to} 已存在，它被覆蓋且沒有提示。
+		該函數在沙盤裡不可用 |sandbox|。
+
+repeat({expr}, {count})					*repeat()*
+		重複 {expr} {count} 次，並返回連接後的結果。例如: >
+			:let separator = repeat('-', 80)
+<		如果 {count} 為零或負，返回空。
+		如果 {expr} 是 |List| 類型，返回連接 {expr} {count} 次的結果。
+		例如: >
+			:let longlist = repeat(['a', 'b'], 3)
+<		返回 ['a', 'b', 'a', 'b', 'a', 'b']。
+
+
+resolve({filename})					*resolve()* *E655*
+		在 MS-Windows 上，如果 {filename} 是一個快捷方式 (.lnk 文件)，
+		返回簡化的快捷方式指向的路徑。
+		在 Unix 上，反覆分析 {filename} 的所有路徑部分的符號鏈接的真正
+		路徑，直到返回最簡化的結果為止。為了處理循環鏈接的問題，符號鏈
+		接的分析在 100 次疊代之後停止。
+		在其它系統上，返回簡化了的 {filename}。
+		簡化的工作通過 |simplify()| 完成。
+		resolve() 保留指向當前目錄的首個路徑部分 (保證結果仍然是相對路
+		徑名)，也保留出現在尾部的路徑分隔符。
+
+							*reverse()*
+reverse({list})	反轉 {list} 項目的順序，直接對 {list} 進行修改。返回 {list}。
+		如果你不想修改列表，先構建一個備份: >
+			:let revlist = reverse(copy(mylist))
+
+round({expr})							*round()*
+		返回浮點數，即最接近於 {expr} 的整數。如果 {expr} 在兩個整數的
+		正中間，使用 (譯者注: 絕對值) 較大 (遠離零的) 那個。
+		{expr} 的計算結果必須是浮點數或數值。
+		示例: >
+			echo round(0.456)
+<			0.0  >
+			echo round(4.5)
+<			5.0 >
+			echo round(-4.5)
+<			-5.0
+		{僅當編譯時加入 |+float| 特性才有效}
+
+
+search({pattern} [, {flags} [, {stopline} [, {timeout}]]])	*search()*
+		搜索正規表達式模式 {pattern}。搜索從光標位置 (用 |cursor()| 可
+		以得到) 開始。
+		{flags} 是字符串，可以包含以下字符標誌位:
+		'b'	反向搜索，而不是正向搜索
+		'c'     接受光標位置上的匹配
+		'e'	移到匹配的尾部
+		'n'	不 (Not) 移動光標
+		'p'	返回匹配的子模式號 (見下)
+		's'	在光標上次的位置上設置 ' 位置標記
+		'w'	在文件尾部處迴繞到文件開始處
+		'W'	不在文件尾部處迴繞
+		如果 'w' 和 'W' 都沒有給出，根據 'wrapscan' 選項決定。
+
+		如果提供 's' 標誌位，只有在光標移動的時候才設置 ' 位置標記。
+		's' 標誌位不能和 'n' 標誌位一起使用。
+
+		適用 'ignorecase'、'smartcase' 和 'magic' 標誌位。
+
+		如果給出 {stopline} 參數，搜索在搜索完該行後結束。可用於限制搜
+		索在給出的行範圍內。例如: >
+			let match = search('(', 'b', line("w0"))
+			let end = search('END', '', line("w$"))
+<		如果使用了 {stopline} 且非零，隱含意味著搜索不會在文件尾迴繞。
+		零就相當於沒給出該參數。
+
+		如果給出 {timeout} 參數，搜索在超過給出的毫秒數後中止。這樣，
+		如果 {timeout} 為 500，搜索在半秒鐘後中止。該值不能為負。
+		零就相當於沒給出該參數。
+		{僅當在編譯時加入 |+reltime| 特性才有效}
+
+		如果找不到匹配，返回 0 並且光標位置不改變。不會給出錯誤信息。
+		如果找到了匹配，返回其所在的行號。
+							*search()-sub-match*
+		如果有 'p' 標誌位，返回值比第一個匹配的 \(\) 裡的子模式的編號
+		多一。如果所有子模式都不匹配但整個模式匹配，返回一。
+		要得到列號，使用 |searchpos()|。
+
+		光標定位在匹配的文本上，除非使用了 'n' 標誌位。
+
+		示例 (遍歷參數列表裡的所有文件): >
+		    :let n = 1
+		    :while n <= argc()	    " 循環遍歷參數列表的每個文件
+		    :  exe "argument " . n
+		    :  " 從文件最後一個字符開始並迴繞，這樣第一個搜索可以找到
+		    :  " 文件開始的匹配
+		    :  normal G$
+		    :  let flags = "w"
+		    :  while search("foo", flags) > 0
+		    :    s/foo/bar/g
+		    :	 let flags = "W"
+		    :  endwhile
+		    :  update		    " 如果修改過，寫入文件
+		    :  let n = n + 1
+		    :endwhile
+<
+
+searchdecl({name} [, {global} [, {thisblock}]])			*searchdecl()*
+		搜索 {name} 的聲明。
+		
+		如果 {global} 參數非零，使用 |gD| 的工作方式，尋找文件的第一個
+		匹配。否則使用 |gd| 的工作方式，尋找函數里的第一個匹配。
+
+		如果 {thisblock} 參數非零，忽略光標位置前結束的 {} 塊裡的匹
+		配。可以避免只有在別的作用域裡才有效的變量聲明。
+
+		移動光標到找到的匹配上。
+		返回零代表成功，非零代表失敗。
+		例如: >
+			if searchdecl('myvar') == 0
+			   echo getline('.')
+			endif
+<
+							*searchpair()*
+searchpair({start}, {middle}, {end} [, {flags} [, {skip}
+				[, {stopline} [, {timeout}]]]])
+		搜索嵌套的 start-end 組對的匹配。這可以用來查找匹配 "if" 的
+		"endif"。在這裡面的其它的 if/endif 組對被忽略。搜索從光標開
+		始。缺省正向搜索，在 {flags} 裡包含 'b' 的時候反向搜索。
+		如果找到一個匹配，光標移動到那裡並返回行號。如果沒有匹配，
+		返回 0 或者 -1，光標不移動。不會給出錯誤信息。
+
+		{start}、{middle} 和 {end} 都是模式，見 |pattern|。它們不能包
+		含 \( \) 對，但可以使用 \%( \)。如果 {middle} 非空，在相應的方
+		向試圖尋找它 (如果找到，停留在哪裡)，但在嵌套的 start-end 組對
+		裡面的不算。一個典型的應用是: >
+			searchpair('\<if\>', '\<else\>', '\<endif\>')
+<		如果 {middle} 為空，跳過 "else"。
+
+		{flags} 'b'、'c'、'n'、's'、'w' 和 'W' 的使用方式和 |search()|
+		類似。此外，還可用:
+		'r'	重複 (Repeat) 直到沒有更多匹配位置；會找到最外層的組
+		        對。隱含 'W' 標誌位。
+		'm'	返回匹配 (Match) 的數目而不是匹配的行號；使用 'r' 時會
+			> 1。
+		備註: 最好使用 'W' 標誌位，避免在文件尾迴繞。
+
+		如果找到 {start}、{middle} 或 {end} 的匹配，計算 {skip} 表達
+		式，此時假定光標定位在匹配的開始處。如果返回零，該匹配被跳過。
+		比如，可能是出現在註釋裡的匹配。
+		如果 {skip} 不提供或者為空，接受每一個匹配。如果計算 {skip} 時
+		出現錯誤，搜索被中止，並返回 -1。
+
+		{stopline} 和 {timeout} 見 |search()|。
+
+		使用 'ignorecase' 的值。忽略 'magic'，使用模式時假設它總是置位
+		的。
+
+		搜索從準確的光標處開始。根據搜索方向，尋找從下一個字符開始的
+		{start}、{middle} 或 {end}。比如: >
+			if 1
+			  if 2
+			  endif 2
+			endif 1
+<		如果從 "if 2" 開始且光標在 "i" 上並正向搜索，找到的是
+		"endif 2"。如果剛好在 "if 2" 之前開始，找到的是 "endif 1"。因
+		為先找到的了 "if 2"，而它被認為是嵌套的 if/endif，以 "if 2"
+		開始，以 "endif 2" 結束。
+		如果反向搜索且 {end} 多於一個字符，在模式的最後加上 "\zs" 可能
+		有用，這樣光標在 end 匹配的中間某位置的時候，仍然可以找到匹配
+		的 start 匹配。
+
+		例如，要找到 Vim 腳本裡的 "endif" 命令: >
+
+	:echo searchpair('\<if\>', '\<el\%[seif]\>', '\<en\%[dif]\>', 'W',
+			\ 'getline(".") =~ "^\\s*\""')
+
+<		光標必須在要尋找匹配的 "if" 之上或之後。注意 單引號字符串的使
+		用，它避免了反斜槓的麻煩。skip 表達式只用來發現行首的註釋，命
+		令之後的不行。另外，一行中間的單詞 "en" 或 "if" 也被認為是匹
+		配。
+		另一個例子，搜索匹配 "}" 的 "{": >
+
+	:echo searchpair('{', '', '}', 'bW')
+
+<		只需要光標在需要匹配的 "}" 之上或之前就可以了。要拒絕語法高亮
+		識別為字符串的匹配: >
+
+	:echo searchpair('{', '', '}', 'bW',
+	     \ 'synIDattr(synID(line("."), col("."), 0), "name") =~? "string"')
+<
+							*searchpairpos()*
+searchpairpos({start}, {middle}, {end} [, {flags} [, {skip}
+				[, {stopline} [, {timeout}]]]])
+		和 |searchpair()| 相同，但返回 |List|，包含匹配的行號和列號。
+		|List| 的第一個元素是行號，而第二個元素是匹配所在的列位置的字
+		節位置。如果沒有匹配，返回 [0, 0]。 >
+
+			:let [lnum,col] = searchpairpos('{', '', '}', 'n')
+<
+		|match-parens| 提供一個更複雜更有用的例子。
+
+searchpos({pattern} [, {flags} [, {stopline} [, {timeout}]]])	*searchpos()*
+		和 |search()| 相同，但返回 |List|，包含匹配的行號和列號。
+		|List| 的第一個元素是行號，而第二個元素是匹配所在的列位置的字
+		節位置。如果沒有匹配，返回 [0, 0]。
+		例如: >
+	:let [lnum, col] = searchpos('mypattern', 'n')
+
+<		如果給出 'p' 標誌位，返回值裡有一個附加項目，包含匹配的子模式
+		號 |search()-sub-match|。例如: >
+	:let [lnum, col, submatch] = searchpos('\(\l\)\|\(\u\)', 'np')
+<		此例中如果找到小寫字母 |/\l| "submatch" 為 2，如果找到大寫字母
+		|/\u| 則為 3。
+
+server2client( {clientid}, {string})			*server2client()*
+		發送應答字符串到 {clientid}。最近剛發送過字符串的 {clientid}
+		可以通過 expand("<client>") 得到。
+		{僅當在編譯時加入 |+clientserver| 特性才有效}
+		備註:
+		該 id 應在接受下一個命令前保存。也就是，在接收命令返回之前 (譯
+		者注: 似應為 "之後") 和任何等待輸入的命令之前。
+		另見 |clientserver|。
+		示例: >
+			:echo server2client(expand("<client>"), "HELLO")
+<
+serverlist()					*serverlist()*
+		返回可用的服務器名字列表，每行一個。如果沒有服務器或者該信息
+		無法得到，返回空字符串。另見 |clientserver|。
+		{僅當編譯時加入 |+clientserver| 特性才有效}
+		示例: >
+			:echo serverlist()
+<
+setbufvar({expr}, {varname}, {val})			*setbufvar()*
+		設置緩衝區 {expr} 的選項或局部變量 {varname} 的值為 {val}。
+		也可用於全局或者局部於窗口的選項，但不能用於全局或者局部於窗口
+		的變量。
+		如果設置局部於窗口的選項，全局值不會改變。
+		{expr} 的使用方式見上 |bufname()|。
+		注意必須使用不帶 "b:" 的變量名。
+		示例: >
+			:call setbufvar(1, "&mod", 1)
+			:call setbufvar("todo", "myvar", "foobar")
+<		該命令在沙盤裡不可用 |sandbox|。
+
+setcmdpos({pos})					*setcmdpos()*
+		設置命令行的光標位置到字節位置 {pos}。第一個位置為 1。
+		用 |getcmdpos()| 得到當前的位置。
+		只有在編輯命令行時有效，所以必須在 |c_CTRL-\_e|、|c_CTRL-R_=|
+		或帶 '=' 的 |c_CTRL-R_CTRL-R| 裡使用。對於 |c_CTRL-\_e| 和帶
+		'=' 的 |c_CTRL-R_CTRL-R|，在命令行設為表達式的內容之後才設置位
+		置。對於 |c_CTRL-R_=|，在計算表達式之後但在插入返回的文本之前
+		設置位置。
+		如果數值太大，光標放在行尾。如果小於 1，結果沒有定義。
+		如果成功，返回 0，如果不在編輯命令行，返回 1。
+
+setline({lnum}, {text})					*setline()*
+		設置當前緩衝區第 {lnum} 行的內容為 {text}。
+		{lnum} 的用法同 |getline()|。
+		如果 {lnum} 剛剛在末行之下，{text} 用來增加新行。
+		如果成功，返回 0。如果失敗 (多數是因為 {lnum} 不合法) 返回 1。
+		例如: >
+			:call setline(5, strftime("%c"))
+<		如果 {text} 為 |List|，那麼第 {lnum} 行和其後的行被設為列表裡
+		的項目。例如: >
+			:call setline(5, ['aaa', 'bbb', 'ccc'])
+<		等價於: >
+			:for [n, l] in [[5, 6, 7], ['aaa', 'bbb', 'ccc']]
+			:  call setline(n, l)
+			:endfor
+<		注意: 這裡不會設置 '[ 和 '] 位置標記。
+
+setloclist({nr}, {list} [, {action}])			*setloclist()*
+		創建或替代或加入到窗口 {nr} 的位置列表。
+		如果 {nr} 為零，使用當前窗口。如果是位置列表窗口，修改所顯示的
+		位置列表。如果窗口號 {nr} 非法，返回 -1。
+		其它同 |setqflist()|。
+		另見 |location-list|。
+
+setmatches({list})					*setmatches()*
+		恢復 |getmatches()| 保存的匹配列表。如果成功，返回 0，否則返回
+		-1。原有的所有匹配都被清除。示例見 |getmatches()|。
+
+							*setpos()*
+setpos({expr}, {list})
+		設置 {expr} 的位置。可能的值:
+			.	光標
+			'x	位置標記 x
+
+		{list} 必須是帶四個數值的 |List|:
+		    [bufnum, lnum, col, off]
+
+		"bufnum" 是緩衝區號。零代表當前緩衝區。只能為當前緩衝區設置光
+		標。要設置別的緩衝區裡的位置標記，可以用 |bufnr()| 函數把文件
+		名轉化為緩衝區號。
+		不修改跳轉表。
+
+		"lnum" 和 "col" 是緩衝區裡的位置。第一列為 1。"lnum" 為零則刪
+		除位置標記。"col" 如小於 1，則以 1 代替。
+
+		除非使用了 'virtualedit'。不用 "off" 值。這是從對應字符開始位置
+		計算的屏幕列。例如，在製表之中或最後一個字符之後的某個位置。
+
+		如果位置可以設置，返回 0，否則返回 -1。如果 {expr} 不合法，報
+		錯。
+
+		另見 |getpos()|
+
+		這並不能恢復垂直移動使用的列。為此，可見 |winrestview()|。
+
+
+setqflist({list} [, {action}])				*setqflist()*
+		用 {list} 的項目來創建或替代或加入到 quickfix 表。每個 {list}
+		項目是一個字典。
+		{list} 裡非字典的項目被忽略。每個字典項目可以包含以下的項目:
+
+		    bufnr	緩衝區號；必須為某個合法緩衝區的編號
+		    filename	文件名；僅當 "bufnr" 不存在或者不合法時才使用
+		    lnum	緩衝區裡的行號
+		    pattern	用於定位錯誤的模式
+		    col		列號
+		    vcol	非零: "col" 是可視列
+				零: "col" 是字節位置
+		    nr		錯誤號
+		    text	錯誤描述
+		    type	錯誤類型，'E'、'W' 等。
+	
+		"col"、"vcol"、"nr"、"type" 和 "text" 項目是可選的。"lnum" 或
+		"pattern" 項目用來定位匹配的錯誤行。
+		如果 "filename" 和 "bufnr" 項目都不存在或者 "lnum" 和
+		"pattern" 項目都不存在，那麼此項目不被當作錯誤行處理。
+		如果 "pattern" 和 "lnum" 都存在，使用 "pattern"。
+		如果 {list} 為空，quickfix 列表被清除。
+		注意 此列表和 |getqflist()| 返回之值不盡相同。
+
+		如果 {action} 設為 'a'，把 {list} 項目加入已有的 quickfix 列
+		表。如果該列表尚不存在，建立新表。如果 {action} 設為 'r'，
+		{list} 項目替換當前 quickfix 列表項目。如果 {action} 不存在或
+		者設為 ' '，那麼建立新表。
+
+		返回零代表成功，-1 代表失敗。
+
+		該函數用來獨立於 'errorformat' 的設置建立 quickfix 列表。
+		":cc 1" 這樣的命令可以跳轉到第一個位置上。
+
+
+							*setreg()*
+setreg({regname}, {value} [,{options}])
+		設置寄存器 {regname} 的值為 {value}。
+		如果 {options} 包含 "a" 或者 {regname} 為大寫，該值被附加於現
+		有值之後。
+		{options} 還可以指定寄存器新類型的規格:
+		    "c" 或 "v"	      |characterwise| (面向字符) 模式
+		    "l" 或 "V"	      |linewise| (面向行) 模式
+		    "b" 或 "<CTRL-V>" |blockwise-visual| (面向列塊) 模式
+		如果 "b" 或 "<CTRL-V>" 之後緊跟數值，那麼該數值用作選擇的寬度
+		- 如果沒有指定，那麼列塊的寬度設為最長的行字符數 (把 <Tab>
+		看作一個字符)。
+
+		如果 {options} 沒有寄存器的設置，那麼缺省使用面向字符模式，除
+		非 {value} 以 <NL> 結尾。
+		不能設置 '=' 寄存器。
+		返回零代表成功，非零代表失敗。
+
+		示例: >
+			:call setreg(v:register, @*)
+			:call setreg('*', @%, 'ac')
+			:call setreg('a', "1\n2\n3", 'b5')
+
+<		本例說明如何使用函數來保存和恢復寄存器 >
+			:let var_a = getreg('a'， 1)
+			:let var_amode = getregtype('a')
+			    ....
+			:call setreg('a', var_a, var_amode)
+
+<		你可以通過附加空串來改變寄存器的類型: >
+			:call setreg('a', '', 'al')
+
+settabvar({tabnr}, {varname}, {val})			*settabvar()*
+		設置標籤頁 {tabnr} 的標籤頁局部變量 {varname} 的值為 {val}。
+		注意 必須使用不帶 "t:" 的名字。
+		標籤頁的編號從一開始。
+		Vim 短暫地進入標籤頁 {tabnr}，所以會激活 TabLeave 和 TabEnter 
+		自動命令。
+		該命令在沙盤裡不可用 |sandbox|。
+
+settabwinvar({tabnr}, {winnr}, {varname}, {val})	*settabwinvar()*
+		設置窗口 {nr} 的選項或局部變量 {varname} 的值為 {val}。
+		標籤頁的編號從一開始。|setwinvar()| 總是使用當前標籤頁。
+		如果 {winnr} 為零，使用當前窗口。
+		也可用於全局或者局部於緩衝區的選項，但不能用於全局或者局部於緩
+		沖區的變量。
+		如果設置局部於緩衝區的選項，全局值不會改變。
+		注意 必須使用不帶 "w:" 的變量名。
+		Vim 短暫地進入標籤頁 {tabnr}，所以會激活 TabLeave 和 TabEnter 
+		自動命令。
+		示例: >
+			:call settabwinvar(1, 1, "&list", 0)
+			:call settabwinvar(3, 2, "myvar", "foobar")
+<		該命令在沙盤裡不可用 |sandbox|。
+
+setwinvar({nr}, {varname}, {val})			*setwinvar()*
+		類似於 |settabwinvar()|，只用當前標籤頁。
+		示例: >
+			:call setwinvar(1, "&list", 0)
+			:call setwinvar(2, "myvar", "foobar")
+
+shellescape({string} [, {special}])			*shellescape()*
+		轉義 {string} 以便用作外殼命令的參數。
+		在 MS-Windows 和 MS-DOS 上，如果未設定 'shellslash'，用雙引號
+		包圍 {string}，並給 {string} 內的雙引號加倍。
+		在其它系統上，用單引號包圍，並把所有的 "'" 替換為 "'\''"。
+		如果給出 {special} 參數且它是非零的數值或非空的字符串
+		(|non-zero-arg|)，則特殊項目如 "!"、"%"、"#" 和 "<cword>" 等會
+		在前面加上反斜槓。|:!| 命令會再把反斜槓刪除。
+		如果 'shell' 以 "csh" 結尾，"!" 字符會被轉義 (仍是當 {special}
+		為 |non-zero-arg| 時)。這是因為 csh 和 tcsh 即使在單引號內仍然
+		使用 "!" 用於歷史替換。
+		<NL> 也被轉義。如果 {special} 為 |non-zero-arg| 且 'shell' 以
+		"csh" 結尾時，轉義兩次。
+		|:!| 命令的示例: >
+		    :exe '!dir ' . shellescape(expand('<cfile>'), 1)
+<		返回光標所在文件給出的目錄列表。|system()| 的示例: >
+		    :call system("chmod +w -- " . shellescape(expand("%")))
+
+
+simplify({filename})					*simplify()*
+		在不改變含義的前提下，盡可能簡化文件名。快捷方式 (MS-Windows
+		上) 或者符號鏈接 (Unix 上) 不會被解析。如果 {filename} 第一個
+		路徑部分指定了當前目錄，結果也會是如此。而結尾的路徑分隔符也不
+		會被刪除。
+		示例: >
+			simplify("./dir/.././/file/") == "./file/"
+<		注意: 組合 "dir/.." 只有在 "dir" 是可以遍歷的或者不存在的目錄
+		才會被刪掉。Unix 上，如果 "dir" 是同一目錄下的符號鏈接，也會刪
+		除該組合。為了在簡化路徑名之前解析所有牽涉到的符號鏈接，使用
+		|resolve()|。
+
+
+sin({expr})						*sin()*
+		返回浮點數，即以弧度測量的 {expr} 的正弦值。
+		{expr} 的計算結果必須是浮點數或數值。
+		示例: >
+			:echo sin(100)
+<			-0.506366 >
+			:echo sin(-4.01)
+<			0.763301
+		{僅當編譯時加入 |+float| 特性才有效}
+
+
+sinh({expr})						*sinh()*
+		返回 {expr} 的雙曲正弦值，返回值為 [-inf, inf] 區間內的浮點
+		數。
+		{expr} 的計算結果必須是浮點數或數值。
+		示例: >
+			:echo sinh(0.5)
+<			0.521095 >
+			:echo sinh(-0.9)
+<			-1.026517
+		{僅當編譯時加入 |+float| 特性才有效}
+
+
+sort({list} [, {func}])					*sort()* *E702*
+		給 {list} 項目排序，直接修改列表。返回 {list}。如果你不想修改
+		列表，先構建一個備份: >
+			:let sortedlist = sort(copy(mylist))
+<		每個項目使用字符串表示形式進行排序。
+		數值排在字符串之後，|Lists| 排在數值之後。
+		要給當前緩衝區的文本排序，用 |:sort|。
+		如果給出 {func} 且為一，忽略大小寫。
+		如果 {func} 為 |Funcref| 或函數名，調用該函數來比較項目。函數
+		調用時使用兩個項目作為參數，函數返回時，0 代表相等，1 或更高代
+		表第一個排在第二個之後，-1 或更小代表第一個排在第二個之前。
+		例如: >
+			func MyCompare(i1, i2)
+			   return a:i1 == a:i2 ? 0 : a:i1 > a:i2 ? 1 : -1
+			endfunc
+			let sortedlist = sort(mylist, "MyCompare")
+<		對這個簡單的例子，有更簡短的一個比較版本，不考慮溢出情況: >
+			func MyCompare(i1, i2)
+			   return a:i1 - a:i2
+			endfunc
+<
+
+							*soundfold()*
+soundfold({word})
+		返回 {word} 按發音折疊的等價形式。使用當前窗口的 'spelllang'
+		中第一個支持按發音折疊的語言。 'spell' 必須置位。如果不能按發
+		音折疊，按原樣返回 {word}。
+		可用來提供拼寫建議。注意 此方法可能很慢。
+
+							*spellbadword()*
+spellbadword([{sentence}])
+		沒有參數: 返回光標所在或之後的拼寫錯誤的單詞。光標移動到這個壞
+		詞的開始處。如果光標行上沒有壞詞，返回空字符串，不移動光標。
+
+		有參數: 返回 {sentence} 裡第一個拼寫錯誤的單詞。如果沒有拼寫錯
+		誤，返回空字符串。
+
+		返回值是兩個項目的列表:
+		- 錯誤拼寫的單詞，或空字符串。
+		- 拼寫錯誤的類型:
+			"bad"		拼寫錯誤
+			"rare"		偏僻詞
+			"local"		只在其它區域裡合法的單詞
+			"caps"		單詞應該大寫開頭
+		例如: >
+			echo spellbadword("the quik brown fox")
+<			['quik', 'bad'] ~
+
+		使用當前窗口的拼寫信息。'spell' 選項必須置位，也用到
+		'spelllang' 的值。
+
+							*spellsuggest()*
+spellsuggest({word} [, {max} [, {capital}]])
+		返回 |List|，包含替代 {word} 的拼寫建議。
+		如果給出 {max}，返回的建議不超過此數目。否則，返回不超過 25 個
+		建議。
+
+		如果給出 {capital} 參數且非零，只給出大寫開頭的拼寫建議。
+		'spellcapcheck' 匹配後再使用此功能。
+
+		{word} 可以是後跟其它文本的錯誤拼寫單詞。這樣可以對兩個被分開
+		的單詞進行連接。建議裡也包含附加文本，以便你替換整行。
+
+		{word} 也可以是個好詞。返回和它類似的單詞。建議裡不包含 {word}
+		自身，但可能會出現其大寫開頭的形式。
+
+		使用當前窗口的拼寫信息。'spell' 選項必須置位，也用到
+		'spelllang' 和 'spellsuggest' 的值。
+
+
+split({expr} [, {pattern} [, {keepempty}]])			*split()*
+		從 {expr} 構造 |List|。
+		如果 {pattern} 省略或為空，用每個空白分隔的字符序列構造一個項
+		目。否則，在匹配 {pattern} 的地方分割字符串，刪除匹配部分的字
+		符。
+		如果列表的首末項目為空，省略它們，除非 {keepempty} 參數給出且
+		非零。其它空項目在 {pattern} 匹配至少一個字符或者 {keepempty}
+		非零的時候被保留。
+		例如: >
+			:let words = split(getline('.'), '\W\+')
+<		要把字符串分割到每個字符: >
+			:for c in split(mystring, '\zs')
+<		如果你想保留分隔符，可以用 '\zs': >
+			:echo split('abc:def:ghi', ':\zs')
+<			['abc:', 'def:', 'ghi'] ~
+		分割首項可能為空的表格: >
+			:let items = split(line, ':', 1)
+<		逆函數是 |join()|。
+
+
+sqrt({expr})						*sqrt()*
+		返回浮點數，即 {expr} 的非負平方根。
+		{expr} 的計算結果必須是浮點數或數值。如果 {expr} 為負，返回
+		NaN (Not a Number，非數)。
+		示例: >
+			:echo sqrt(100)
+<			10.0 >
+			:echo sqrt(-4.01)
+<			nan
+		"nan" 可能不同，取決於系統庫。
+		{僅當編譯時加入 |+float| 特性才有效}
+
+
+str2float( {expr})					*str2float()*
+		把字符串 {expr} 轉換為浮點數。這和使用浮點數的工作方式一樣，見
+		|floating-point-format|，但稍稍寬鬆一點。例如，接受 "1e40"，而
+		表達式中你必須書寫 "1.0e40"。
+		安靜地忽略數值之後的文本。
+		小數點必須是 '.'，和當前的 locale 無關。逗號會使數值轉換結束:
+		"12,345.67" 轉換為 12.0。用 |substitute()| 可以拿掉千分位分
+		隔符: >
+			let f = str2float(substitute(text, ',', '', 'g'))
+<		{僅當編譯時加入 |+float| 特性才有效}
+
+
+str2nr( {expr} [, {base}])				*str2nr()*
+		把字符串 {expr} 轉化為數值。
+		{base} 是轉換的基底，可以為 8、10 或 16。
+		如果省略 {base}，使用基底 10。這也意味著開頭的零不會導致八進制
+		的轉換，缺省的字符串到數值的轉化並非如此。
+		如果 {base} 為 16，忽略開頭的 "0x" 或 "0X"。如果使用別的基底，
+		返回零。
+		安靜地忽略數值之後的文本。
+
+
+strchars({expr})					*strchars()*
+		返回數值，給出字符串 {expr} 佔據的字符數。組合用字符也算一個字
+		符。
+		另見 |strlen()|、|strdisplaywidth()| 和 |strwidth()|。
+
+strdisplaywidth({expr}[, {col}])			*strdisplaywidth()*
+		返回數值，給出字符串 {expr} 在屏幕上佔據的顯示單元的數目。
+		如果省略 {col}，假定為零。 否則給出開始計算的屏幕列號。該值對
+		包含製表符的計算有影響。
+		使用當前窗口的選項設置。其中影響顯示的選項也對返回值有影響，如
+		'tabstop' 和 'display'。
+		{expr} 如包含東亞二義性寬度字符類，'ambiwidth' 也會影響返回結
+		果。
+		另見 |strlen()|、|strwidth()| 和 |strchars()|。
+
+strftime({format} [, {time}])				*strftime()*
+		返回字符串，即經過 {format} 字符串的格式轉換的日期和時間。使用
+		給定的 {time}，如果沒有給出時間，使用當前時間。可以接受的
+		{format} 取決於你的系統。這意味著該函數不是可移植的！
+		可用的格式參見 C 函數 strftime() 的參考手冊。
+                >
+                "Added by Akria Sheng
+                "---------------------------------------------------------------------
+                Visual C++ Express 2008 example:
+                %a Abbreviated weekday name
+                %A Full weekday name
+                %b Abbreviated month name
+                %B Full month name
+                %c Date and time representation appropriate for locale
+                %d Day of month as decimal number (01 – 31)
+                %H Hour in 24-hour format (00 – 23)
+                %I Hour in 12-hour format (01 – 12)
+                %j Day of year as decimal number (001 – 366)
+                %m Month as decimal number (01 – 12)
+                %M Minute as decimal number (00 – 59)
+                %p Current locale's A.M./P.M. indicator for 12-hour clock
+                %S Second as decimal number (00 – 59)
+                %U Week of year as decimal number, with Sunday as first day of week (00 – 53)
+                %w Weekday as decimal number (0 – 6; Sunday is 0)
+                %W Week of year as decimal number, with Monday as first day of week (00 – 53)
+                %x Date representation for current locale
+                %X Time representation for current locale
+                %y Year without century, as decimal number (00 – 99)
+                %Y Year with century, as decimal number
+                %z Either the time-zone name or time zone abbreviation, depending on registry settings; no characters if time zone is unknown
+                %Z The same as %z
+                %% Percent sign
+                "---------------------------------------------------------------------
+<
+                
+                返回結果的最大長度是 80 個字符。另見 |localtime()| 和 |getftime()|。
+		可以用 |:language| 命令改變語言。
+		示例: >
+		  :echo strftime("%c")		   Sun Apr 27 11:49:23 1997
+		  :echo strftime("%Y %b %d %X")	   1997 Apr 27 11:53:25
+		  :echo strftime("%y%m%d %T")	   970427 11:53:55
+		  :echo strftime("%H:%M")	   11:55
+		  :echo strftime("%c", getftime("file.c"))
+						   顯示 file.c 的修改時間。
+<		並非所有系統都可以用。要檢查這一點，用: >
+			:if exists("*strftime")
+
+stridx({haystack}, {needle} [, {start}])		*stridx()*
+		返回數值，給出字符串 {haystack} 裡第一個字符串 {needle} 出現的
+		字節位置。
+		如果給出 {start}，搜索從 {start} 位置開始。可用來尋找第二個匹
+		配: >
+			:let comma1 = stridx(line, ",")
+			:let comma2 = stridx(line, ",", comma1 + 1)
+<		搜索對大小寫敏感。
+		模式搜索可用 |match()|。
+		如果 {needle} 不出現在 {haystack} 裡，返回 -1。
+		另見 |strridx()|。示例: >
+		  :echo stridx("An Example", "Example")	     3
+		  :echo stridx("Starting point", "Start")    0
+		  :echo stridx("Starting point", "start")   -1
+<						*strstr()* *strchr()*
+		stridx() 和 C 函數 strstr() 類似。如果使用單個字符，和
+		strchr() 類似。
+
+							*string()*
+string({expr})	返回 {expr} 轉換後的字符串。如果 {expr} 為數值、浮點數、字符串
+		或它們的復合形式，那麼用 |eval()| 可以把結果轉回去。
+			{expr} 類型	返回值 ~
+			字符串		'string'
+			數值		123
+			浮點數		123.123456 或 1.23456e8
+			函數引用	function('name')
+			列表		[item, item]
+			字典		{key: value, key: value}
+		注意 字符串的值裡 ' 字符加倍。
+		另見 |strtrans()|。
+
+							*strlen()*
+strlen({expr})	返回數值，即字符串 {expr} 的字節長度。
+		如果你要計算多字節字符的數目 (不計算合成用字符)，可以這麼用: >
+
+			:let len = strlen(substitute(str, ".", "x", "g"))
+
+<		如果參數為數值，先把它轉化為字符串。其它類型報錯。
+		另見 |len()|、|strchars()|、|strdisplaywidth()| 和
+		|strwidth()|。
+
+strpart({src}, {start}[, {len}])			*strpart()*
+		返回字符串，{src} 從第 {start} 個字節開始字節長度為 {len} 的子
+		串。
+		如果包含不存在的字節，不會產生錯誤。只是那些字節被忽略而已。
+		如果沒有提供 {len}，子串從 {start} 開始直到 {src} 的結尾。 >
+			strpart("abcdefg", 3, 2)    == "de"
+			strpart("abcdefg", -2, 4)   == "ab"
+			strpart("abcdefg", 5, 4)    == "fg"
+			strpart("abcdefg", 3)       == "defg"
+<		注意: 要得到第一個字符，{start} 必須是零。比如，要得到光標開始
+		的三個字節: >
+			strpart(getline("."), col(".") - 1, 3)
+<
+strridx({haystack}, {needle} [, {start}])			*strridx()*
+		返回數值，給出字符串 {haystack} 裡最後一個字符串 {needle} 出現
+		的字節位置。
+		如果給出 {start}，此位置之外的匹配被忽略。可用來尋找上次匹配之
+		前的匹配: >
+			:let lastcomma = strridx(line, ",")
+			:let comma2 = strridx(line, ",", lastcomma - 1)
+<		搜索對大小寫敏感。
+		模式搜索可用 |match()|。
+		如果 {needle} 不出現在 {haystack} 裡，返回 -1。
+		如果 {needle} 為空，返回 {haystack} 的長度。
+		另見 |stridx()|。示例: >
+		  :echo strridx("an angry armadillo", "an")	     3
+<							*strrchr()*
+		如果使用單個字符，和 C 函數 strrchr() 類似。
+
+strtrans({expr})					*strtrans()*
+		返回等於 {expr} 的字符串，但所有的不可顯示字符被翻譯成可顯示的
+		字符序列 |'isprint'|，類似於窗口裡顯示的形式。例如: >
+			echo strtrans(@a)
+<		會顯示寄存器裡的換行符為 "^@" 而不是開啟新行。
+
+strwidth({expr})					*strwidth()*
+		返回數值，給出字符串 {expr} 在屏幕上佔據的顯示單元的數目。製表
+		符算作一個單元。如果不想這樣，可用 |strdisplaywidth()|。
+		{expr} 如包含東亞二義性寬度字符類，'ambiwidth' 也會影響返回結
+		果。
+		另見 |strlen()|、|strdisplaywidth()| 和 |strchars()|。
+
+submatch({nr})						*submatch()*
+		只用於 |:substitute| 命令裡的表達式。返回匹配文本的第 {nr} 個
+		子匹配。如果 {nr} 為 0，返回整個匹配的文本。
+		例如: >
+			:s/\d\+/\=submatch(0) + 1/
+<		找到行內第一個數值並加 1。
+		使用 <NL> 可以包含換行符。
+
+substitute({expr}, {pat}, {sub}, {flags})		*substitute()*
+		返回等於 {expr} 的字符串，但其中第一個 {pat} 的匹配被替代成
+		{sub}。
+		和 ":substitute" 命令類似 (不帶任何標誌位)。但 {pat} 的匹配總
+		假定置位了 'magic' 選項而且 'cpoptions' 為空 (為了腳本的可移植
+		性)。
+		'ignorecase' 仍然適用，但 'smartcase' 不適用。
+		|string-match| 說明如何使用 {pat}。
+		{sub} 裡的 '~' 不會被換成前一個 {sub}。
+		注意 {sub} 裡的一些代碼有特殊含義 |sub-replace-special|。比
+		如，要替換一些文本為 "\n" (兩個字符)，使用 "\\\\n" 或 '\\n'。
+		如果 {pat} 在 {expr} 裡不能匹配，返回沒有修改的 {expr}。
+		如果 {flags} 為 "g"，{expr} 裡的所有 {pat} 匹配都被替換。否
+		則，{flags} 應該為 ""。
+		示例: >
+			:let &path = substitute(&path, ",\\=[^,]*$", "", "")
+<		刪除 'path' 選項的最後一部分。 >
+			:echo substitute("testing", ".*", "\\U\\0", "")
+<		返回 "TESTING"。
+
+synID({lnum}, {col}, {trans})				*synID()*
+		返回數值，即當前窗口 {lnum} 行 {col} 列所在的語法 ID。
+		語法 ID  可以用在 |synIDattr()| 和 |synIDtrans()|，以得到文本
+		的語法信息。
+		最左列的 {col} 為 1。第一行的 {lnum} 為 1。適用 'synmaxcol' 的
+		值，如果行比它更長，就返回零。
+		如果 {trans} 非零，透明的項目被簡約為它們實際顯露的項目。這可
+		以用於你想知道實際使用的顏色的情形。如果 {trans} 為零，返回透
+		明的項目本身。這可用於想知道實際有效的語法項目的情形 (比如，在
+		括號內部)。
+		警告: 本函數可能很慢。最佳速度可以通過正向遍歷文件獲得。
+
+		例如 (回顯光標所在的語法項目的名字): >
+			:echo synIDattr(synID(line("."), col("."), 1), "name")
+<
+
+synconcealed({lnum}, {col})				*synconcealed()*
+		返回列表。如果 {lnum} 和 {col} 所在位置的字符不在可隱藏區域，
+		列表的第一個項目為 0，否則為 1。列表的第二個項目為字符串。如果
+		第一個值為 1，第二個值包含代替被隱藏文本實際顯示的文本，視乎
+		'conceallevel' 的當前值而定。列表的第三個，也即最後一個項目是
+		代表匹配的特定語法區域的唯一的數值。這用於在有兩個連續的使用相
+		同替代字符的區域時，檢測此處是否是一個新的可隱藏區域的開始。
+		示例可見 $VIMRUNTIME/syntax/2html.vim。
+
+
+synIDattr({synID}, {what} [, {mode}])			*synIDattr()*
+		返回字符串，syntax ID {synID} 的 {what} 屬性。可用於得到語法項
+		目的相關信息。
+		{mode} 可以是 "gui"、"cterm" 或 "term"，從而得到的是該模式下的
+		屬性。如果忽略 {mode} 或者指定了非法的值，使用當前激活的高亮方
+		式的屬性 (GUI、cterm 或 term)。
+		使用 synIDtrans() 來跟隨鏈接的高亮組。
+		{what}		結果 ~
+		"name"		語法項目的名字
+		"fg"		前景色 (GUI: 用於設置顏色的色彩名，cterm: 色彩
+				號，以字符串形式出現，term: 空字符串)
+		"bg"		背景色 (細節同 "fg")
+		"font"		字體名 (只適用於 GUI) |highlight-font|
+		"sp"		特殊顏色 (細節同 "fg") |highlight-guisp|
+		"fg#"		類似於 "fg"，但只適用於 GUI，而且 GUI 使用的名
+				字形如 "#RRGGBB"。
+		"bg#"		"bg"，細節同 "fg#"
+		"sp#"		"sp"，細節同 "fg#"
+		"bold"		"1" 如果粗體
+		"italic"	"1" 如果斜體
+		"reverse"	"1" 如果反顯
+		"inverse"	"1" 如果反顯 (= reverse)
+		"standout"	"1" 如果突出
+		"underline"	"1" 如果下劃線
+		"undercurl"	"1" 如果下曲線
+
+		示例 (回顯光標所在的語法項目的顏色): >
+	:echo synIDattr(synIDtrans(synID(line("."), col("."), 1)), "fg")
+<
+synIDtrans({synID})					*synIDtrans()*
+		返回數值，即 {synID} 經過翻譯的語法 ID。這是用於高亮字符的語法
+		組的 ID。":highlight link" 給出的高亮組被跟隨，以找到實際使用
+		的組。
+
+synstack({lnum}, {col})					*synstack()*
+		返回 |List|，即當前窗口在 {lnum} 行 {col} 列語法項目的堆棧。列
+		表的每個項目是像 |synID()| 返回那樣的 ID。
+		列表的第一個項目是最外層區域，其後依次是包含在內的項目。末項即
+		|synID()| 返回的項目，除非不是整個項目都被高亮，或者它是一個透
+		明項目。
+		此函數可用於調試語法文件。
+		顯示光標所在的語法項目棧的示例: >
+			for id in synstack(line("."), col("."))
+			   echo synIDattr(id, "name")
+			endfor
+<		如果 {lnum} 和 {col} 指定的位置非法，不返回任何值。行末字符之
+		後的位置以及空行的第一個位置是合法的位置。
+
+system({expr} [, {input}])				*system()* *E677*
+		得到外殼命令 {expr} 的輸出結果。
+		如果給出 {input}，該字符串被寫到文件裡，並傳給外殼命令作為標準
+		輸入。字符串照原樣寫入，你需要自己注意使用合適的換行符。不使用
+		管道。
+		注意: |shellescape()| 可以轉義命令參數里的特殊字符。{expr} 裡
+		的換行可能會使命令失敗。'shellquote' 和 'shellxquote' 裡的字符
+		也可能會引起麻煩。
+		這不是用來執行交互命令的。
+		返回字符串。示例: >
+		    :let files = system("ls " .  shellescape(expand('%:h')))
+
+<		要使結果更獨立於所用的系統，外殼輸出的結果被過濾，Macintosh 的
+		<CR> 被換成 <NL>，而 DOS 系列的系統上 <CR><NL> 也被換成 <NL>。
+		使用若干選項，以下面的方法構造要執行的命令:
+	'shell' 'shellcmdflag' 'shellxquote' {expr} 'shellredir' {tmp} 'shellxquote'
+		({tmp} 是自動生成的一個文件名)。
+		Unix 和 OS/2 上，{expr} 用大括號包圍，以便支持連接的多條命令。
+
+		以加工 ("cooked") 模式執行命令，這樣 CTRL-C 可以用來中止命令
+		(至少在 Unix 上是如此)。
+
+		返回的錯誤代碼可以在 |v:shell_error| 裡找到。
+		該函數不能運行於 |restricted-mode|。
+
+		注意 上面提到的選項值如有錯誤，該函數就會失敗。使用若干安全代
+		理應用時也有報告說它會失敗。
+		不同於 ":!cmd"，沒有自動對改變過的文件的檢查。使用
+		|:checktime| 來強制這種檢查。
+
+
+tabpagebuflist([{arg}])					*tabpagebuflist()*
+		返回 |List|，每個項目是當前標籤頁裡每個窗口相關聯的緩衝區的編
+		號。
+		{arg} 指定使用的標籤頁的編號。如果省略，使用當前標籤頁。
+		如果 {arg} 非法，返回數值零。
+		要得到所有標籤頁裡的所有緩衝區的列表，這樣用: >
+			tablist = []
+			for i in range(tabpagenr('$'))
+			   call extend(tablist, tabpagebuflist(i + 1))
+			endfor
+<		注意 緩衝區可能出現於多於一個窗口裡。
+
+
+tabpagenr([{arg}])					*tabpagenr()*
+		返回數值，當前標籤頁號。第一個標籤頁的編號為 1。
+		如果可選參數為 "$"，返回最後一個標籤頁的編號 (即標籤頁總數)。
+		該數值可用於 |:tab| 命令。
+
+
+tabpagewinnr({tabarg}, [{arg}])				*tabpagewinnr()*
+		類似於 |winnr()|，但使用標籤頁 {tabarg}。
+		{tabarg} 指定要使用的標籤頁號。
+		{arg} 的用法類似於 |winnr()|:
+		- 如果省略，返回當前窗口號，也就是轉到該標籤頁時會使用的窗口。
+		- 如果是 "$"，返回窗口的總數。
+		- 如果是 "#"，返回上次的窗口編號。
+		用於的例子: >
+		    tabpagewinnr(1)	    " 標籤頁 1 的當前窗口
+		    tabpagewinnr(4, '$')    " 標籤頁 4 的窗口總數
+<		如果 {tabarg} 非法，返回零。
+
+							*tagfiles()*
+tagfiles()	返回 |List|，當前緩衝區用於搜索的標籤文件名。這是 'tags' 選項
+		擴展後的內容。
+
+
+taglist({expr})							*taglist()*
+		返回匹配正規表達式 {expr} 的標籤列表。每個列表項目是一個至少包
+		含以下項目的字典:
+			name		標籤名。
+			filename	標籤定義的文件名。它或者相對於當前目
+					錄，或者包含完整路徑。
+			cmd		用於在文件裡定位標籤的 Ex 命令。
+			kind		標籤類型。該項目的值取決於特定於語言的
+					類型值。只在 Exuberant ctags 或 hdrtag
+					生成的標籤文件裡存在。
+			static		特定於文件的標籤。詳見 |static-tag|。
+		可能還有一些其它項目，取決於標籤文件的內容: access、
+		implementation、inherits 和 signature。這些字段的信息參見
+		ctags 文檔。C 代碼裡可能出現字段 "struct"、"class" 和 "enum"，
+		它們給出標籤所在的實體的名字。
+
+		ex 命令 'cmd' 可以是 ex 搜索模式、行號或者行號後跟字節位置。
+
+		如果沒有匹配的標籤，返回空列表。
+
+		要得到標籤的準確匹配，{expr} 裡必須使用 '^' 和 '$'。 關於標籤
+		搜索正規表達式模式的詳情見 |tag-regexp|。
+
+		|'tags'| 提供 Vim 如何定位標籤文件的信息。|tags-file-format|
+		說明不同的 ctags 工具生成的標籤文件的格式。
+
+tempname()					*tempname()* *temp-file-name*
+		返回字符串，它是一個不存在的文件名。可以用作臨時文件。該文件在
+		至少 26 個接連的調用內不會重複。例如: >
+			:let tmpfile = tempname()
+			:exe "redir > " . tmpfile
+<		Unix 上，文件會在用戶個人的目錄中 |tempfile|。
+		MS-Windows 上，如果置位了 'shellslash' 選項或者 'shellcmdflag'
+		以 '-' 開始的時候，使用正斜槓。
+
+tan({expr})						*tan()*
+		返回以弧度測量的 {expr} 的正切值。返回值是 [-inf, inf] 區間內
+		的浮點數。
+		{expr} 的計算結果必須是浮點數或數值。
+		示例: >
+			:echo tan(10)
+<			0.648361 >
+			:echo tan(-4.01)
+<			-1.181502
+		{僅當編譯時加入 |+float| 特性才有效}
+
+tanh({expr})						*tanh()*
+		返回 {expr} 的雙曲正切值，返回值為 [-1, 1] 區間內的浮點數。
+		{expr} 的計算結果必須是浮點數或數值。
+		示例: >
+			:echo tanh(0.5)
+<			0.462117 >
+			:echo tanh(-1)
+<			-0.761594
+		{僅當編譯時加入 |+float| 特性才有效}
+
+tolower({expr})						*tolower()*
+		返回給出字符串的備份，但所有的大寫字符變為小寫 (就如同在字符串
+		上應用了 |gu| 一樣)。
+
+toupper({expr})						*toupper()*
+		返回給出字符串的備份，但所有的小寫字符變為大寫 (就如同在字符串
+		上應用了 |gU| 一樣)。
+
+tr({src}, {fromstr}, {tostr})				*tr()*
+		返回 {src} 字符串的備份，其中 {fromstr} 裡的每個字符被 {tostr}
+		字符串裡同樣的位置的字符替代。也就是，{fromstr} 的第一個字符被
+		翻譯成 {tostr} 的第一個字符，依此類推。和 unix 命令 "tr" 完全
+		相同。
+		能正確處理多字節字符。
+
+		例如: >
+			echo tr("hello there", "ht", "HT")
+<		返回 "Hello THere" >
+			echo tr("<blob>", "<>", "{}")
+<		返回 "{blob}"
+
+trunc({expr})							*trunc()*
+		返回浮點數，即絕對值小於等於 {expr} 的最大整數 (向零取整)。
+		{expr} 的計算結果必須是浮點數或數值。
+		示例: >
+			echo trunc(1.456)
+<			1.0  >
+			echo trunc(-5.456)
+<			-5.0  >
+			echo trunc(4.0)
+<			4.0
+		{僅當編譯時加入 |+float| 特性才有效}
+
+							*type()*
+type({expr})	返回數值，取決於 {expr} 的類型:
+			數值:       0
+			字符串:     1
+			函數引用:   2
+			列表:	    3
+			字典:       4
+			浮點數:     5
+		要避免使用這些魔術數，應該這樣使用: >
+			:if type(myvar) == type(0)
+			:if type(myvar) == type("")
+			:if type(myvar) == type(function("tr"))
+			:if type(myvar) == type([])
+			:if type(myvar) == type({})
+			:if type(myvar) == type(0.0)
+
+undofile({name})					*undofile()*
+		返回用於名為 {name} 的文件的撤銷文件名。使用 'undodir' 選項並
+		尋找實際存在的目錄。並不檢查該撤銷文件是否存在。
+		{name} 總是擴展為完整路徑，因為內部是這麼使用的。
+		可用於 |:wundo| 和 |:rundo|。
+		如果編譯時沒有 +persistent_undo 選項，總是返回空字符串。
+
+undotree()						*undotree()*
+		返回撤銷樹的當前狀態。返回值是包含以下項目的字典:
+		  "seq_last"	最大使用的撤銷序列號。
+		  "seq_cur"	撤銷樹中當前位置的序列號。如果有撤銷過的改變，
+				和 "seq_last" 會有不同。
+		  "time_cur"	最近用於 |:earlier| 和相關命令的時間。
+				可用 |strftime()| 轉換成可讀的格式。
+		  "save_last"	最後的文件寫入編號。如果沒有寫入，返回零。
+		  "save_cur"	撤銷樹當前位置的編號。
+		  "synced"	如果最後的撤銷塊已經同步，返回非零值。等待用戶
+				輸入時會發生。見 |undo-blocks|。
+		  "entries"	關於撤銷塊的信息的字典的列表。
+
+		"entries" 列表的第一個值是最老的撤銷項目。每個列表項目是一個包
+		含以下項目的字典:
+		  "seq"		撤銷序列號。和 |:undolist| 顯示的相同。
+		  "time"	改變發生的時間。可用 |strftime()| 轉換成可讀的
+				格式。
+		  "newhead"	只出現在最後加入的項目。標識最後的改變，並指示
+		  		將來的改變加入所在的位置。
+		  "curhead"	只出現在最後撤銷的項目。表示撤銷樹當前的位置，
+		  		該塊可用於 redo 命令。如果最後改變之後沒有撤銷
+				動作，此項目不出現。
+		  "save"	只出現在文件寫入前最後的塊。該值為寫入計數。首
+		  		次寫入的編號為 1，最後一次是上面提及的
+				"save_last"。
+		  "alt"		替代項。這又是一個撤銷塊的列表。每個項目又可以
+		  		有 "alt" 項目。
+
+values({dict})						*values()*
+		返回 |List|，{dict} 的所有值。|List| 項目的順序不定。
+
+
+virtcol({expr})						*virtcol()*
+		要得到屏幕列的位置，用 |virtcol()|。
+		注意 只能使用當前文件的位置標記。
+
+		返回數值，即 {expr} 給定的文件位置的屏幕列號。也就是，該位置的
+		字符佔據的最後一個屏幕位置，這裡假設屏幕有無限的寬度。如果該位
+		置是一個 <Tab>，返回的數值是 <Tab> 佔據的最後一列。比如，如果
+		<Tab> 在第 1 列，而 'ts' 設為 8 的話，返回 8。
+		關於字節位置，見 |col()|。
+		{expr} 用法見 |col()|。
+		如果使用 'virtualedit'，{expr} 可以用 [lnum, col, off]，其中
+		"off" 是字符位置開始計算的屏幕列。例如，製表中或最後一個字符之
+		後的某個位置。
+		如果在當前模式下使用了虛擬編輯，也可能返回行尾之後的位置。
+		|'virtualedit'|
+		可接受的位置是:
+		    .	    光標位置
+		    $	    光標行的行尾 (返回光標行顯示的字符數加 1)
+		    'x	    位置標記 x 的位置 (如果該位置標記沒有設置，返回 0)
+		注意 只能使用當前文件的位置標記。
+		示例: >
+  virtcol(".")	   文本 "foo^Lbar"，光標在 "^L" 上，返回 5
+  virtcol("$")	   文本 "foo^Lbar"，返回 9
+  virtcol("'t")    文本 "    there"，'t 在 'h' 上，返回 6
+<		第一列為 1。返回 0 代表錯誤。
+		一個更高級的示例，顯示所有行的最大長度: >
+		    echo max(map(range(1, line('$')), "virtcol([v:val, '$'])"))
+
+
+visualmode([expr])						*visualmode()*
+		返回字符串，它描述當前緩衝區最近使用的可視模式。一開始，它返回
+		空字符串，一旦使用了可視模式，返回 "v"、"V" 或 "<CTRL-V>" (單
+		個 CTRL-V 字符)，分別代表面向字符、面向行、和面向列塊的可視模
+		式。
+		例如: >
+			:exe "normal " . visualmode()
+<		進入和上次相同的可視模式。也可以用於在腳本裡根據最近的可視模式
+		採取不同的行動。
+		如果當前正處於可視模式中，|mode()| 可得到具體的可視模式 (例如
+		在 |:vmap| 中可用)。
+							*non-zero-arg*
+		如果提供 [expr] 並且計算結果是非零數值或者是非空字符串，那麼將
+		清除可視模式，並返回舊的值。注意 " " 和 "0" 也是非空字符串，所
+		以也會清除該模式。列表、字典或浮點數不是數值或字符串，所以不會
+		清除該模式。
+
+							*winbufnr()*
+winbufnr({nr})	返回數值，即窗口 {nr} 相關聯的緩衝區號。如果 {nr} 為零，返回當
+		前窗口的緩衝區號。如果窗口 {nr} 不存在，返回 -1。
+		示例: >
+  :echo "當前窗口的文件是 " . bufname(winbufnr(0))
+<
+							*wincol()*
+wincol()	返回數值，窗口光標的虛擬列。亦即從窗口左側起算的屏幕列數。最左
+		列為第一列。
+
+winheight({nr})						*winheight()*
+		返回數值，窗口 {nr} 的高度。如果 {nr} 為零，返回當前窗口的高
+		度。如果窗口 {nr} 不存在，返回 -1。存在的窗口的寬度至少為零。
+		示例: >
+  :echo "當前窗口有 " . winheight(0) . " 行。"
+<
+							*winline()*
+winline()	返回數值，窗口光標所在的屏幕行，亦即，從窗口頂部起算的屏幕行
+		數。第一行返回 1。
+		如果光標移動，文件的視圖會先更新，這可能會導致滾動。
+
+							*winnr()*
+winnr([{arg}])	返回數值，當前窗口的編號。最上面的窗口的編號為 1。
+		如果可選的參數為 "$"，返回最後一個窗口的編號 (即窗口的總數)。
+		如果可選的參數為 "#"，返回最近訪問的窗口號 (|CTRL-W_p| 到的地
+		方)。如果沒有上次窗口或它在另一個標籤頁中，返回 0。
+		該數值可以用於 |CTRL-W_w| 和 ":wincmd w" |:wincmd|。
+		另見 |tabpagewinnr()|。
+
+							*winrestcmd()*
+winrestcmd()	返回 |:resize| 命令序列，該序列應該能夠恢復當前窗口的大小。只
+		有在沒有窗口被打開或關閉且當前窗口和標籤頁都沒有改變的時候才能
+		正確工作。
+		示例: >
+			:let cmd = winrestcmd()
+			:call MessWithWindowSizes()
+			:exe cmd
+<
+							*winrestview()*
+winrestview({dict})
+		使用 |winsaveview()| 返回的 |Dictionary| 來恢復當前窗口的視
+		圖。
+		如果你改變了其中的值，結果無法預測。如果窗口大小改變了，結果不
+		會完全一樣。
+
+							*winsaveview()*
+winsaveview()	返回 |Dictionary|，包含當前窗口的信息，這些信息可用來恢復視
+		圖。
+		|winrestview()| 進行視圖的恢復。
+		可用於定義在緩衝區裡跳轉後想恢復的原來視圖的映射。
+		這裡不保存折疊的信息。用 'foldenable' 選項來暫時關閉折疊功能，
+		這樣在移動時折疊就不會打開。
+		返回值包括:
+			lnum		光標行號
+			col		光標列號
+			coladd		'virtualedit' 使用的光標列偏移
+			curswant	垂直移動使用的列
+			topline		窗口的第一行
+			topfill		填充行，只用於 diff 模式
+			leftcol		顯示的第一列
+			skipcol		跳過的列數
+		注意 這裡不保存任何選項值。
+
+
+winwidth({nr})						*winwidth()*
+		返回數值，窗口 {nr} 的寬度。如果 {nr} 為零，返回當前窗口的寬
+		度。如果窗口 {nr} 不存在，返回 -1。存在的窗口的寬度至少為零。
+		示例: >
+  :echo "當前窗口有 " . winwidth(0) . " 列。"
+  :if winwidth(0) <= 50
+  :  exe "normal 50\<C-W>|"
+  :endif
+<
+							*writefile()*
+writefile({list}, {fname} [, {binary}])
+		把 |List| {list} 寫到文件 {fname} 裡。列表的項目間以 NL 分隔。
+		每個列表項必須是字符串或數值。
+		如果 {binary} 等於 "b"，使用二進制模式: 最後一個列表項目之後沒
+		有 NL，最後的空項目使得文件的末行以 NL 結尾。
+		所有的 NL 字符被 NUL 字符代替。
+		CR 字符的插入需要在把 {list} 傳遞給 writefile() 之前先做好。
+		如果可能，覆蓋已有的文件。
+		如果寫入失敗，返回 -1，否則返回 0。如果文件不能建立或者寫入失
+		敗，會有錯誤信息。
+		另見 |readfile()|。
+		要按字節複製文件: >
+			:let fl = readfile("foo", "b")
+			:call writefile(fl, "foocopy", "b")
+<
+
+							*feature-list*
+有三種類型的特性:
+1.  只有在 Vim 編譯時加入才會支持的特性 |+feature-list|。例如: >
+	:if has("cindent")
+2.  只有特定條件滿足才會支持的特性。例如: >
+	:if has("gui_running")
+<							*has-patch*
+3.  包含的補丁。先檢查 |v:version| 確定 Vim 的版本。然後形如 "patch123" 的特性
+    意味著補丁 123 已經在本版本裡包含了。例如 (確定是 version 6.2.148 或更新的
+    版本): >
+	:if v:version > 602 || v:version == 602 && has("patch148")
+<   注意 包含了補丁 148 但不包含補丁 147 是可能的。
+
+all_builtin_terms	編譯時打開了所有的內建終端。
+amiga			Vim 的 Amiga 版本。
+arabic			編譯時加入了阿拉伯語的支持。|Arabic|。
+arp			編譯時加入了 ARP 的支持。(Amiga)。
+autocmd			編譯時加入了自動命令的支持。|autocommand|
+balloon_eval		編譯時加入了 |balloon-eval| 的支持。
+balloon_multiline	GUI 支持多行氣泡。
+beos			Vim 的 BeOS 版本。
+browse			編譯時加入了 |:browse| 的支持。因而 browse() 可以工作。
+builtin_terms		編譯時打開了一些內建終端。
+byte_offset		編譯時加入了的支持。for 'o' in 'statusline'
+cindent			編譯時加入了 'cindent' 的支持。
+clientserver		編譯時加入了遠程調用的支持。|clientserver|。
+clipboard		編譯時加入了 'clipboard' 的支持。
+cmdline_compl		編譯時加入了 |cmdline-completion| 的支持。
+cmdline_hist		編譯時加入了 |cmdline-history| 的支持。
+cmdline_info		編譯時加入了 'showcmd' and 'ruler' 的支持。
+comments		編譯時加入了 |'comments'| 的支持。
+cryptv			編譯時加入了加密的支持。|encryption|。
+cscope			編譯時加入了 |cscope| 的支持。
+compatible		編譯時確保和 Vi 非常兼容。
+debug			編譯時定義了 "DEBUG"。
+dialog_con		編譯時加入了控制台對話框的支持。
+dialog_gui		編譯時加入了 GUI 對話框的支持。
+diff			編譯時加入了 |vimdiff| 和 'diff' 的支持。
+digraphs		編譯時加入了二合字母的支持。
+dnd			編譯時加入了 "~ 寄存器的支持 |quote_~|。
+dos32			Vim 的 32 位 DOS 的 (DJGPP) 版本。
+dos16			Vim 的 16 位的 DOS 版本。
+ebcdic			在使用 ebcdic 字符集的機器上編譯。
+emacs_tags		編譯時加入了 Emcac 標籤的支持。
+eval			編譯時加入了表達式計算的支持。當然總要打開啦！
+ex_extra		編譯時加入了附加的 Ex 命令 |+ex_extra|。
+extra_search		編譯時加入了 |'incsearch'| 和 |'hlsearch'| 的支持。
+farsi			編譯時加入了波斯語的支持。|farsi|。
+file_in_path		編譯時加入了 |gf| 和 |<cfile>| 的支持。
+filterpipe		'shelltemp' 關閉時，外殼讀/寫/過濾命令使用管道
+find_in_path		編譯時加入了頭文件搜索 |+find_in_path| 的支持。
+float			編譯時加入了 |Float| 的支持。
+fname_case		文件名大小寫敏感 (在 Amiga、MS-DOS 和 Windows 本特性不
+			存在)。
+folding			編譯時加入了 |folding| 的支持。
+footer			編譯時加入了 GUI 信息頁腳的支持。|gui-footer|
+fork			編譯時決定使用 fork()/exec() 而不是 system()。
+gettext			編譯時加入了信息翻譯 |multi-lang|。
+gui			編譯時加入了 GUI 的支持。
+gui_athena		編譯時加入了 Athena GUI。
+gui_gtk			編譯時加入了 GTK+ GUI (任何版本)。
+gui_gtk2		編譯時加入了 GTK+ 2 GUI (同時也定義了 gui_gtk)。
+gui_gnome		編譯時加入了 Gnome 支持 (同時也定義了 gui_gtk)。
+gui_mac			編譯時加入了 Macintosh GUI。
+gui_motif		編譯時加入了 Motif GUI。
+gui_photon		編譯時加入了 Photon GUI。
+gui_win32		編譯時加入了 MS Windows Win32 GUI。
+gui_win32s		同上，使用了 Win32s 系統 (Windows 3.1)
+gui_running		Vim 在 GUI 上運行，或者 GUI 將很快啟動。
+hangul_input		編譯時加入了韓語 (Hangul) 輸入的支持。 |hangul|
+iconv			可以使用 iconv() 進行轉換。
+insert_expand		編譯時加入了插入模式中 CTRL-X 擴展命令的支持。
+jumplist		編譯時加入了 |jumplist| 的支持。
+keymap			編譯時加入了 'keymap' 的支持。
+langmap			編譯時加入了 'langmap' 的支持。
+libcall			編譯時加入了 |libcall()| 的支持。
+linebreak		編譯時加入了 'linebreak'、'breakat' 和 'showbreak' 的
+			支持。
+lispindent		編譯時加入了 lisp 縮進的支持。
+listcmds		編譯時加入了緩衝區列表 |:files| 和參數列表 |arglist|
+			的命令。
+localmap		編譯時加入了局部映射和縮寫。|:map-local|
+lua			編譯時加入了 Lua 接口 |Lua|。
+mac			Vim 的 Macintosh 版本。
+macunix			Vim 的 Macintosh 版本，使用 Unix 文件命名 (OS-X)。
+menu			編譯時加入了 |:menu| 的支持。
+mksession		編譯時加入了 |:mksession| 的支持。
+modify_fname		編譯時加入了文件名的修飾符支持。|filename-modifiers|
+mouse			編譯時加入了鼠標的支持。
+mouseshape		編譯時加入了 'mouseshape' 的支持。
+mouse_dec		編譯時加入了 Dec 終端的鼠標支持。
+mouse_gpm		編譯時加入了 gpm (Linux 控制台鼠標) 的支持。
+mouse_netterm		編譯時加入了 netterm 的鼠標支持。
+mouse_pterm		編譯時加入了 qnx 的鼠標支持。
+mouse_sysmouse		編譯時加入了 sysmouse 支持 (*BSD 控制台鼠標)
+mouse_xterm		編譯時加入了 xterm 的鼠標支持。
+multi_byte		編譯時加入了 'encoding' 的支持。
+multi_byte_encoding	'encoding' 設為某個多字節的編碼。
+multi_byte_ime		編譯時加入了 IME 輸入方法的支持。
+multi_lang		編譯時加入了多語言的支持。
+mzscheme		編譯時加入了 MzScheme 接口支持 |mzscheme|。
+netbeans_intg		編譯時加入了 |netbeans| 的支持。
+netbeans_enabled	編譯時加入了 |netbeans| 的支持並且已連接上。
+ole			編譯時加入了 Win32 OLE automation 的支持。
+os2			Vim 的 OS/2 版本。
+osfiletype		編譯時加入了 osfiletypes 的支持。|+osfiletype|
+path_extra		編譯時加入了 'path' 和 'tags' 上下搜索的支持。
+perl			編譯時加入了 Perl 接口。
+persistent_undo		編譯時加入了永久撤銷歷史的支持。
+postscript		編譯時加入了 PostScript 文件打印的支持。
+printer			編譯時加入了 |:hardcopy| 的支持。
+profile			編譯時加入了 |:profile| 的支持。
+python			編譯時加入了 Python 接口。
+qnx			Vim 的 QNX 版本。
+quickfix		編譯時加入了 |quickfix| 的支持。
+reltime			編譯時加入了 |reltime()| 的支持。
+rightleft		編譯時加入了 'rightleft' 的支持。
+ruby			編譯時加入了 Ruby 接口 |ruby|。
+scrollbind		編譯時加入了 'scrollbind' 的支持。
+showcmd			編譯時加入了 'showcmd' 的支持。
+signs			編譯時加入了 |:sign| 的支持。
+smartindent		編譯時加入了 'smartindent' 的支持。
+sniff			編譯時加入了 SNiFF interface 的支持。
+startuptime		編譯時加入了 |--startuptime| 支持。
+statusline		編譯時加入了 'statusline' 和 'rulerformat' 還有
+			'titlestring' 和 'iconstring' 的特殊格式的支持。
+sun_workshop		編譯時加入了 Sun |workshop| 的支持。
+spell			編譯時加入了拼寫檢查的支持 |spell|。
+syntax			編譯時加入了語法高亮的支持 |syntax|。
+syntax_items		當前緩衝區有激活的語法高亮項目。
+system			編譯時決定使用 system() 而不是 fork()/exec()。
+tag_binary		編譯時加入了標籤文件的二分搜索 |tag-binary-search|。
+tag_old_static		編譯時加入了老的靜態標籤的支持。|tag-old-static|。
+tag_any_white		編譯時加入了允許標籤文件使用任何空白字符的支持。
+			|tag-any-white|。
+tcl			編譯時加入了 Tcl 接口。
+terminfo		編譯時決定使用 terminfo 而不是 termcap。
+termresponse		編譯時加入了 |t_RV| 和 |v:termresponse| 的支持。
+textobjects		編譯時加入了 |text-objects| 的支持。
+tgetent			編譯時加入了 tgetent 的支持，可以使用外部 termcap 或
+			terminfo 文件。
+title			編譯時加入了窗口標題的支持。|'title'|。
+toolbar			編譯時加入了 |gui-toolbar| 的支持。
+unix			Vim 的 Unix 版本。
+user_commands		用戶定義命令支持。
+viminfo			編譯時加入了 viminfo 的支持。
+vim_starting		如果在啟動載入腳本的階段則為真。
+vertsplit		編譯時加入了垂直分割窗口的支持 |:vsplit|。
+virtualedit		編譯時加入了 'virtualedit' 選項支持。
+visual			編譯時加入了可視模式的支持。
+visualextra		編譯時加入了附加的可視模式命令支持。
+			|blockwise-operators|。
+vms			Vim 的 VMS 版本。
+vreplace		編譯時加入了 |gR| and |gr| 命令支持。
+wildignore		編譯時加入了 'wildignore' 選項支持。
+wildmenu		編譯時加入了 'wildmenu' 選項支持。
+windows			編譯時加入了多窗口的支持。
+winaltkeys		編譯時加入了 'winaltkeys' 選項。
+win16			Vim 的 Win16 版本。(MS-Windows 3.1)。
+win32			Vim 的 Win32 版本。(MS-Windows 95/98/ME/NT/2000/XP)。
+win64			Vim 的 Win64 版本。(MS-Windows 64 位)。
+win32unix		Vim 的 Win32 版本。使用 Unix 文件命名 (Cygwin)
+win95			支持 MS-Windows 95/98/ME 的 Win32 版本。
+writebackup		編譯時決定缺省打開 'writebackup'。
+xfontset		編譯時加入了 X 字體集 的支持。|xfontset|。
+xim			編譯時加入了 X 輸入法 的支持。|xim|。
+xsmp			編譯時加入了 X 會話管理 的支持。
+xsmp_interact		編譯時加入了交互的 X 會話管理 的支持。
+xterm_clipboard		編譯時加入了 xterm 剪貼板的支持。
+xterm_save		編譯時加入了保存和恢復 xterm 屏幕的支持。
+x11			編譯時加入了 X11 的支持。
+
+							*string-match*
+字符串裡的模式匹配
+
+|pattern| 說明的正規表達式通常用於尋找緩衝區行的匹配。如果匹配用來在字符串裡尋
+找匹配，幾乎所有的功能都相同。唯一的區別是，字符串是作為單行處理的。如果字符串
+裡包含了 "\n" 字符，它並不看作是模式裡的換行。它可以匹配模式裡的 "\n"，甚至於
+"."。示例: >
+	:let a = "aaaa\nxxxx"
+	:echo matchstr(a, "..\n..")
+	aa
+	xx
+	:echo matchstr(a, "a.x")
+	a
+	x
+
+不要忘記 "^" 只會在字符串的第一個字符匹配，而 "$" 在字符串的最後一個字符匹配。
+它們不會匹配 "\n" 之後和之前的位置。
+
+==============================================================================
+5. 定義函數						*user-functions*
+
+可以定義新的函數。調用的方式就像內建函數一樣。函數執行一系列 Ex 命令。普通模式
+下的命令可以用 |:normal| 命令執行。
+
+函數名須以大寫字母開始，以免和內建函數引起混淆。要避免在不同腳本使用相同的名
+字，避免顯見的或者過短的名字。一個好習慣是使用腳本名字作為函數名字的開頭，比如
+"HTMLcolor()"。
+
+也可以使用花括號，見 |curly-braces-names|。|autoload| 機制可用於在調用時才提供
+函數的定義。
+
+							*local-function*
+局部於腳本的函數必須以 "s:" 開始。局部於腳本的函數只能在同一腳本和腳本中定義的
+函數、用戶命令和自動命令裡調用。也可以在腳本定義的映射裡調用該函數，但必須使用
+|<SID>| 而不是 "s:"，如果映射會在腳本之外被擴展的話。
+
+					*:fu* *:function* *E128* *E129* *E123*
+:fu[nction]		列出所有函數和它們的參數。
+
+:fu[nction] {name}	列出 {name} 命名的函數。
+			{name} 也可以是 |Funcref| 類型的 |Dictionary| 項目: >
+				:function dict.init
+
+:fu[nction] /{pattern}	列出名字匹配 {pattern} 的函數。
+			列出所有以 "File" 結束的函數的例子: >
+				:function /File$
+<
+							*:function-verbose*
+如果 'verbose' 非零，列出函數的同時也顯示它上次定義的位置。例如: >
+
+    :verbose function SetFileTypeSH
+	function SetFileTypeSH(name)
+	    Last set from /usr/share/vim/vim-7.0/filetype.vim
+<
+|:verbose-cmd| 有更多信息。
+
+							*E124* *E125*
+:fu[nction][!] {name}([arguments]) [range] [abort] [dict]
+			定義 {name} 命名的新函數。名字必須由字母數字和 '_' 字
+			符組成，而且必須以大寫字母或者 "s:" 開頭 (見上)。
+
+			{name} 也可以是 |Funcref| 類型的 |Dictionary| 項目: >
+				:function dict.init(arg)
+<			"dict" 必須是一個已經存在的字典。如果還不存在，項目
+			"init" 被加入此字典。否則必須提供 [!] 以覆蓋已經存在的
+			函數。返回指向一個編號函數的 |Funcref|。該函數只能通過
+			|Funcref| 引用，沒有引用指向它時，該函數會被刪除。
+								*E127* *E122*
+			如果同名的函數已經存在而且沒有使用 [!]，給出錯誤信息。
+			如果給出 [!]，已有的函數被悄然替代。如果該函數正在執行
+			期間除外。此時，這是一個錯誤。
+
+			{arguments} 參見 |function-argument|。
+
+						*a:firstline* *a:lastline*
+			如果給出 [range] 參數，則該函數自己能理解並處理行范
+			圍。該範圍通過 "a:firstline" 和 "a:lastline" 定義。如
+			果沒有 [range]，":{range}call" 會在該範圍的每一行分別
+			執行該函數，每次光標都定位在處理行的行首。見
+			|function-range-example|。
+
+			如果給出 [abort] 參數，該函數在遇到錯誤時立即中止。
+
+			如果給出 [dict] 參數，該函數必須通過 |Dictionary| 的項
+			目才能調用。局部變量 "self" 這時設為該字典。見
+			|Dictionary-function|。
+
+						*function-search-undo*
+			最近使用的搜索模式和重做命令 "." 不會受到函數的影響。
+			這也意味著 |:nohlsearch| 的效果在函數返回時會被撤銷。
+
+					*:endf* *:endfunction* *E126* *E193*
+:endf[unction]		結束函數定義。必須單起一行，沒有任何其它命令。
+
+					*:delf* *:delfunction* *E130* *E131*
+:delf[unction] {name}	刪除 {name} 命名的函數。
+			{name} 也可以是 |Funcref| 類型的 |Dictionary| 項目: >
+				:delfunc dict.init
+<			會刪除 "dict" 的 "init" 項目。如果沒有更多指向它的引
+			用，該函數被刪除。
+							*:retu* *:return* *E133*
+:retu[rn] [expr]	從函數返回。如果給出 "[expr]"，計算該表達式的結果成為
+			函數的返回值。如果沒有給出 "[expr]"，返回 0。
+			如果函數退出時沒有顯式的調用 ":return"，返回 0。
+			注意 沒有不可到達行的檢查，因而，如果有命令在
+			":return" 之後，不會給出警告。
+
+			如果 ":return" 在 |:try| 之後使用但在匹配的 |:finally|
+			(如果有的話) 之前的話，":finally" 之後直到匹配的
+			|:endtry| 的命令會先執行。該過程反覆應用於所有函數內的
+			嵌套 ":try" 塊。在最外層 ":endtry" 結束之後才真正返
+			回。
+
+
+						*function-argument* *a:var*
+參數的定義只要給出它的名字。在函數里，可以使用 "a:name" 來訪問 ("a:" 代表參數
+(argument))。
+					*a:0* *a:1* *a:000* *E740* *...*
+可以給出不超過 20 個參數，以逗號分隔。最後，可以給出參數 "..."，意味著可以有更
+多的參數。在函數里，可以通過 "a:1"、"a:2" 等等訪問它們。"a:0" 設為這些附加參數
+的數目 (可以為 0)。"a:000" 設為包含這些參數的 |List|。注意 "a:1" 等同於
+"a:000[0]"。
+								*E742*
+a: 作用域和其中的變量不能修改，它們是固定的。不過，如果使用了 |List| 或
+|Dictionary|，你可以改變它們的內容。 所以你可以傳遞給函數一個 |List|，讓該函數
+在裡面增加項目。如果要確保函數不能修改 |List| 或 |Dictionary|，用 |:lockvar|。
+
+如果不使用 "..."，實際給出的參數數目必須等於命名參數的數目。如果使用 "..."，參
+數的數目可以更多。
+
+可以定義沒有參數的函數。但你這時仍然需要提供 ()。函數體在之後的行給出，直到匹
+配的 |:endfunction| 為止。可以在函數體裡定義別的函數。
+
+							*local-variables*
+在函數里，可以使用變量。它們是局部變量，在函數返回時就會消失。全局變量的訪問需
+要通過 "g:"。
+
+例如: >
+  :function Table(title, ...)
+  :  echohl Title
+  :  echo a:title
+  :  echohl None
+  :  echo a:0 . " items:"
+  :  for s in a:000
+  :    echon ' ' . s
+  :  endfor
+  :endfunction
+
+該函數這時可以這樣調用: >
+  call Table("Table", "line1", "line2")
+  call Table("Empty Table")
+
+要返回多於一個值，返回一個 |List|: >
+  :function Compute(n1, n2)
+  :  if a:n2 == 0
+  :    return ["fail", 0]
+  :  endif
+  :  return ["ok", a:n1 / a:n2]
+  :endfunction
+
+該函數這時可以這樣調用: >
+  :let [success, div] = Compute(102, 6)
+  :if success == "ok"
+  :  echo div
+  :endif
+<
+						*:cal* *:call* *E107* *E117*
+:[range]cal[l] {name}([arguments])
+		調用函數。函數名和參數通過 |:function| 指定。可以使用不超過 20
+		個參數。忽略返回值。
+		如果沒有給出範圍而函數又接受範圍，該函數被調用一次。如果給出范
+		圍，光標在執行函數前定位在該範圍的第一行的開始。
+		如果給出範圍但函數自己不能處理之，該函數在範圍裡的每一行分別執
+		行。光標定位在每個處理行的第一列。光標留在最後一行 (但可能被最
+		後一個函數調用移動)。每一行上，參數被重新計算。所以這是可以的:
+						*function-range-example*  >
+	:function Mynumber(arg)
+	:  echo line(".") . " " . a:arg
+	:endfunction
+	:1,5call Mynumber(getline("."))
+<
+		"a:firstline" 和 "a:lastline" 總是有定義的。它們可以用來在範圍
+		的開始或結束處進行一些不同的處理。
+
+		能處理範圍本身的函數示例: >
+
+	:function Cont() range
+	:  execute (a:firstline + 1) . "," . a:lastline . 's/^/\t\\ '
+	:endfunction
+	:4,8call Cont()
+<
+		該函數在範圍裡的每行開頭插入續行符 "\"，除了第一行以外。
+
+		如果函數返回復合值，該值可被進一步解除參照 (譯者注: 調用其上的
+		方法)，但該範圍不能被繼續使用。例如: >
+	:4,8call GetDict().method()
+<		這裡 GetDict() 得到範圍值，method() 不會。
+
+								*E132*
+用戶函數的遞歸調用受到 |'maxfuncdepth'| 選項的限制。
+
+
+自 動 載 入 函 數 ~
+							*autoload-functions*
+如果使用很多或者很大的函數，可以在需要使用它們的時候才自動提供其定義。有兩個方
+法: 用自動命令，還有用 'runtimepath' 裡的 "autoload" 目錄。
+
+
+使用自動命令 ~
+
+用戶手冊 |41.14| 一節有介紹。
+
+自動命令可用於很長的 Vim 腳本的插件。你可以定義自動命令然後用 |:finish| 快速退
+出腳本。這使得 Vim 啟動快得多。這時，自動命令應該再次載入相同的文件，並設置變
+量使得 |:finish| 命令被跳過。
+
+使用 FuncUndefined 自動命令事件，它需要一個能匹配等待定義的函數的模式。例如: >
+
+	:au FuncUndefined BufNet* source ~/vim/bufnetfuncs.vim
+
+文件 "~/vim/bufnetfuncs.vim" 這時應該定義 "BufNet" 開始的函數。另見
+|FuncUndefined|。
+
+
+使用 autoload 腳本 ~
+							*autoload* *E746*
+用戶手冊 |41.15| 一節有介紹。
+
+在 "autoload" 目錄裡定義腳本更簡單，但需要使用準確的文件名。能夠自動載入的函數
+的名字形如: >
+
+	:call filename#funcname()
+
+這樣的函數如果調用時還沒有定義，Vim 在 'runtimepath' 裡的 "autoload" 目錄搜索
+腳本文件 "filename.vim"。例如 "~/.vim/autoload/filename.vim"。該文件這時應該這
+樣定義函數: >
+
+	function filename#funcname()
+	   echo "Done!"
+	endfunction
+
+文件名和函數的 # 之前的名字必須完全匹配，而定義的函數名也必須和調用時使用的形
+式完全一致。
+
+可以使用子目錄。函數名每個 # 相當於路徑分隔符。這樣，調用函數: >
+
+	:call foo#bar#func()
+
+的時候，Vim 尋找 'runtimepath' 裡的文件 "autoload/foo/bar.vim"。
+
+也適用於讀取還沒有設置的變量: >
+
+	:let l = foo#bar#lvar
+
+不過，如果 autoload 腳本已經載入，不會為未知的變量再次載入該腳本。
+
+給這樣的變量賦值並沒有什麼特別。這可以用於在載入 autoload 腳本之前給它傳遞一些
+設置: >
+
+	:let foo#bar#toggle = 1
+	:call foo#bar#func()
+<
+注意 如果你不小心調用了應該在 autoload 腳本裡定義，但該腳本實際沒有定義的函數
+時，每次試圖對該函數的調用都會重新載入一次腳本。從而每次都會得到錯誤信息。
+
+還有，注意 如果你有兩個腳本文件，不能在使用的函數定義之前同時從一個文件裡調用
+另一個文件裡的函數並且從那個文件裡調用這個文件的函數。
+避免在頂層使用自動載入功能。
+
+提示: 如果你發佈很多腳本，可以用 |vimball| 工具把它們捆綁在一起。另請閱讀用戶
+手冊 |distribute-script|。
+
+==============================================================================
+6. 花括號名字						*curly-braces-names*
+
+使用變量的任何地方可以改用 "花括號名字" 變量。和常規的變量名類似，但可以包含一
+到多個花括號 {} 包圍的表達式，形如: >
+	my_{adjective}_variable
+
+如果 Vim 遇到這種情形，它會計算花括號內的表達式，把結果放在表達式所在的位置，
+然後重新解釋整個字符串為完整的變量名。所以在上例中，如果變量 "adjective" 設為
+"noisy"，那麼引用的將是 "my_noisy_variable"。如果 "adjective" 設為 "quiet"，那
+麼引用的將是 "my_quiet_variable"。
+
+一個這種形式的應用是建立一系列變量，由一個選項管理。比如，語句 >
+	echo my_{&background}_message
+
+會顯示 "my_dark_message" 或者 "my_light_message" 的內容，取決於 'background'
+的當前值。
+
+你可以使用多個花括號對: >
+	echo my_{adverb}_{adjective}_message
+..甚至嵌套使用: >
+	echo my_{ad{end_of_word}}_message
+其中 "end_of_word" 可以是 "verb" 或者 "jective"。
+
+不過，花括號裡的表達式必須計算出合法的單個變量名，比如，這不行: >
+	:let foo='a + b'
+	:echo c{foo}d
+.. 因為擴展的結果是 "ca + bd"，這不是合法的變量名。
+
+						*curly-braces-function-names*
+類似的，你可以調用和定義計算的出的函數名。比如: >
+	:let func_end='whizz'
+	:call my_func_{func_end}(parameter)
+
+會調用函數 "my_func_whizz(parameter)"。
+
+==============================================================================
+7. 命令							*expression-commands*
+
+:let {var-name} = {expr1}				*:let* *E18*
+			設置內部變量 {var-name} 為表達式 {expr1} 的計算結果。
+			該變量也會得到 {expr} 的類型。如果 {var-name} 不存在，
+			它會被創立。
+
+:let {var-name}[{idx}] = {expr1}			*E689*
+			設置列表項目為表達式 {expr1} 的返回值。{var-name} 必須
+			引用列表而 {idx} 必須是該列表裡合法的索引值。嵌套的列
+			表可以重複使用索引。
+			不能用於給列表 |List| 增加項目。
+			不能用來給字符串改變個別字節。為此你可以這麼做: >
+				:let var = var[0:2] . 'X' . var[4:]
+<
+							*E711* *E719*
+:let {var-name}[{idx1}:{idx2}] = {expr1}		*E708* *E709* *E710*
+			設置 |List| 的一系列項目為表達式 {expr1} 的返回值，後
+			者必須是正確數量項目的列表。
+			{idx1} 可以省略，這時以零代替。
+			{idx2} 可以省略，這時意味著到列表尾部。
+			如果選擇的項目範圍部分越過列表的尾部，會加入新的項目。
+
+					*:let+=* *:let-=* *:let.=* *E734*
+:let {var} += {expr1}	類似於 ":let {var} = {var} + {expr1}"。
+:let {var} -= {expr1}	類似於 ":let {var} = {var} - {expr1}"。
+:let {var} .= {expr1}	類似於 ":let {var} = {var} . {expr1}"。
+			如果 {var} 還沒有設置或者 {var} 和 {expr1} 的類型不符
+			合操作符的要求，失敗。
+
+
+:let ${env-name} = {expr1}			*:let-environment* *:let-$*
+			設置環境變量 {env-name} 為表達式 {expr1} 的計算結果。
+			它總是字符串型。
+:let ${env-name} .= {expr1}
+			把 {expr1} 附加到環境變量 {env-name} 之後。如果該環境
+			變量還不存在，相當於 "="。
+
+:let @{reg-name} = {expr1}			*:let-register* *:let-@*
+			把表達式 {expr1} 的計算結果寫到寄存器 {reg-name} 裡。
+			{reg-name} 必須是單個字符，而且是一個可以寫入的寄存器
+			(見 |registers|)。"@@" 可以用來訪問無名寄存器，而 "@/"
+			設置搜索模式。
+			如果 {expr1} 的結果以 <CR> 或 <NL> 結束，該寄存器會成
+			為面向行類型，不然，它會成為面向字符類型。
+			這可以用來清除最近的搜索模式: >
+				:let @/ = ""
+<			這和搜索空字符串不同，後者會在任何地方得到匹配。
+
+:let @{reg-name} .= {expr1}
+			把 {expr1} 附加到寄存器 {reg-name} 之後。如果寄存器為
+			空，相當於把它設為 {expr1} 的值。
+
+:let &{option-name} = {expr1}			*:let-option* *:let-&*
+			設置選項 {option-name} 為表達式 {expr1} 的計算結果。字
+			符串或數值類型的值總會被轉化為選項需要的類型。
+			對於局部於窗口或者緩衝區的選項而言，這和 |:set| 命令的
+			效果相同: 局部值和全局值都被改變。
+			例如: >
+				:let &path = &path . ',/usr/local/include'
+
+:let &{option-name} .= {expr1}
+			對字符串選項: 附加 {expr1} 到選項值之後。和 |:set+=|
+			不同，不會插入逗號。
+
+:let &{option-name} += {expr1}
+:let &{option-name} -= {expr1}
+			對數值或布爾選項: 加減 {expr1}。
+
+:let &l:{option-name} = {expr1}
+:let &l:{option-name} .= {expr1}
+:let &l:{option-name} += {expr1}
+:let &l:{option-name} -= {expr1}
+			同上，但只設置選項的局部值 (如果有的話)。和
+			|:setlocal| 類似。
+
+:let &g:{option-name} = {expr1}
+:let &g:{option-name} .= {expr1}
+:let &g:{option-name} += {expr1}
+:let &g:{option-name} -= {expr1}
+			同上，但只設置選項的全局值 (如果有的話)。和
+			|:setglocal| 類似。
+
+:let [{name1}, {name2}, ...] = {expr1}		*:let-unpack* *E687* *E688*
+			{expr1} 計算結果必須是 |List|。該列表的第一項賦給
+			{name1}，第二項給 {name2}，依此類推。
+			命名的數量必須匹配 |List| 項目的數量。
+			每個名字必須是上面提到的 ":let" 命令的項目之一。
+			例如: >
+				:let [s, item] = GetItem(s)
+<			細節: 先計算 {expr1}，然後按順序依次進行賦值。如果
+			{name2} 依賴於 {name1}，該細節就有關係。例如: >
+				:let x = [0, 1]
+				:let i = 0
+				:let [i, x[i]] = [1, 2]
+				:echo x
+<			結果是 [0, 2]。
+
+:let [{name1}, {name2}, ...] .= {expr1}
+:let [{name1}, {name2}, ...] += {expr1}
+:let [{name1}, {name2}, ...] -= {expr1}
+			同上，但附加/加/減值到每個 |List| 項目。
+
+:let [{name}, ..., ; {lastname}] = {expr1}
+			類似於上面的 |:let-unpack|，但 |List| 可以包含比給出名
+			字的數量更多的項目。列表其餘項目賦給 {lastname}。
+			如果沒有餘下的項目，{lastname} 設為空列表。
+			例如: >
+				:let [a, b; rest] = ["aval", "bval", 3, 4]
+<
+:let [{name}, ..., ; {lastname}] .= {expr1}
+:let [{name}, ..., ; {lastname}] += {expr1}
+:let [{name}, ..., ; {lastname}] -= {expr1}
+			同上，但附加/加/減值到每個 |List| 項目。
+							*E106*
+:let {var-name}	..	列出變量 {var-name} 的值。可以給出多個變量的名字。這裡
+			識別特殊的名字包括:		*E738*
+			  g:	全局變量
+			  b:	緩衝區的局部變量
+			  w:	窗口的局部變量
+			  t:	標籤頁的局部變量
+			  s:	腳本的局部變量
+			  l:	函數的局部變量
+			  v:	Vim 變量。
+
+:let			列出所有變量的值。變量的類型在值之前給出:
+			       <空>	字符串
+				#	數值
+				*	函數引用
+
+
+:unl[et][!] {name} ...				*:unlet* *:unl* *E108* *E795*
+			刪除內部變量 {var-name}。可以給出多個變量的名字。它們
+			都被刪除。該名字也可以是 |List| 或 |Dictionary| 項目。
+			如果使用 [!]，即使變量不存在也不會給出錯誤。
+			|List| 裡可以刪除一到多個項目: >
+				:unlet list[3]	  " remove fourth item
+				:unlet list[3:]   " remove fourth item to last
+<			|Dictionary| 裡一次只能刪除一個項目: >
+				:unlet dict['two']
+				:unlet dict.two
+<			這對於清除全局和腳本局部變量很有用 (腳本結束時並不自動
+			刪除這些變量)。函數局部變量在函數結束時是自動清除的。
+
+:lockv[ar][!] [depth] {name} ...			*:lockvar* *:lockv*
+			給內部變量 {name} 加鎖。加鎖意味著不能再修改該變量 (直
+			到它被解鎖為止)。
+			加鎖的變量可以刪除: >
+				:lockvar v
+				:let v = 'asdf'		" fails!
+				:unlet v
+<							*E741*
+			如果試圖修改加鎖的變量，你會得到錯誤信息: "E741: Value
+			of {name} is locked"
+
+			給 |List| 或 |Dictionary| 加鎖時用到 [depth]。它決定加
+			鎖到達的深度:
+				1	給 |List| 或 |Dictionary| 自身加鎖。不
+					能增加或者刪除項目，但你可以修改它們的
+					值。
+				2	給這些值加也鎖，不能修改項目。如果項目
+					是 |List| 或 |Dictionary|，不能增加或
+					刪除其中項目，但仍然可以修改項目值。
+				3	同 2，但又適用於 |List| / |Dictionary|
+					中的 |List| / |Dictionary| 項目，更深
+					一層。
+			缺省的 [depth] 為 2，{name} 是 |List| 或 |Dictionary|
+			時，不能修改項目值。
+								*E743*
+			要使用沒有限制的深度，用 [!] 並省略 [depth]。不過，為
+			了捕獲循環，設定最大深度為 100。
+
+			注意 如果兩個變量引用同一個 |List| 而你鎖住其中一個，
+			通過另一個變量來訪問 |List| 也同時被鎖住。
+			例如: >
+				:let l = [0, 1, 2, 3]
+				:let cl = l
+				:lockvar l
+				:let cl[1] = 99		" won't work!
+<			為了避免這一點，可以給列表建立備份。見 |deepcopy()|。
+
+
+:unlo[ckvar][!] [depth] {name} ...			*:unlockvar* *:unlo*
+			給內部變量 {name} 解鎖。和 |:lockvar| 剛好相反。
+
+
+:if {expr1}			*:if* *:endif* *:en* *E171* *E579* *E580*
+:en[dif]		如果 {expr} 計算為非零，執行命令直到其後匹配的 ":else"
+			或者 ":endif" 為止。
+
+			從 Vim 版本 4.5 到 5.0，":if" 和 ":endif" 之間的 Ex 命
+			令被忽略。提供這兩個命令只是為了後向兼容 (譯者注，原文
+			如此)，以方便未來的擴展。可以嵌套。注意 任何的 ":else"
+			或 ":elseif" 也被忽略，"else" 部分也一樣不會執行。
+
+			利用這一點，你可以保持和舊版本的兼容: >
+				:if version >= 500
+				:  版本 5 專用的命令
+				:endif
+<			為了找到 "endif"，仍然需要分析命令。有時，舊版本的 Vim
+			不能識別新的命令。比如， ":silent" 被識別為
+			":substitute" 命令。這種情形可以用 ":execute" 來避
+			免: >
+				:if version >= 600
+				:  execute "silent 1,$delete"
+				:endif
+<
+			注意: ":append" 和 ":insert" 命令在 ":if" 和 ":endif"
+			之間不能正常工作。
+
+						*:else* *:el* *E581* *E583*
+:el[se]			如果這之前的命令沒有被執行，執行命令直到其後匹配的
+			":else" 或 ":endif"。
+
+					*:elseif* *:elsei* *E582* *E584*
+:elsei[f] {expr1}	":else" ":if" 的縮寫，而且無需另一個 ":endif"。
+
+:wh[ile] {expr1}			*:while* *:endwhile* *:wh* *:endw*
+						*E170* *E585* *E588* *E733*
+:endw[hile]		只要 {expr1} 計算的結果非零，重複 ":while" 和
+			":endwhile" 之間的命令。
+			如果發現循環裡有命令出錯，從 "endwhile" 之後繼續執行。
+			例如: >
+				:let lnum = 1
+				:while lnum <= line("$")
+				   :call FixLine(lnum)
+				   :let lnum = lnum + 1
+				:endwhile
+<
+			注意: ":append" 和 ":insert" 命令在 ":while" 和 ":for"
+			循環裡不能正常工作。
+
+:for {var} in {list}					*:for* *E690* *E732*
+:endfo[r]						*:endfo* *:endfor*
+			為每個 {list} 項目重複執行 ":for" 和 ":endfor" 之間的
+			命令。變量 {var} 設為每個項目的值。
+			如果循環裡某個命令出錯，從 "endfor" 之後繼續執行。
+			在循環裡修改 {list} 影響使用的項目。如果不希望如此，構
+			建一個備份: >
+				:for item in copy(mylist)
+<			如果不備份，Vim 在為當前項目執行命令前保存列表裡下一個
+			項目的引用。這樣，刪除當前項目不會影響循環的繼續。而刪
+			除任何後來的項目也會使循環跳過它。這意味著下例可以工作
+			(一個效率低下的清空列表的方法): >
+				for item in mylist
+				   call remove(mylist, 0)
+				endfor
+<			注意 給列表調整順序 (例如用 sort() 或 reverse()) 可能
+			會有意想不到的效果。
+			注意 每個列表的類型必須完全相同，以免改變 {var} 類型時
+			產生的錯誤。不過，在循環體的尾部 unlet 變量就可以使用
+			多種項目類型: >
+				for item in ["foo", ["bar"]]
+				   echo item
+				   unlet item  " 如果沒有，會報錯 E706
+				endfor
+
+:for [{var1}, {var2}, ...] in {listlist}
+:endfo[r]
+			和上面 ":for" 類似，但每個 {listlist} 項目必須是列表，
+			其中每個項目被依次賦予 {var1}、{var2} 等。例如: >
+				:for [lnum, col] in [[1, 3], [2, 5], [3, 8]]
+				   :echo getline(lnum)[col]
+				:endfor
+<
+						*:continue* *:con* *E586*
+:con[tinue]		在 ":while" 或 ":for" 循環的內部，跳回循環開始的地方。
+			如果在循環內部的 |:try| 之後但在匹配的 |:finally| (如
+			果有的話) 之前，":finally" 之後，匹配的 |:endtry| 之前
+			的命令會被先執行。該過程反覆應用於所有函數內的嵌套
+			":try" 塊。在最外層 ":endtry" 結束之後才跳回循環的開始
+			處。
+
+						*:break* *:brea* *E587*
+:brea[k]		在 ":while" 或 ":for" 循環的內部，跳到相匹配的
+			":endwhile" 或 ":endfor" 之後的命令。
+			如果在循環內部的 |:try| 之後但在匹配的 |:finally| (如
+			果有的話) 之前，":finally" 之後，匹配的 |:endtry| 之前
+			的命令會被先執行。該過程反覆應用於所有函數內的嵌套
+			":try" 塊。在最外層 ":endtry" 結束之後才跳到循環之後的
+			命令。
+
+:try				*:try* *:endt* *:endtry* *E600* *E601* *E602*
+:endt[ry]		改變 ":try" 和 ":endtry" 之間命令的錯誤處理，包括所有
+			執行的內容，":source" 裡的命令，函數調用，或者自動命令
+			的激活等。
+
+			如果檢測到錯誤或者中斷，而其後又跟隨了 |:finally| 命
+			令，執行從 ":finally" 之後繼續。否則，或者在那以後遇到
+			了 ":endtry"，則檢查是否存在 (動態的) 往外一層的
+			":try" 以及其相應的 ":finally" 等等。然後，腳本的處理
+			被終止。(函數定義裡是否有 "abort" 參數都不相干。)
+			示例: >
+		:try | edit too much | finally | echo "cleanup" | endtry
+		:echo "impossible"	" 到不了這裡，腳本在上面已經終止
+<
+			另外，":try" 和 ":endtry" 之間的錯誤或者中斷 (動態地)
+			被轉換成一個例外。它的捕獲過程如同它被 |:throw| 命令拋
+			出那樣 (見 |:catch|)。這種情況下，腳本的處理不會被終
+			止。
+
+			"Vim:Interrupt" 的值用於中斷例外。Vim 命令的錯誤被轉換
+			成形如 "Vim({command}):{errmsg}" 的值，其它錯誤被轉換
+			成形如 "Vim:{errmsg}"。這裡，{command} 是完整的命令
+			名，而 {errmsg} 是錯誤例外如果沒有被捕獲的時候會顯示的
+			消息，它總以錯誤號開始。
+			示例: >
+		:try | sleep 100 | catch /^Vim:Interrupt$/ | endtry
+		:try | edit | catch /^Vim(edit):E\d\+/ | echo "error" | endtry
+<
+					*:cat* *:catch* *E603* *E604* *E605*
+:cat[ch] /{pattern}/	匹配 {pattern} 的例外拋出時，如果它沒有被前一個
+			":catch" 捕獲，則執行本語句之後的命令，直到遇到和本
+			":catch" 處於同一 |:try| 塊的下一個 |:catch|、
+			|:finally| 或者 |:endtry| 為止。否則，這些命令被跳過。
+			如果沒有提供 {pattern}，所有的錯誤都會被捕獲。
+			示例: >
+		:catch /^Vim:Interrupt$/	" 捕獲中斷 (CTRL-C)
+		:catch /^Vim\%((\a\+)\)\=:E/	" 捕獲所有的 Vim 錯誤
+		:catch /^Vim\%((\a\+)\)\=:/	" 捕獲錯誤和中斷
+		:catch /^Vim(write):/		" 捕獲所有 :write 的錯誤
+		:catch /^Vim\%((\a\+)\)\=:E123/	" 捕獲錯誤 E123
+		:catch /my-exception/		" 捕獲用戶例外
+		:catch /.*/			" 捕獲一切
+		:catch				" 等同於 /.*/
+<
+			除了 / 以外，也可以用別的字符包圍 {pattern}，只要它沒
+			有特殊含義 (比如 '|' 或 '"') 而且不出現在 {pattern}
+			裡。
+			注意: 依賴 ":catch" 去捕獲錯誤信息的_文本_是不可靠的，
+			因為不同的 locale 的信息可以不同。
+
+					*:fina* *:finally* *E606* *E607*
+:fina[lly]		任何匹配的 |:try| 和本 ":finally" 之間的部分要離開的時
+			候都執行本語句之後的命令，直到遇到匹配的 |:endtry| 為
+			止。包括這些情形: 正常完成且要執行到 ":finally"，通過
+			|:continue|、|:break|、|:finish| 或 |:return|，或者由
+			於錯誤或者中斷或者例外 (見 |:throw|)。
+
+							*:th* *:throw* *E608*
+:th[row] {expr1}	計算 {expr1} 然後拋出例外。如果 ":throw" 在 |:try| 之
+			後但在第一個對應的 |:catch| 之前使用，它之後的命令被跳
+			過，直到遇到第一個匹配 {expr1} 為止。如果沒有這樣的
+			":catch"，或者如果 ":throw" 在 ":catch" 之後
+			|:finally| 之前使用，執行 ":finally" (如果有的話) 之後
+			直到匹配的 |:endtry| 為止的命令。如果本 ":throw" 在
+			":finally" 之後之後出現，直到 ":endtry" 為止的命令都被
+			跳過。到達 ":endtry" 的時候，在動態計算的往外一層的
+			":try" 塊上再次重複本過程 (這可能出現在外層調用的函數
+			或者執行的腳本上)，直到找到一個匹配的 ":catch"。如果最
+			終該例外沒有被捕獲，命令處理被終止。
+			示例: >
+		:try | throw "oops" | catch /^oo/ | echo "caught" | endtry
+<
+
+							*:ec* *:echo*
+:ec[ho] {expr1} ..	回顯每個 {expr1}，以空格分隔。第一個 {expr1} 開啟一個
+			新行。另見 |:comment|。
+			使用 "\n" 來開啟新行。使用 "\r" 把光標移到第一列。
+			使用 |:echohl| 命令的高亮設置。
+			後面不能跟註釋。
+			示例: >
+		:echo "'shell' 的值是 " &shell
+<							*:echo-redraw*
+			後來的重畫可能使消息再次消失。因為 Vim 常常會推遲重畫
+			直到整個命令序列執行完為止，這個問題會頻繁出現。要避免
+			":echo" 之前的命令引起它之後的重畫 (通常，重畫被延遲到
+			有輸入的時候才進行)，使用 |:redraw| 命令強制重畫。例
+			如: >
+		:new | redraw | echo "這裡有一個新窗口"
+<
+							*:echon*
+:echon {expr1} ..	回顯每個 {expr1}，不附加其它字符。另見 |:comment|。
+			使用 |:echohl| 命令的高亮設置。
+			後面不能跟註釋。
+			例如: >
+				:echon "'shell' 的值是 " &shell
+<
+			注意 兩者的區別: ":echo" 是一個 Vim 命令，而 ":!echo"
+			是一個外部的外殼命令: >
+		:!echo %		--> filename
+<			":!" 的參數被擴展，見 |:_%|。 >
+		:!echo "%"		--> filename or "filename"
+<			和前例類似，你是否會看到雙引號取決於你的 'shell'。 >
+		:echo %			--> nothing
+<			'%' 不是一個表達式合法的字符。 >
+		:echo "%"		--> %
+<			只會回顯 '%' 字符。 >
+		:echo expand("%")	--> filename
+<			調用 expand() 函數來擴展 '%'。
+
+							*:echoh* *:echohl*
+:echoh[l] {name}	讓其後的 |:echo|、|:echon| 和 |:echomsg| 命令使用高亮
+			組 {name}。也可用於 |input()| 的提示。示例: >
+		:echohl WarningMsg | echo "Don't panic!" | echohl None
+<			不要忘記把組設回 "None"。不然其後的 echo 都會被高亮。
+
+							*:echom* *:echomsg*
+:echom[sg] {expr1} ..	回顯表達式的結果，將其作為一個真正的消息，並把該消息保
+			存在 |message-history| 裡。
+			參數之間加入空格，和 |:echo| 類似。但不可顯示的字符只
+			是回顯而不會被解釋。
+			這裡的分析過程和 |:echo| 略有不同，而更像 |:execute|。
+			所有的表達式都先經計算後進行連接，然後再進行回顯。
+			表達式必須返回數值或字符串，返回字典和列表會出錯。
+			使用 |:echohl| 命令的高亮設置。
+			示例: >
+		:echomsg "It's a Zizzer Zazzer Zuzz, as you can plainly see."
+<			|:echo-redraw| 說明如何避免屏幕重畫時消息的消失問題。
+							*:echoe* *:echoerr*
+:echoe[rr] {expr1} ..	回顯表達式的結果，將其作為一個錯誤消息，並把該消息保
+			存在 |message-history| 裡。如果用在腳本或函數里，會加
+			入行號。
+			參數之間加入空格，和 |:echo| 類似。如果在 try 條件句裡
+			使用，該消息會拋出一個錯誤例外 (見 |try-echoerr|)。
+			示例: >
+		:echoerr "This script just failed!"
+<			如果你只想要使用 |:echohl| 高亮的消息。
+			要得到鈴聲: >
+		:exe "normal \<Esc>"
+<
+							*:exe* *:execute*
+:exe[cute] {expr1} ..	計算 {expr1}，返回的字符串作為 Ex 命令執行。
+			多個參數用空格連接。如果不想有額外的空格，使用 "." 操
+			作符來連接字符串使之成為一個參數。
+			{expr1} 用作被處理的命令，命令行編輯的鍵不會被識別。
+			後面不能跟註釋。
+			示例: >
+		:execute "buffer" nextbuf
+		:execute "normal" count . "w"
+<
+			":execute" 可以用來把命令附加到不能接受 '|' 的命令後
+			面。比如: >
+		:execute '!ls' | echo "theend"
+
+<			":execute" 也是一個避免在 Vim 腳本裡為 ":normal" 命令
+			輸入控制字符的好方法: >
+		:execute "normal ixxx\<Esc>"
+<			這裡給出一個 <Esc> 字符，見 |expr-string|。
+
+			要謹慎對待文件名中特殊字符的正確轉義。|fnameescape()|
+			可用於 Vim 命令，|shellescape()| 可用於 |:!| 命令。示
+			例: >
+		:execute "e " . fnameescape(filename)
+		:execute "!ls " . shellescape(expand('%:h'), 1)
+<
+			注意: 執行的字符串可以是任何命令行，但不能開始或結束一
+			個 "while"、"for" 或 "if" 命令。所以，這樣不行: >
+		:execute 'while i > 5'
+		:execute 'echo "test" | break'
+<
+			但如果執行的字符串裡有完整的 "while" 和 "if" 命令就沒
+			有問題: >
+		:execute 'while i < 5 | echo i | let i = i + 1 | endwhile'
+<
+
+							*:exe-comment*
+			":execute"、":echo" 和 ":echon" 後面不能直接跟註釋。
+			因它們把 '"' 看成字符串的開始。但你可以把註釋加到 '|'
+			後面。例如: >
+		:echo "foo" | "這是一個註釋
+
+==============================================================================
+8. 例外處理						*exception-handling*
+
+Vim 腳本語言包含了例外處理特性。本節解釋如何在 Vim 腳本裡應用該機制。
+
+Vim 在出錯或者中斷的時候可以拋出例外。見 |catch-errors| 和 |catch-interrupt|。
+你也可以顯式地使用 ":throw" 命令拋出例外。見 |throw-catch|。
+
+
+TRY 條 件 句						*try-conditionals*
+
+例外可以被捕獲或者用來激發清理代碼的運行。你可以使用 try 條件句來指定 catch 子
+句 (捕獲例外) 和/或 finally 子句 (執行清理)。
+   try 條件句以 |:try| 命令開始，以匹配的 |:endtry| 命令結束。兩者之間，你可以
+使用 |:catch| 命令開始 catch 子句，或者用 |:finally| 命令開始 finally 子句。
+catch 子句可有零到多個，但 finally 子句至多只有一個，且它之後不能再有 catch 子
+句。catch 子句和 finally 子句之前的行稱為 try 塊。
+
+     :try
+     :  ...
+     :  ...				TRY 塊
+     :  ...
+     :catch /{pattern}/
+     :  ...
+     :  ...				CATCH 子 句
+     :  ...
+     :catch /{pattern}/
+     :  ...
+     :  ...				CATCH 子 句
+     :  ...
+     :finally
+     :  ...
+     :  ...				FINALLY 子 句
+     :  ...
+     :endtry
+
+try 子句允許觀察代碼裡是否有例外，並採取合適的行動。try 塊裡的例外可能被捕獲。
+try 塊和 catch 子句裡的例外可能引起清理動作。
+   如果 try 塊的執行過程中沒有拋出例外，控制轉移到 finally 子句。在它執行後，
+腳本從 ":endtry" 之後的行繼續。
+   如果 try 塊的執行過程中拋出了例外，該 try 塊其餘的行被跳過。例外和 ":catch"
+命令的模式參數一一比較。第一個匹配的 ":catch" 之後的 catch 子句被採用，其餘的
+catch 子句則不會執行。catch 子句在下一個最早遇到的 ":catch"、":finally" 或
+":endtry" 命令結束。這時，finally 子句 (如果有的話) 被執行。當遇到 ":endtry"
+的時候，腳本從後面的行繼續，一如往常。
+   如果 try 塊拋出的例外不能匹配任何 ":catch" 命令的模式，該例外不能由本 try
+條件句捕獲，因而不會執行任何的 catch 子句。只有 finally 子句，如果有的話，被采
+用。該例外在 finally 子句的執行時被暫時擱置。在 ":endtry" 之後才繼續。這樣，
+":endtry" 之後的命令不會被執行，而該例外可以在別的地方捕獲，見 |try-nesting|。
+   如果在 catch 子句的執行過程中拋出了另一個錯誤，catch 子句的其餘部分不再執
+行。新的例外不會和試圖和同一個 try 條件句的任何 ":catch" 命令的模式匹配，因而
+也不會執行任何它的 catch 子句。不過，如果有 finally 子句，它還是會被執行，而在
+它的執行過程中暫時擱置新的例外。":endtry" 之後的命令也不會執行。而新的例外仍可
+能在別的地方捕獲，見 |try-nesting|。
+   如果在 finally 子句 (如果有的話) 的執行過程中拋出了另一個錯誤，finally 子句
+的其餘部分不再執行。如果 finally 子句是因為 try 塊或者某個 catch 子句裡產生的
+例外引起的，原先的 (被暫時擱置的) 例外被放棄。":endtry" 之後的命令也不會執行。
+而 finally 子句的這個例外被傳播，而可以在別的地方捕獲，見 |try-nesting|。
+
+在 ":while" 循環包含的完整的 try 條件句裡的 try 塊或者某個 catch 子句裡遇到
+":break" 或 ":continue" 時，或者在函數或者被執行的腳本裡的 try 條件句裡的 try
+塊或者某個 catch 子句裡執行 ":return" (函數) 或者 ":finish" (腳本) 的時候，也
+會執行 finally 子句。":break"、":continue"、":return" 或者 ":finish" 在
+finally 子句的執行時被暫停，而在遇到 ":endtry" 時繼續。不過，如果在執行
+finally 子句時拋出例外，它們都被拋棄。
+   在 ":while" 循環包含的完整的 try 條件句裡的 finally 子句裡遇到 ":break" 或
+":continue" 時，或者在函數或者被執行的腳本裡的 finally 子句裡執行 ":return" (
+函數) 或者 ":finish" (腳本) 的時候，finally 子句的其餘部分被跳過，而
+":break"、":continue"、":return" 或 ":finish" 會如常繼續執行。如果 finally 的
+執行是因為例外或者早先的 try 塊或者 catch 子句的 ":break"、":continue"、
+":return" 或者 ":finish" 引起的，暫停的例外或者命令被放棄。
+
+例子可見 |throw-catch| 和 |try-finally|。
+
+
+TRY 條 件 句 的 嵌 套 					*try-nesting*
+
+try 條件句可以任意嵌套。也就是說，完整的 try 條件句可以在另一個 try 條件句的
+try 塊、某個 catch 子句或者 finally 子句裡出現。如果內層的 try 條件句不能捕獲
+它的 try 塊拋出的例外，或者在它的某個 catch 子句後者 finally 子句裡拋出新的例
+外的話，那麼根據上述規則由外層的 try 條件句繼續檢查是否能捕獲該例外。如果內層
+try 條件句在外層 try 條件句的 try 塊裡，檢查外層的 catch 子句，不然只有
+finally 子句會被執行。對嵌套的處理而言，內層 try 條件句是直接包含在外層裡面，
+還是外層執行了腳本或者調用了函數，而後者又包含了內層 try 條件句，無關緊要。
+
+如果沒有活動的 try 條件句能捕獲某個例外，只有它們的 finally 子句會執行。最後，
+腳本結束它的處理。如果是 ":throw" 命令顯式地拋出的未捕獲的例外，顯示錯誤信息。
+對於 Vim 隱含拋出的未捕獲的錯誤或者中斷例外，錯誤信息或者中斷信息也會像平常一
+樣顯示。
+
+例子可見 |throw-catch|。
+
+
+檢 查 例 外 處 理 代 碼					*except-examine*
+
+例外處理的代碼的編寫可能很麻煩。如果你不知道發生了什麼，把 'verbose' 設為 13，
+或者在執行腳本文件時使用 ":13verbose" 命令修飾符。這樣，你能看到什麼時候例外被
+拋出、放棄、捕獲、或者最終處理。如果詳細程度大於等於 14，finally 子句暫停什麼
+也會顯示。這些信息在調試模式裡也會給出 (見 |debug-scripts|)。
+
+
+拋 出 和 捕 獲 例 外 					*throw-catch*
+
+你可以拋出任何數值或者字符串作為例外。使用 |:throw| 命令然後把要拋出的值作為參
+數傳入: >
+	:throw 4711
+	:throw "string"
+<							*throw-expression*
+你可以指定表達式參數。該表達式先進行計算，然後拋出其結果: >
+	:throw 4705 + strlen("string")
+	:throw strpart("strings", 0, 6)
+
+在計算 ":throw" 命令的參數的時候，也可能會拋出例外。除非它被捕獲，不然表達式的
+計算會被放棄。":throw" 命令這時不會拋出新的例外。
+   例如: >
+
+	:function! Foo(arg)
+	:  try
+	:    throw a:arg
+	:  catch /foo/
+	:  endtry
+	:  return 1
+	:endfunction
+	:
+	:function! Bar()
+	:  echo "in Bar"
+	:  return 4710
+	:endfunction
+	:
+	:throw Foo("arrgh") + Bar()
+
+這裡拋出了 "arrgh"，而不會顯示 "in Bar"，因為 Bar() 沒有執行。 >
+	:throw Foo("foo") + Bar()
+卻顯示 "in Bar" 並且拋出 4711。
+
+別的接受表達式作為參數的命令也可能因為表達式計算過程的 (未捕獲的) 例外而被放
+棄。例外這時被傳播給該命令的調用者。
+   例如: >
+
+	:if Foo("arrgh")
+	:  echo "then"
+	:else
+	:  echo "else"
+	:endif
+
+這裡 "then" 和 "else" 都不會顯示。
+
+							*catch-order*
+try 條件句裡的例外可以用一個或多個 |:catch| 命令捕獲，見 |try-conditionals|。
+每個 ":catch" 命令可以捕獲的值通過模式參數指定。捕獲匹配的例外時，執行其後的
+catch 子句。
+   例如: >
+
+	:function! Foo(value)
+	:  try
+	:    throw a:value
+	:  catch /^\d\+$/
+	:    echo "Number thrown"
+	:  catch /.*/
+	:    echo "String thrown"
+	:  endtry
+	:endfunction
+	:
+	:call Foo(0x1267)
+	:call Foo('string')
+
+第一個 Foo() 的調用顯示 "Number thrown"，第二個 "String thrown"。
+按照 ":catch" 命令本身的順序，依次匹配例外。只用第一個成功匹配。所以，你應該把
+更專門的 ":catch" 放在前面。下面的順序並不合理: >
+
+	:  catch /.*/
+	:    echo "String thrown"
+	:  catch /^\d\+$/
+	:    echo "Number thrown"
+
+這裡，第一個 ":catch" 總是會被匹配，所以第二個子句永遠不可能被採用。
+
+							*throw-variables*
+如果你使用通用的模式捕獲到例外，可以通過變量 |v:exception| 得到準確的例外值: >
+
+	:  catch /^\d\+$/
+	:    echo "Number thrown.  Value is" v:exception
+
+你也許會對在什麼地方拋出例外也感興趣。它被保存在 |v:throwpoint| 裡。注意
+"v:exception" 和 "v:throwpoint" 可用於最近捕獲的例外，只要該例外還沒有完成處
+理。
+   例如: >
+
+	:function! Caught()
+	:  if v:exception != ""
+	:    echo 'Caught "' . v:exception . '" in ' . v:throwpoint
+	:  else
+	:    echo 'Nothing caught'
+	:  endif
+	:endfunction
+	:
+	:function! Foo()
+	:  try
+	:    try
+	:      try
+	:	 throw 4711
+	:      finally
+	:	 call Caught()
+	:      endtry
+	:    catch /.*/
+	:      call Caught()
+	:      throw "oops"
+	:    endtry
+	:  catch /.*/
+	:    call Caught()
+	:  finally
+	:    call Caught()
+	:  endtry
+	:endfunction
+	:
+	:call Foo()
+
+會顯示 >
+
+	Nothing caught
+	Caught "4711" in function Foo, line 4
+	Caught "oops" in function Foo, line 10
+	Nothing caught
+
+更實際的例子:  下面的命令 ":LineNumber" 顯示調用它時，腳本或者函數里的行號: >
+
+	:function! LineNumber()
+	:    return substitute(v:throwpoint, '.*\D\(\d\+\).*', '\1', "")
+	:endfunction
+	:command! LineNumber try | throw "" | catch | echo LineNumber() | endtry
+<
+							*try-nested*
+try 條件句沒有捕獲的例外可以在包圍它的 try 條件句中捕獲: >
+
+	:try
+	:  try
+	:    throw "foo"
+	:  catch /foobar/
+	:    echo "foobar"
+	:  finally
+	:    echo "inner finally"
+	:  endtry
+	:catch /foo/
+	:  echo "foo"
+	:endtry
+
+內層的 try 條件句沒有捕獲例外，只執行了 finally 子句。例外在外層得到捕獲。本例
+顯示 "inner finally" 然後是 "foo"。
+
+							*throw-from-catch*
+你可以捕獲某例外，然後拋出另一個。它在該 catch 子句之外捕獲: >
+
+	:function! Foo()
+	:  throw "foo"
+	:endfunction
+	:
+	:function! Bar()
+	:  try
+	:    call Foo()
+	:  catch /foo/
+	:    echo "Caught foo, throw bar"
+	:    throw "bar"
+	:  endtry
+	:endfunction
+	:
+	:try
+	:  call Bar()
+	:catch /.*/
+	:  echo "Caught" v:exception
+	:endtry
+
+顯示 "Caught foo, throw bar" 然後是 "Caught bar"。
+
+							*rethrow*
+Vim 腳本語言沒有真正的 rethrow。但可以拋出 "v:exception" 來代替: >
+
+	:function! Bar()
+	:  try
+	:    call Foo()
+	:  catch /.*/
+	:    echo "Rethrow" v:exception
+	:    throw v:exception
+	:  endtry
+	:endfunction
+<							*try-echoerr*
+注意 這個方法不能用來 "rethrow" Vim 錯誤或者中斷例外，因為不能偽造 Vim 的內部
+例外。試圖這麼做會產生一個錯誤例外。你應該拋出自己的例外來說明這種情形。如果你
+想產生 Vim 的錯誤例外並包含原來的錯誤例外的值，可以使用 |:echoerr| 命令: >
+
+	:try
+	:  try
+	:    asdf
+	:  catch /.*/
+	:    echoerr v:exception
+	:  endtry
+	:catch /.*/
+	:  echo v:exception
+	:endtry
+
+本代碼會顯示
+
+	Vim(echoerr):Vim:E492: Not an editor command:   asdf ~
+
+
+清 理 代 碼						*try-finally*
+
+腳本經常需要改變全局設定然後結束時恢復之。不過，如果用戶按了 CTRL-C 中止腳本，
+這些設定會處於不一致的狀態。如果你處於某腳本的開發階段而發生了錯誤或者你顯式地
+拋出例外而沒有試圖捕獲之，也會有相同的情況。用帶有 finally 子句的 try 條件句，
+可以恢復設置，從而解決這個問題。可以保證無論是正常的控制流、出錯或者顯式的例外
+":throw"、還是被中斷，都會執行 finally 子句 (注意 try 條件句的錯誤和中斷被轉換
+成例外。如果沒有捕獲，它們在 finally 子句執行完之後會終止腳本。)
+例如: >
+
+	:try
+	:  let s:saved_ts = &ts
+	:  set ts=17
+	:
+	:  " 這裡執行重要的任務。
+	:
+	:finally
+	:  let &ts = s:saved_ts
+	:  unlet s:saved_ts
+	:endtry
+
+無論任何函數還是腳本的一部分，只要它需要修改全局設置，而在失敗或者成功退出該函
+數或者腳本部分時需要恢復這些設置，就應該在本地應用本方法。
+
+							*break-finally*
+清理代碼也適用於 ":continue"、":break"、":return" 或 ":finish" 退出的 try 塊或
+catch 子句。
+   例如: >
+
+	:let first = 1
+	:while 1
+	:  try
+	:    if first
+	:      echo "first"
+	:      let first = 0
+	:      continue
+	:    else
+	:      throw "second"
+	:    endif
+	:  catch /.*/
+	:    echo v:exception
+	:    break
+	:  finally
+	:    echo "cleanup"
+	:  endtry
+	:  echo "still in while"
+	:endwhile
+	:echo "end"
+
+會顯示 "first"、"cleanup"、"second"、"cleanup" 和 "end"。 >
+
+	:function! Foo()
+	:  try
+	:    return 4711
+	:  finally
+	:    echo "cleanup\n"
+	:  endtry
+	:  echo "Foo still active"
+	:endfunction
+	:
+	:echo Foo() "returned by Foo"
+
+會顯示 "cleanup" 和 "4711 returned by Foo"。你不需要在 finally 子句裡加上附加
+的 ":return"。(最終，它會覆蓋原來的返回值。)
+
+							*except-from-finally*
+finally 子句裡可以使用 ":continue"、":break"、":return"、":finish" 或
+":throw"，但不推薦，因為它放棄了 try 條件句的清理工作。不過當然了，finally 子
+句裡仍然可能有中斷或者錯誤例外。
+   finally 子句的錯誤引起中斷不能正常工作的例子: >
+
+	:try
+	:  try
+	:    echo "Press CTRL-C for interrupt"
+	:    while 1
+	:    endwhile
+	:  finally
+	:    unlet novar
+	:  endtry
+	:catch /novar/
+	:endtry
+	:echo "Script still running"
+	:sleep 1
+
+如果你需要在 finally 裡放入可能出錯的命令，考慮捕獲或者忽略這些命令的錯誤，見
+|catch-errors| 和 |ignore-errors|。
+
+
+捕 獲 錯 誤						*catch-errors*
+
+如果你想捕獲特定的錯誤，你需要把要關注的代碼放到 try 塊裡，然後為該錯誤消息加
+入 catch 子句。try 條件句的存在使得所有的錯誤被轉換為例外。不會顯示消息，而
+|v:errmsg| 也不會設置。要找到 ":catch" 命令右邊的模式，你需要知道錯誤例外的格
+式。
+   錯誤例外使用如下的格式: >
+
+	Vim({cmdname}):{errmsg}
+或 >
+	Vim:{errmsg}
+
+{cmdname} 是失敗的命令名；第二種形式用於命令名未知的場合。{errmsg} 是錯誤在
+try 條件句發生時，本應產生的錯誤消息。它總是以大寫的 "E" 開始，後面跟兩或者三
+位的錯誤號，一個冒號和一個空格。
+
+例如:
+
+命令 >
+	:unlet novar
+通常產生錯誤信息 >
+	E108: No such variable: "novar"
+它在 try 條件句裡被轉換為例外 >
+	Vim(unlet):E108: No such variable: "novar"
+
+命令 >
+	:dwim
+通常產生錯誤信息 >
+	E492: Not an editor command: dwim
+它在 try 條件句裡被轉換為例外 >
+	Vim:E492: Not an editor command: dwim
+
+你可以這樣捕獲所有的 ":unlet" 錯誤 >
+	:catch /^Vim(unlet):/
+或者這樣捕獲所有拼錯命令名字的錯誤 >
+	:catch /^Vim:E492:/
+
+有的錯誤信息可能由不同的命令產生: >
+	:function nofunc
+和 >
+	:delfunction nofunc
+都會產生錯誤信息 >
+	E128: Function name must start with a capital: nofunc
+它在 try 條件句裡被分別轉換為例外 >
+	Vim(function):E128: Function name must start with a capital: nofunc
+或 >
+	Vim(delfunction):E128: Function name must start with a capital: nofunc
+使用下面的模式，你可以根據其號碼捕獲錯誤，而不管產生的命令是什麼: >
+	:catch /^Vim(\a\+):E128:/
+
+有些命令，比如 >
+	:let x = novar
+產生多個錯誤信息，這裡: >
+	E121: Undefined variable: novar
+	E15: Invalid expression:  novar
+只有第一個會用做例外的值，因為它是最專門的那個 (見 |except-several-errors|)。
+所以你應該這樣捕獲它 >
+	:catch /^Vim(\a\+):E121:/
+
+你可以這樣捕獲所有和名字 "nofunc" 相關的錯誤 >
+	:catch /\<nofunc\>/
+
+你可以這樣捕獲 ":write" 和 ":read" 命令產生的所有 Vim 的錯誤 >
+	:catch /^Vim(\(write\|read\)):E\d\+:/
+
+你可以這樣捕獲所有的 Vim 錯誤 >
+	:catch /^Vim\((\a\+)\)\=:E\d\+:/
+<
+							*catch-text*
+注意: 永遠不要根據錯誤信息文本本身捕獲錯誤: >
+	:catch /No such variable/
+只適用於英語的 locale，如果用戶用 |:language| 命令使用別的語言就不行了。不過，
+在註釋裡引用該消息或許有幫助: >
+	:catch /^Vim(\a\+):E108:/   " No such variable
+
+
+忽 略 錯 誤						*ignore-errors*
+
+你可以通過在本地捕獲來忽略某個 Vim 命令的錯誤: >
+
+	:try
+	:  write
+	:catch
+	:endtry
+
+但強烈建議，_不要_使用這種簡單的形式，因為它捕獲的東西超過你的想像。":write"
+命令裡，會執行一些自動命令，它們可能引起與寫入無關的錯誤。例如: >
+
+	:au BufWritePre * unlet novar
+
+作為腳本的作者，你不應該負責處理這些錯誤: 使用你書寫的腳本的用戶可能定義了這些
+自動命令。而你這麼做只會屏蔽用戶自己的錯誤。
+   更好的方法是用 >
+
+	:try
+	:  write
+	:catch /^Vim(write):/
+	:endtry
+
+這樣，只捕獲真正的 write 錯誤。總之，只應該捕獲你有意忽略的錯誤。
+
+對於單個不會執行自動命令的命令，你可以用 ":silent!" 命令來關閉錯誤到例外的轉
+換: >
+	:silent! nunmap k
+即使在活動的 try 條件句裡也能這麼用。
+
+
+捕 獲 中 斷						*catch-interrupt*
+
+如果有活動的 try 條件句，中斷 (CTRL-C) 被轉換為例外 "Vim:Interrupt"。你可以和
+其他例外一樣捕獲它。那樣，腳本就不會中止。
+   例如: >
+
+	:function! TASK1()
+	:  sleep 10
+	:endfunction
+
+	:function! TASK2()
+	:  sleep 20
+	:endfunction
+
+	:while 1
+	:  let command = input("Type a command: ")
+	:  try
+	:    if command == ""
+	:      continue
+	:    elseif command == "END"
+	:      break
+	:    elseif command == "TASK1"
+	:      call TASK1()
+	:    elseif command == "TASK2"
+	:      call TASK2()
+	:    else
+	:      echo "\nIllegal command:" command
+	:      continue
+	:    endif
+	:  catch /^Vim:Interrupt$/
+	:    echo "\nCommand interrupted"
+	:    " Caught the interrupt.  Continue with next prompt.
+	:  endtry
+	:endwhile
+
+這裡，你可以用 CTRL-C 中止任務；腳本會詢問新的命令。如果你在提示上按 CTRL-C，
+腳本就會中止。
+
+要測試在你腳本的某一行上如果按了 CTRL-C 會發生什麼，使用調試模式，然後在那行上
+執行 |>quit| 或 |>interrupt|。見 |debug-scripts|。
+
+
+捕 獲 一 切						*catch-all*
+
+命令 >
+
+	:catch /.*/
+	:catch //
+	:catch
+
+會捕獲一切: 錯誤例外，中斷例外和 |:throw| 命令顯式拋出的例外。腳本的頂層可用此
+捕獲所有意料不到的問題。
+   示例: >
+
+	:try
+	:
+	:  " 這裡做重要的工作
+	:
+	:catch /MyException/
+	:
+	:  " 處理未知的問題
+	:
+	:catch /^Vim:Interrupt$/
+	:    echo "腳本被中斷"
+	:catch /.*/
+	:  echo "內部錯誤 (" . v:exception . ")"
+	:  echo " - 發生在 " . v:throwpoint
+	:endtry
+	:" 腳本結束
+<
+注意: 捕獲一切可能會捕獲到比你想得到的更多的錯誤。所以，強烈建議你只用指定模式
+參數的 ":catch" 來捕獲你真正處理的錯誤。
+   例如: 捕獲一切會使得按 CTRL-C 來中斷腳本幾乎沒有辦法: >
+
+	:while 1
+	:  try
+	:    sleep 1
+	:  catch
+	:  endtry
+	:endwhile
+
+
+例 外 和 自 動 命 令 					*except-autocmd*
+
+執行自動命令的過程中可以使用例外。例如: >
+
+	:autocmd User x try
+	:autocmd User x   throw "Oops!"
+	:autocmd User x catch
+	:autocmd User x   echo v:exception
+	:autocmd User x endtry
+	:autocmd User x throw "Arrgh!"
+	:autocmd User x echo "Should not be displayed"
+	:
+	:try
+	:  doautocmd User x
+	:catch
+	:  echo v:exception
+	:endtry
+
+會顯示 "Oops!" 和 "Arrgh!"。
+
+							*except-autocmd-Pre*
+有些命令裡，自動命令在命令執行的主要動作之前執行。如果在自動命令的序列中拋
+出沒有捕獲的例外，該序列和導致其執行的命令本身被放棄，而例外被傳播到命令的調用
+者那裡。
+   例如: >
+
+	:autocmd BufWritePre * throw "FAIL"
+	:autocmd BufWritePre * echo "應該不會顯示"
+	:
+	:try
+	:  write
+	:catch
+	:  echo "Caught:" v:exception "from" v:throwpoint
+	:endtry
+
+這裡，":write" 命令不會寫入當前編輯的文件 (你可以通過查看 'modified' 發現)。因
+為例外來自 BufWritePre 自動命令，它放棄了 ":write"。然後，該例外被捕獲而腳本會
+顯示: >
+
+	Caught: FAIL from BufWrite Auto commands for "*"
+<
+							*except-autocmd-Post*
+有些命令裡，自動命令在命令執行的主要動作之後執行。如果主要動作失敗，而命令包含
+在活動的 try 條件句裡，將跳過這些自動命令並拋出錯誤例外，該命令的調用者可以捕
+獲這些例外。
+   例如: >
+
+	:autocmd BufWritePost * echo "文件被成功寫入！"
+	:
+	:try
+	:  write /i/m/p/o/s/s/i/b/l/e
+	:catch
+	:  echo v:exception
+	:endtry
+
+只會顯示: >
+
+	Vim(write):E212: Can't open file for writing (/i/m/p/o/s/s/i/b/l/e)
+
+如果你真想在主要動作失敗的時候也執行自動命令的話，在 catch 子句裡激活自動命令
+事件。
+   例如: >
+
+	:autocmd BufWritePre  * set noreadonly
+	:autocmd BufWritePost * set readonly
+	:
+	:try
+	:  write /i/m/p/o/s/s/i/b/l/e
+	:catch
+	:  doautocmd BufWritePost /i/m/p/o/s/s/i/b/l/e
+	:endtry
+<
+你也可以用 ":silent!": >
+
+	:let x = "ok"
+	:let v:errmsg = ""
+	:autocmd BufWritePost * if v:errmsg != ""
+	:autocmd BufWritePost *   let x = "after fail"
+	:autocmd BufWritePost * endif
+	:try
+	:  silent! write /i/m/p/o/s/s/i/b/l/e
+	:catch
+	:endtry
+	:echo x
+
+會顯示 "after fail"。
+
+如果命令的主要動作沒有失敗，可以在命令的調用者那裡捕獲自動命令產生的例外:  >
+
+	:autocmd BufWritePost * throw ":-("
+	:autocmd BufWritePost * echo "這裡不應該被顯示"
+	:
+	:try
+	:  write
+	:catch
+	:  echo v:exception
+	:endtry
+<
+							*except-autocmd-Cmd*
+有的命令的正常動作可以被自動命令的序列代替。可以在命令的調用者那裡捕獲該序列產
+生的例外。
+   例如: 對於 ":write" 命令，調用者並不知道發生例外時，文件是不是已經被寫入。
+你需要想辦法告知調用者。 >
+
+	:if !exists("cnt")
+	:  let cnt = 0
+	:
+	:  autocmd BufWriteCmd * if &modified
+	:  autocmd BufWriteCmd *   let cnt = cnt + 1
+	:  autocmd BufWriteCmd *   if cnt % 3 == 2
+	:  autocmd BufWriteCmd *     throw "BufWriteCmdError"
+	:  autocmd BufWriteCmd *   endif
+	:  autocmd BufWriteCmd *   write | set nomodified
+	:  autocmd BufWriteCmd *   if cnt % 3 == 0
+	:  autocmd BufWriteCmd *     throw "BufWriteCmdError"
+	:  autocmd BufWriteCmd *   endif
+	:  autocmd BufWriteCmd *   echo "File successfully written!"
+	:  autocmd BufWriteCmd * endif
+	:endif
+	:
+	:try
+	:	write
+	:catch /^BufWriteCmdError$/
+	:  if &modified
+	:    echo "Error on writing (file contents not changed)"
+	:  else
+	:    echo "Error after writing"
+	:  endif
+	:catch /^Vim(write):/
+	:    echo "Error on writing"
+	:endtry
+
+如果腳本在修改後執行了多次，它先顯示 >
+	File successfully written!
+然後 >
+	Error on writing (file contents not changed)
+然後 >
+	Error after writing
+等等。
+
+							*except-autocmd-ill*
+你不能把一個 try 條件句分散到不同事件的自動命令。
+下面的代碼是非法的構造: >
+
+	:autocmd BufWritePre  * try
+	:
+	:autocmd BufWritePost * catch
+	:autocmd BufWritePost *   echo v:exception
+	:autocmd BufWritePost * endtry
+	:
+	:write
+
+
+例 外 層 次 和 參 數 化 的 例 外			*except-hier-param*
+
+有些編程語言支持使用例外類的層次結構，或者在例外類的對象裡傳入附加的信息。你可
+以在 Vim 裡完成類似的工作。
+   為了拋出屬於某層次的例外，只要拋出完整的類名，部件之間用冒號分隔。比如，在
+某個數學庫裡的溢出錯誤可以拋出字符串 "EXCEPT:MATHERR:OVERFLOW"。
+   如果你想給例外類傳遞附加的信息，把它加到括號裡。比如寫入文件 "myfile" 時的
+錯誤，可以拋出字符串 "EXCEPT:IO:WRITEERR(myfile)"。
+   在 ":catch" 命令裡使用合適的模式，可以捕獲你的層次中的基本類或者派生類。括
+號裡的附加信息也可以運用 ":substitute" 命令從 |v:exception| 裡切出。
+   例如: >
+
+	:function! CheckRange(a, func)
+	:  if a:a < 0
+	:    throw "EXCEPT:MATHERR:RANGE(" . a:func . ")"
+	:  endif
+	:endfunction
+	:
+	:function! Add(a, b)
+	:  call CheckRange(a:a, "Add")
+	:  call CheckRange(a:b, "Add")
+	:  let c = a:a + a:b
+	:  if c < 0
+	:    throw "EXCEPT:MATHERR:OVERFLOW"
+	:  endif
+	:  return c
+	:endfunction
+	:
+	:function! Div(a, b)
+	:  call CheckRange(a:a, "Div")
+	:  call CheckRange(a:b, "Div")
+	:  if (a:b == 0)
+	:    throw "EXCEPT:MATHERR:ZERODIV"
+	:  endif
+	:  return a:a / a:b
+	:endfunction
+	:
+	:function! Write(file)
+	:  try
+	:    execute "write" fnameescape(a:file)
+	:  catch /^Vim(write):/
+	:    throw "EXCEPT:IO(" . getcwd() . ", " . a:file . "):WRITEERR"
+	:  endtry
+	:endfunction
+	:
+	:try
+	:
+	:  " 一些算術和 I/O
+	:
+	:catch /^EXCEPT:MATHERR:RANGE/
+	:  let function = substitute(v:exception, '.*(\(\a\+\)).*', '\1', "")
+	:  echo "Range error in" function
+	:
+	:catch /^EXCEPT:MATHERR/	" 捕獲 OVERFLOW 和 ZERODIV
+	:  echo "Math error"
+	:
+	:catch /^EXCEPT:IO/
+	:  let dir = substitute(v:exception, '.*(\(.\+\),\s*.\+).*', '\1', "")
+	:  let file = substitute(v:exception, '.*(.\+,\s*\(.\+\)).*', '\1', "")
+	:  if file !~ '^/'
+	:    let file = dir . "/" . file
+	:  endif
+	:  echo 'I/O error for "' . file . '"'
+	:
+	:catch /^EXCEPT/
+	:  echo "Unspecified error"
+	:
+	:endtry
+
+Vim 自己拋出的例外 (錯誤或者按了 CTRL-C) 使用扁平的層次: 它們都在 "Vim" 類裡。
+你自己不能拋出帶有 "Vim" 前綴的例外；它們是 Vim 保留的。
+   如果已知失敗的命令名，Vim 錯誤例外使用該命令名作為參數。見 |catch-errors|。
+
+
+特 別 之 處
+							*except-compat*
+例外處理的概念需要產生例外的命令序列被立即中止，而控制轉移到 finally 子句和/或
+catch 子句。
+
+在 Vim 腳本語言裡，有一些情況下腳本和函數在錯誤後還會繼續: 在沒有 "abort" 標誌
+位的函數或者 ":silent!" 之後的命令裡，控制流轉到下一行。而在函數外，控制流轉到
+最外層 ":endwhile" 或者 ":endif" 之後的行。另一方面，錯誤應該可以作為例外被捕
+獲 (因而，需要立即被中止)。
+
+這個問題的解決方法是把僅在有活動 try 條件句的時候，把錯誤轉化為例外，並立即中
+止 (如果沒有用 ":silent!" 抑制的話)。這不是一個限制，因為 (錯誤) 例外只能在活
+動的 try 條件句裡被捕獲。如果你需要立即終止而不需要捕獲錯誤的話，只要用一個沒
+有 catch 子句的 try 子句就可以了 (你可以用 finally 子句指定終止前執行的清理代
+碼。)
+
+如果沒有活動的 try 條件句，使用通常的中止和繼續行為，而不是立即中止。這樣，保
+證了與 Vim 6.1 和之前版本編寫的腳本的兼容性。
+
+不過，如果在活動的 try 條件句裡執行已有的不使用例外處理命令的腳本 (或者調用它
+的一個函數)，你也許會改變已有腳本發生錯誤時的控制流。你會在錯誤時立即中止並且
+在新的腳本裡捕獲錯誤。如果被執行的腳本通過 ":silent!" 命令抑制了錯誤 (在合適的
+時候測試 |v:errmsg| 來檢查錯誤)，它的執行路徑沒有改變。錯誤也不會轉換為例外。
+(見 |:silent|。) 所以唯一留下的可能是不關心錯誤並產生錯誤信息的腳本。可能，你
+也不希望在新的腳本裡使用這樣的代碼吧。
+
+							*except-syntax-err*
+例外處理命令的語法錯誤永遠不會被它所屬的 try 條件句的任何 ":catch" 命令所捕
+獲。不過，還是會執行它的 finally 子句。
+   例如: >
+
+	:try
+	:  try
+	:    throw 4711
+	:  catch /\(/ " 有語法錯誤
+	:    echo "in catch with syntax error"
+	:  catch
+	:    echo "inner catch-all"
+	:  finally
+	:    echo "inner finally"
+	:  endtry
+	:catch
+	:  echo 'outer catch-all caught "' . v:exception . '"'
+	:  finally
+	:    echo "outer finally"
+	:endtry
+
+會顯示: >
+    inner finally
+    outer catch-all caught "Vim(catch):E54: Unmatched \("
+    outer finally
+原來的例外被丟棄了，拋出的是取而代之的語法錯誤的錯誤例外。
+
+							*except-single-line*
+":try"、":catch"、":finally" 和 ":endtry" 命令可以放在一行裡，但這樣如果有語法
+錯誤，可能使得 "catch" 行無法被識別。所以，最好不要這麼做。
+   例如: >
+	:try | unlet! foo # | catch | endtry
+":unlet!" 參數之後的拖尾字符拋出了錯誤例外，但因此無法看到 ":catch" 和
+":endtry" 命令，從而只能丟棄該錯誤例外並且顯示消息 "E488: Trailing
+characters"。
+
+							*except-several-errors*
+如果多個錯誤在一個命令裡出現，第一個錯誤信息通常是最專門的，因而它被轉換為錯誤
+例外。
+   例如: >
+	echo novar
+產生 >
+	E121: Undefined variable: novar
+	E15: Invalid expression: novar
+try 條件句裡錯誤例外的值是: >
+	Vim(echo):E121: Undefined variable: novar
+<							*except-syntax-error*
+不過，如果同一命令在普通錯誤之後發現了語法錯誤，語法錯誤被用作拋出的例外。
+   例如: >
+	unlet novar #
+產生 >
+	E108: No such variable: "novar"
+	E488: Trailing characters
+try 條件句裡錯誤例外的值是: >
+	Vim(unlet):E488: Trailing characters
+這麼做是因為語法錯誤可能會以用戶意想不到的方式改變執行的路徑。例如: >
+	try
+	    try | unlet novar # | catch | echo v:exception | endtry
+	catch /.*/
+	    echo "outer catch:" v:exception
+	endtry
+顯示 "outer catch: Vim(unlet):E488: Trailing characters"，然後給出錯誤信息
+"E600: Missing :endtry"，見 |except-single-line|。
+
+==============================================================================
+9. 示例							*eval-examples*
+
+用二進制顯示 ~
+>
+  :" 函數 Nr2Bin() 返回數值的二進制字符串。
+  :func Nr2Bin(nr)
+  :  let n = a:nr
+  :  let r = ""
+  :  while n
+  :    let r = '01'[n % 2] . r
+  :    let n = n / 2
+  :  endwhile
+  :  return r
+  :endfunc
+
+  :" 函數 String2Hex() 把字符串裡的每個字符轉換成二進制字符串，用連字符分隔字
+  :" 符。
+  :func String2Bin(str)
+  :  let out = ''
+  :  for ix in range(strlen(a:str))
+  :    let out = out . '-' . Nr2Bin(char2nr(a:str[ix]))
+  :  endfor
+  :  return out[1:]
+  :endfunc
+
+使用示例: >
+  :echo Nr2Bin(32)
+返回: "100000" >
+  :echo String2Bin("32")
+返回: "110011-110010"
+
+
+給行排序 ~
+
+下例用特定比較函數給行排序。 >
+
+  :func SortBuffer()
+  :  let lines = getline(1, '$')
+  :  call sort(lines, function("Strcmp"))
+  :  call setline(1, lines)
+  :endfunction
+
+可寫為一行程序: >
+  :call setline(1, sort(getline(1, '$'), function("Strcmp")))
+
+
+scanf() 的替代 ~
+							*sscanf*
+Vim 裡沒有 sscanf() 函數。如果你需要提取一行的部分內容，可以使用 matchstr() 和
+substitute() 完成。本例子說明如何得到從類似 "foobar.txt, 123, 45" 的行裡提取文
+件名，行號和列號。 >
+   :" 設置匹配模式
+   :let mx='\(\f\+\),\s*\(\d\+\),\s*\(\d\+\)'
+   :"取得匹配整個表達式的文本部分
+   :let l = matchstr(line, mx)
+   :"從匹配中提取每個項目
+   :let file = substitute(l, mx, '\1', '')
+   :let lnum = substitute(l, mx, '\2', '')
+   :let col = substitute(l, mx, '\3', '')
+
+這裡，輸入是變量 "line"，返回值放在變量 "file"、"lnum" 和 "col" 裡。(Michael
+Geddes 提供的方法)
+
+
+輸出 scriptnames 到字典 ~
+						*scriptnames-dictionary*
+|:scriptnames| 命令可用於得到執行過的所有腳本文件的列表。沒有等價的函數或變量
+(因為很少用到)。如果需要操作此列表，可以使用下面的代碼: >
+    " 把 ":scriptnames" 的輸出存放到 scriptnames_output 變量中。
+    let scriptnames_output = ''
+    redir => scriptnames_output
+    silent scriptnames
+    redir END
+    
+    " 把輸出分拆為行，並對每行進行分析。在 "script" 字典中加入項目。
+    let scripts = {}
+    for line in split(scriptnames_output, "\n")
+      " 只處理非空白行。
+      if line =~ '\S'
+	" 獲取每行的第一個數字。
+        let nr = matchstr(line, '\d\+')
+	" 獲取文件名，刪除腳本號 " 123: "。
+        let name = substitute(line, '.\+:\s*', '', '')
+	" 在字典中加入項目
+        let scripts[nr] = name
+      endif
+    endfor
+    unlet scriptnames_output
+
+==============================================================================
+10. 不包含 +eval 特性				*no-eval-feature*
+
+如果編譯時關閉了 |+eval| 特性，以上的表達式計算命令都不可用。為了避免因此導致
+你的 Vim 腳本產生各種錯誤，":if" 和 ":endif" 命令仍然得到識別。不過 ":if" 的參
+數和一切  ":if" 和匹配的 ":endif" 之間的內容都被忽略。可以嵌套 ":if" 塊，但只
+允許出現在行首。不識別 ":else" 命令。
+
+下例演示如何在不存在 |+eval| 特性時不執行命令: >
+
+	:if 1
+	:  echo "編譯加入了表達式求值"
+	:else
+	:  echo "你_永遠_看不到這條消息"
+	:endif
+
+==============================================================================
+11. 沙盤 (sandbox)				*eval-sandbox* *sandbox* *E48*
+
+'foldexpr'、'formatexpr'、'includeexpr'、'indentexpr'、'statusline' 和
+'foldtext' 選項在沙盤 (sandbox) 裡進行計算。這意味著這些表達式不會產生可怕的副
+作用。在模式行上設置這些選項時，以及在標籤文件裡和命令行上的 CTRL-R = 執行命令
+時，這項措施提供了一定的安全性。
+沙盤也用於 |:sandbox| 命令。
+
+沙盤裡，不允許以下操作:
+	- 修改緩衝區文本
+	- 定義或者改變映射、自動命令、函數和用戶命令
+	- 設置若干選項 (見 |option-summary|)
+	- 設置若干 v: 變量 (見 |v:var|)  *E794*
+	- 執行外殼命令
+	- 讀入或者寫到文件
+	- 跳轉到另一緩衝區或者去編輯文件
+	- 執行 Python、Perl 等命令
+這並不能保證 100% 安全，但應該可以擋住大多數攻擊。
+
+							*:san* *:sandbox*
+:san[dbox] {cmd}	在沙盤裡執行 {cmd}。用於計算可能在模式行裡設置的選項，
+			比如 'foldexpr'。
+
+							*sandbox-option*
+一些選項包含表達式。對這些表達式進行計算時可能要使用沙盤才能避免安全性的威脅。
+但沙盤限制較多，所以只有在從不安全的位置設置選項時才會如此。在此上下文中，不安
+全的位置指:
+- 執行當前目錄的 .vimrc 或 .exrc 時
+- 在沙盤裡執行時
+- 來自模式行的值
+
+注意 如果在沙盤裡保存選項值然後恢復之，該選項仍然標記為在沙盤裡設置。
+
+==============================================================================
+12. 文本鎖							*textlock*
+
+在一些情況下，不允許修改緩衝區裡的文本、跳轉到其它窗口和一些其它會引起混淆或打
+斷 Vim 正在進行的操作的動作。這主要適用於和 Vim 實際正在進行其它操作的同時發生
+的事情。例如，'balloonexpr' 的計算可能發生在鼠標指針定位在若干位置的任何時候。
+
+文本鎖激活時，不允許:
+	- 修改緩衝區文本
+	- 跳轉到其它緩衝區或窗口
+	- 編輯其它文件
+	- 關閉窗口或者退出 Vim
+	- 其它
+
+
+ vim:tw=78:ts=8:ft=help:norl:

@@ -1,0 +1,105 @@
+*hangulin.txt*  For Vim version 7.3.  最近更新: 2010年5月
+
+
+		  VIM 參考手冊	By Chi-Deok Hwang and Sung-Hyun Nam
+				譯者: Willis
+				http://vimcdoc.sf.net
+
+注意: |+hangul_input| 特性即將被刪除。如果你希望保留，請給 Vim 用戶郵件列表發
+信！
+
+簡介						*hangul*
+------------
+我們的目的是能夠在 VIM 的 GUI 版本中輸入 Hangul，韓國語的一種書寫方式。如果你
+有 XIM 程序，那麼你可以用另外一個 |+xim| 特性。基本上，這個程序是給那些沒有
+XIM 程序的人用的。
+
+編譯
+-------
+下面用的是些簡單的選項。你可以加上其它配置選項。 >
+
+   ./configure --with-x --enable-multibyte --enable-fontset --enable-hangulinput
+
+你現在應該查看 feature.h。如果 |+hangul_input| 特性在配置時已經加入，你可以設
+置更多的選項: 如把鍵盤類型設為 2 bulsik 或者 3 bulsik。在這裡，你可以找到類似
+於下述例子中的關鍵字。 >
+
+	#define HANGUL_DEFAULT_KEYBOARD 2
+	#define ESC_CHG_TO_ENG_MODE
+	/* #define X_LOCALE */
+	/* #define SLOW_XSERVER */
+
+環境變量
+---------------------
+你應該設置 LANG 環境變量為韓國 locale，比如 ko 或者 ko_KR.euc。如果你設置了
+LC_ALL 環境變量，它應該也被設成韓國 locale。
+
+VIM 資源
+------------
+你應該把下面的內容加到你自己全局的 vimrc ($HOME/.vimrc)。 >
+
+	:set fileencoding=korea
+
+鍵盤
+--------
+你可以通過修改 VIM_KEYWORD 或是 HANGUL_KEYBOARD_TYPE 環境變量改變你的鍵盤類型
+(2 bulsik 或是 3 bulsik)。在 sh 裡，只要這麼做 (2 bulsik): >
+
+    export VIM_KEYBOARD="2"
+or >
+    export HANGUL_KEYBOARD_TYPE="2"
+
+如果兩者都設置了，VIM_KEYBOARD 有優先權。
+
+Hangul 字體
+------------
+你可以通過 $HOME/.Xdefaults 或自己的 .gvimrc 修改文本字體。不過對於 Hangul，你
+應該修改你自己的 vimrc 的 'guifontset'。
+
+$HOME/.Xdefaults: >
+    Vim.font: english_font
+
+    ! 以下是 Athena 的 hangul 菜單
+    *international: True
+    Vim*fontSet: english_font,hangul_font
+
+    ! 以下是 Motif 的 hangul 菜單
+    *international: True
+    Vim*fontList: english_font;hangul_font:
+
+$HOME/.gvimrc: >
+    set guifontset=english_font,hangul_font
+
+要 注意 其中用的是 , (逗號) 還是 ; (分號)。
+
+還有，不要設 ':set guifont'。如果這項存在，那麼 Gvim 忽略 ':set guifontset'。
+這就意味著 VIM 不會提供 fontset 的支持，從而只有英語會正確顯示，Hangul 就不會
+了。
+
+在 'fontset' 特性被打開後，VIM 不再允許使用 'font'。比如，如果你在 .gvimrc 裡
+用 >
+   :set guifontset=eng_font,your_font
+那麼你的語法高亮應該這樣寫  >
+   :hi Comment guifg=Cyan font=another_eng_font,another_your_font
+如果你只是這麼寫  >
+   :hi Comment font=another_eng_font
+那麼你會看到一個_很好的_錯誤信息。要 注意 ！
+
+hangul 字體 hangul_font 的寬度應該是英語字體 english_font 的寬度的兩倍。
+
+尚未支持的特性
+-------------------
+Johab 字體還沒能得到支持。我還沒有這方面的計劃。如果你確實想用 johab 字體，
+你可以看看 gau 包裡的 hanguldraw.c。
+
+Hanja 輸入還沒有支持。我也沒有這方面計劃。如果你確實想輸入 Hanja，在 hanterm
+上使用 VIM。
+
+漏洞或者意見
+--------------
+請將意見、補丁和建議送到:
+
+				    Chi-Deok Hwang <hwang@mizi.co.kr>
+				    SungHyun Nam <goweol@gmail.com>
+
+ vim:tw=78:ts=8:ft=help:norl:

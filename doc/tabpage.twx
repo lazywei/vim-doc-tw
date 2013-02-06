@@ -1,0 +1,336 @@
+*tabpage.txt*   For Vim version 7.3.  最近更新: 2010年8月
+
+
+		  VIM 參考手冊	  by Bram Moolenaar
+				譯者: Willis
+				http://vimcdoc.sf.net
+
+
+多標籤頁窗口編輯					*tab-page* *tabpage*
+
+這裡解釋新加入的處理多標籤頁的命令。另外，也提供因為和多於一個標籤頁組合使用而
+行為不同的命令的解釋。
+
+1. 簡介				|tab-page-intro|
+2. 命令				|tab-page-commands|
+3. 其它項目			|tab-page-other|
+4. 設置 'tabline'		|setting-tabline|
+5. 設置 'guitablabel'		|setting-guitablabel|
+
+{Vi 無此功能}
+{僅當編譯時加入 |+windows| 特性才能使用多標籤頁}
+
+==============================================================================
+1. 簡介						*tab-page-intro*
+
+一個標籤頁容納一或多個窗口。標籤頁間很容易切換，這種方式使你可以擁有多個窗口集
+合，每個集合做不同的工作。
+
+通常你會在 Vim 窗口頂部看到一組標籤的列表，每個標籤頁一個。用鼠標點擊標籤可以
+跳轉到對應的標籤頁。下面還介紹在其它標籤頁間移動的方式。
+
+多數命令只能用於當前標籤頁，其中包括 |CTRL-W| 命令、|:windo|、|:all| 和
+|:ball| (除非用 |:tab| 修飾符)。
+下面會列出那些能意識到有其它標籤頁存在的命令。
+
+標籤頁也是臨時編輯某個緩衝區而不用修改當前窗口佈局的好方法。只要打開新標籤頁，
+做你想做的事，然後關閉該標籤頁就可以了。
+
+==============================================================================
+2. 命令							*tab-page-commands*
+
+打 開 新 標 簽 頁:
+
+啟動 Vim 時用 "vim -p filename ..." 為每個文件參數打開一個新標籤頁 (標籤頁個數
+不能超過 'tabpagemax')。見 |-p|
+
+非 GUI 標籤頁行上雙擊鼠標打開新的空白標籤頁。該標籤頁出現在點擊位置的左側。第
+一擊可能會先選擇不同的標籤頁，從而導致額外的屏幕刷新。
+
+在一些 GUI 版本上，特別是 Win32 和 Motif，也可以這麼用。但必須在所有標籤右側點
+擊。
+
+GUI 標籤頁行可以用鼠標右鍵打開菜單。|tabline-menu|。
+
+:[count]tabe[dit]				*:tabe* *:tabedit* *:tabnew*
+:[count]tabnew
+		在當前標籤頁之後打開帶空窗口的新標籤頁。關於 [count] 見下面的
+		|:tab|。
+
+:[count]tabe[dit] [++opt] [+cmd] {file}
+:[count]tabnew [++opt] [+cmd] {file}
+		打開新標籤頁並編輯 {file}，其餘和 |:edit| 類同。關於 [count]
+		見下面的 |:tab|。
+
+:[count]tabf[ind] [++opt] [+cmd] {file}			*:tabf* *:tabfind*
+		打開新標籤頁並編輯 'path' 裡的 {file}，其餘和 |:find| 類同。關
+		於 [count] 見下面的 |:tab|。
+		{僅當編譯時加入 |+file_in_path| 特性才有效}
+
+:[count]tab {cmd}					*:tab*
+		執行 {cmd}，如果它打開新窗口，使用新標籤頁代替。不能用於
+		|:diffsplit|、|:diffpatch|、|:execute| 和 |:normal|。
+		如果省略 [count]，標籤頁出現在當前標籤頁之後。
+		如果指定 [count]，新標籤頁出現在第 [count] 個標籤頁之後。
+		":0tab cmd" 使新標籤頁出現在第一個位置。
+		例如: >
+			:tab split	" 在新標籤頁上打開當前緩衝區
+			:tab help gt	" 打開標籤頁顯示 "gt" 的幫助
+
+CTRL-W gf	打開新標籤頁並編輯光標所在的文件名。見 |CTRL-W_gf|。
+
+CTRL-W gF	打開新標籤頁，編輯光標所在的文件名並轉到文件名後的行號上。見
+		|CTRL-W_gF|。
+
+關 閉 標 簽 頁:
+
+關閉標籤頁的最後一個窗口同時也關閉該標籤頁，除非它是唯一的標籤頁。
+
+使用鼠標: 如果顯示標籤頁行，點擊右上角的 "X" 可以關閉當前標籤頁。如果使用自定
+義的 |'tabline'|，顯示內容可能有所不同。
+
+							*:tabc* *:tabclose*
+:tabc[lose][!]	關閉當前標籤頁。
+		如下情形使該命令失敗:
+		- 屏幕上只有一個標籤頁。				*E784*
+		- 如果 'hidden' 沒有置位，沒有 [!]，緩衝區有修改，而且該緩衝區
+		  沒有其它窗口。
+		緩衝區的修改不會被寫入，也不會丟失。所以這可以說是個 "安全的"
+		命令。
+
+:tabc[lose][!] {count}
+		關閉第 {count} 個標籤頁。失敗條件和上面的 ':tabclose' 相同。
+
+							*:tabo* *:tabonly*
+:tabo[nly][!]	關閉所有其它的標籤頁。
+		如果置位 'hidden' 選項，所有關閉窗口的緩衝區成為隱藏。
+		如果沒有置位 'hidden' 但置位 'autowrite' 選項，寫回修改過的緩
+		沖區。否則，包含修改過的緩衝區的窗口不會被刪除。但如果給出
+		[!]，這些窗口成為隱藏。修改過的緩衝區永遠不會被放棄，所以永遠
+		不被丟失這些改動。
+
+
+切 換 到 另 一 個 標 簽 頁:
+
+使用鼠標: 如果顯示標籤頁行，某個標籤頁標籤上單擊可以切換到該標籤頁。沒有標籤的
+地方點擊則轉到下一個標籤頁。|'tabline'|
+
+:tabn[ext]				*:tabn* *:tabnext* *gt*
+<C-PageDown>				*CTRL-<PageDown>* *<C-PageDown>*
+gt					*i_CTRL-<PageDown>* *i_<C-PageDown>*
+		轉到下一個標籤頁。最後一個標籤頁則迴繞到第一個。
+
+:tabn[ext] {count}
+{count}<C-PageDown>
+{count}gt	轉到第 {count} 個標籤頁。首個標籤頁編號為 1。
+
+
+:tabp[revious]				*:tabp* *:tabprevious* *gT* *:tabN*
+:tabN[ext]				*:tabNext* *CTRL-<PageUp>*
+<C-PageUp>			 *<C-PageUp>* *i_CTRL-<PageUp>* *i_<C-PageUp>*
+gT		轉到前一個標籤頁。首個標籤頁則迴繞到最後一個。
+
+:tabp[revious] {count}
+:tabN[ext] {count}
+{count}<C-PageUp>
+{count}gT	轉到前面 {count} 個標籤頁。首個標籤頁則迴繞到最後一個。
+
+:tabr[ewind]			*:tabfir* *:tabfirst* *:tabr* *:tabrewind*
+:tabfir[st]	轉到第一個標籤頁。
+
+							*:tabl* *:tablast*
+:tabl[ast]	轉到最後一個標籤頁。
+
+
+其它命令:
+							*:tabs*
+:tabs		列出標籤頁和它們包含的窗口。
+		當前窗口顯示 ">"。
+		修改過的緩衝區顯示 "+"。
+
+
+重 新 排 列 標 簽 頁:
+
+:tabm[ove] [N]						*:tabm* *:tabmove*
+		把當前標籤頁移到第 N 個標籤頁之後。用 0 使當前標籤頁成為首個標
+		簽頁。如果沒有 N，當前標籤頁成為最後一個。
+
+
+循 環 遍 歷 所 有 標 簽 頁:
+
+							*:tabd* *:tabdo*
+:tabd[o] {cmd}	對每個標籤頁執行 {cmd}。
+		大致相當於: >
+			:tabfirst
+			:{cmd}
+			:tabnext
+			:{cmd}
+			等等
+<		只對每個標籤頁的當前窗口進行操作。如果某個標籤頁出現錯誤，不再
+		繼續訪問其餘的標籤頁。
+		最後一個標籤頁 (或任何出錯的標籤頁) 成為當前標籤頁。
+		{cmd} 可以包含 '|' 以連接多個命令。
+		{cmd} 不能打開標籤頁、關閉標籤頁或重排標籤頁。
+		{Vi 無此功能} {僅當編譯時加入 |+listcmds| 特性才有效}
+		另見 |:windo|、|:argdo| 和 |:bufdo|。
+
+==============================================================================
+3. 其它項目						*tab-page-other*
+
+							*tabline-menu*
+GUI 標籤頁行提供彈出菜單。用右鍵點擊可以訪問。它包含的項目有:
+	Close		關閉鼠標指針所在的標籤頁。如果鼠標指針不在任何標籤上，
+			關閉當前標籤頁。
+	New Tab		打開新標籤頁並編輯空緩衝區。該標籤頁出現在鼠標指針的左
+			側。
+	Open Tab...	類似於 "New Tab"，但同時提供文件選擇器以選擇要編輯的文
+			件。
+
+每個標籤頁對 diff 模式進行分別的處理。你可以在一個標籤頁上比較若干文件。而在另
+一個標籤頁上比較不同的文件。
+
+局部於標籤頁的變量以 "t:" 開頭。|tabpage-variable|
+
+目前只有一個局部於標籤頁的選項: 'cmdheight'。
+
+TabLeave 和 TabEnter 自動命令事件可以在標籤頁切換時執行任務。準確的順序取決於
+你做的事情。建立新標籤頁相當於先建立工作於同一緩衝區的新窗口，再在其上編輯別的
+緩衝區。所以，":tabnew" 依次激活:
+	WinLeave		離開當前窗口
+	TabLeave		離開當前標籤頁
+	TabEnter		進入新標籤頁
+	WinEnter		進入新標籤頁的窗口
+	BufLeave		離開當前緩衝區
+	BufEnter		進入新的空白緩衝區
+
+而切換到另一個標籤頁的相應順序是:
+	BufLeave
+	WinLeave
+	TabLeave
+	TabEnter
+	WinEnter
+	BufEnter
+
+==============================================================================
+4. 設置 'tabline'					*setting-tabline*
+
+'tabline' 選項指定標籤頁行的外觀。只有沒有 GUI 標籤頁行時才使用該選項。
+
+用 'showtabline' 選項可以指定何時顯示標籤頁行: 從不、多於一個標籤頁才顯示、總
+是。
+
+標籤頁行的高亮用 TabLine、TabLineSel 和 TabLineFill 分別指定。|hl-TabLine|
+|hl-TabLineSel| |hl-TabLineFill|
+
+包含修改過的窗口的標籤頁會顯示 "+"。同時也顯示該標籤頁裡包含的窗口數。所以，
+"3+" 意味著有三個窗口，其中一個有修改過的緩衝區。
+
+'tabline' 選項允許你定義自己喜歡的標籤頁標籤顯示方式。實現並不簡單，所以這裡給
+出一個例子。
+
+基本知識見 'statusline' 選項。'tabline' 選項可以使用相同的項目。此外，還可用
+|tabpagebuflist()|、|tabpagenr()| 和 |tabpagewinnr()| 函數。
+
+因為標籤頁標籤的編號可以不同，你可以指定整個選項為一個函數。就像這樣: >
+	:set tabline=%!MyTabLine()
+
+然後定義 MyTabLine() 函數以列出所有標籤頁標籤。一個方便的方式是把該函數分成兩
+部分: 首先遍歷所有的標籤頁並分別定義它們的標籤。然後得到每個標籤頁的標籤。 >
+
+	function MyTabLine()
+	  let s = ''
+	  for i in range(tabpagenr('$'))
+	    " 選擇高亮
+	    if i + 1 == tabpagenr()
+	      let s .= '%#TabLineSel#'
+	    else
+	      let s .= '%#TabLine#'
+	    endif
+
+	    " 設置標籤頁號 (用於鼠標點擊)
+	    let s .= '%' . (i + 1) . 'T'
+
+	    " MyTabLabel() 提供標籤
+	    let s .= ' %{MyTabLabel(' . (i + 1) . ')} '
+	  endfor
+
+	  " 最後一個標籤頁之後用 TabLineFill 填充並復位標籤頁號
+	  let s .= '%#TabLineFill#%T'
+
+	  " 右對齊用於關閉當前標籤頁的標籤
+	  if tabpagenr('$') > 1
+	    let s .= '%=%#TabLine#%999Xclose'
+	  endif
+
+	  return s
+	endfunction
+
+現在為每個標籤頁調用 MyTabLabel() 函數以得到它們的標籤。 >
+
+	function MyTabLabel(n)
+	  let buflist = tabpagebuflist(a:n)
+	  let winnr = tabpagewinnr(a:n)
+	  return bufname(buflist[winnr - 1])
+	endfunction
+
+這只是一個產生和缺省值類似的標籤頁行的簡單例子，和缺省的區別是修改過的緩衝區沒
+有加上 + 號，而名字也沒有被截短。如果空間不足，你需要用聰明一些的方法來縮短標
+簽寬度。 'columns' 選項可以查看可用的空間。
+
+==============================================================================
+5. 設置 'guitablabel'					*setting-guitablabel*
+
+如果顯示 GUI 的標籤頁行，'guitablabel' 可以用來指定每個標籤頁顯示的標籤。和
+'tabline' 不同，後者一次指定整個標籤頁行，而 'guitablabel' 分別指定每個標籤。
+
+'guitabtooltip' 與之非常類似，但用來設置同一標籤的工具提示。因為只有在鼠標指針
+在標籤上逗留時它才會出現，所以通常可以長一些。不過，只有部分系統支持。
+
+'statusline' 選項說明本選項值的格式。
+
+用 "%N" 項目可以得到當前的標籤頁號。計算此選項時，|v:lnum| 變量也設置為該值。
+使用文件名的項目引用當前標籤頁的當前窗口。
+
+注意 此選項不使用語法高亮。也忽略 %T 和 %X 項目。
+
+簡單示例，在標籤頁標籤上顯示標籤頁號和緩衝區名: >
+	:set guitablabel=%N\ %f
+
+模擬 'guitablabel' 缺省值的示例: 顯示標籤頁裡的窗口數目，如果有修改過的緩衝
+區，顯示 '+': >
+
+	function GuiTabLabel()
+	  let label = ''
+	  let bufnrlist = tabpagebuflist(v:lnum)
+
+	  " 如果標籤頁裡有修改過的緩衝區，加上 '+'
+	  for bufnr in bufnrlist
+	    if getbufvar(bufnr, "&modified")
+	      let label = '+'
+	      break
+	    endif
+	  endfor
+
+	  " 如果標籤頁裡的窗口數目多於一，加上窗口數目
+	  let wincount = tabpagewinnr(v:lnum, '$')
+	  if wincount > 1
+	    let label .= wincount
+	  endif
+	  if label != ''
+	    let label .= ' '
+	  endif
+
+	  " 附加緩衝區名
+	  return label . bufname(bufnrlist[tabpagewinnr(v:lnum) - 1])
+	endfunction
+
+	set guitablabel=%{GuiTabLabel()}
+<
+注意 設置選項值前就必須已經定義好函數。否則會報錯，提示函數未知。
+
+如果你希望回到缺省的標籤，返回空字符串。
+
+如果你希望顯示標籤頁特定的內容，可以使用局部於標籤頁的變量。|t:var|
+
+
+ vim:tw=78:ts=8:ft=help:norl:

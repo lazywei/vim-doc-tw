@@ -1,0 +1,435 @@
+*if_cscop.txt*  For Vim version 7.3.  最近更新：2010年5月
+
+
+		  VIM REFERENCE MANUAL    by Andy Kahn
+		譯者：lang2，tocer http://vimcdoc.sf.net
+
+							*cscope* *Cscope*
+本文檔闡述如何使用 Vim 的 cscope 接口。
+
+Cscope 是一個類似 ctags 的工具。 你可以把它想作是超過頻的 ctags，因為它功能比
+ctags 強大很多。 在 Vim 裡，通過 cscope 查詢結果來跳轉就像跳轉到其他的標籤完全
+一樣；它被保存在標籤棧裡。這樣你就可以像使用 |tags| 一樣在函數等等之間便捷的跳
+轉。
+
+1. Cscope 簡介			|cscope-intro|
+2. Cscope 相關命令		|cscope-commands|
+3. Cscope 選項			|cscope-options|
+4. 如何在 Vim 中使用 cscope	|cscope-howtouse|
+5. 缺陷				|cscope-limitations|
+6. 建議的使用方法		|cscope-suggestions|
+7. 如何獲取 cscope 等信息	|cscope-info|
+
+目前為止 cscope 接口僅在 Unix 及 Win32 平台上有效。
+{Vi 無此功能}
+
+==============================================================================
+1. Cscope 簡介						*cscope-intro*
+
+下面文本摘自 cscope 的手冊頁:
+
+				    -----
+
+  Cscope 是一個交互式的屏幕下使用的工具，用來幫助你:
+
+       無須在厚厚的程序清單中翻來翻去就可以認識一個 C 程序的工作原理。
+
+       無須熟悉整個程序就可以知道清楚程序 bug 所要修改的代碼位置。
+
+       檢查提議的改動 (如添加一個枚舉值) 可能會產生的效果。
+
+       驗證所有的源文件都已經作了需要的修改；例如給某一個現存的函數添加一個參
+       數。
+
+       在所有相關的源文件中對一個全局變量改名。
+
+       在所有相關的位置將一個常數改為一個預處理符號。
+
+  它被設計用來回答以下的問題:
+       什麼地方用到了這個符號？
+       這是在什麼地方定義的？
+       這個變量在哪裡被賦值？
+       這個全局符號的定義在哪裡？
+       這個函數在源文件中的哪個地方？
+       哪些函數調用了這個函數？
+       這個函數調用了哪些函數？
+       信息 "out of space" 從哪來？
+       這個源文件在整個目錄結構中處於什麼位置？
+       哪些文件包含這個頭文件？
+
+  Cscope 在第一次被使用在指定的源文件時會建立一個符號的數據庫。接下來調用時，
+  cscope 僅僅重建那些被改動或者和新文件相關的數據庫。那些沒有被改動的文件相關
+  的數據庫會被直接複製使用。這使得重建數據庫要比第一次運行快許多。
+
+				    -----
+
+當 cscope 正常調用時，你會得到一個全屏幕的選擇窗口。你可以針對以上問題輸入一個
+查詢。然而，一旦找到一個匹配而你進入了一個文本編輯器來查看和編輯包含匹配的源文
+件時，你無法像在 vi 中使用 Ctrl-] 或 :tag 命令那樣方便地跳轉。
+
+Vim 的 cscope 接口的工作原理是：先調用 cscope 的命令行接口，然後分析其輸出結果
+從而找到匹配處。最終結果是：cscope 查詢結果就像一般的標籤一樣。你可以使用一般
+的標籤命令 (Ctrl-〕 或 :tag) 然後再用 Ctrl-T 回跳。 (注意 不過，其實你不能直接
+使用 Ctrl-] 或 :tag 跳轉到標籤。在那之前你必須重新定義映射或設定一些選項值。下
+面的幾節會告訴你 cscope 接口如何工作，以及建議的使用方式。)
+
+
+==============================================================================
+2. Cscope 相關命令					*cscope-commands*
+
+		*:cscope* *:cs* *:scs* *:scscope* *E259* *E262* *E561* *E560*
+所有命令都是通過主命令 ":cscope" 的子項完成的。主命令最短的縮寫是 ":cs"。
+":scscope" 完成同樣的功能的同時還可以分割窗口 (縮寫: "scs")。
+
+可用的子命令有:
+
+			*E563* *E564* *E566* *E568* *E569* *E622* *E623*
+			*E625* *E626* *E609*
+    add   : 添加一個新的 cscope 數據庫／連接。
+
+	用法	:cs add {file|dir} [pre-path] [flags]
+
+	    [pre-path] 用來通知 cscope 使用 -P [pre-path] 選項。
+
+	    [flags] 可以用來給 cscope 傳遞額外的選項。
+
+	例子 >
+	    :cscope add /usr/local/cdb/cscope.out
+	    :cscope add /projects/vim/cscope.out /usr/local/vim
+	    :cscope add cscope.out /usr/local/vim -C
+<
+				      *cscope-find* *cs-find*
+						*E565* *E567*
+    find  : 查詢 cscope。除了第 5 個之外的所有 cscope 查詢功能都可以使用。
+    	    第 5 個是 "Change this grep pattern"。
+
+	用法	:cs find {querytype} {name}
+
+	    {querytype} 對應 cscope 控制台接口編號和 nvi 的缺省命令:
+
+		0 或 s: 查找本 C 符號
+		1 或 g: 查找本定義
+		2 或 d: 查找本函數調用的函數
+		3 或 c: 查找調用本函數的函數
+		4 或 t: 查找本字符串
+		6 或 e: 查找本 egrep 模式
+		7 或 f: 查找本文件
+		8 或 i: 查找包含本文件的文件
+
+	除了 4 和 6 之外的類型忽略 {name} 之前的空格。4 和 6 在 {querytype} 和
+	{name} 之間只能有一個空格分隔。多餘的空格是 {name} 的一部分。
+
+	例如 >
+	    :cscope find c vim_free
+	    :cscope find 3  vim_free
+<
+	    這兩個例子執行同樣的查詢: 名為 "vim_free" 的函數。 >
+
+	    :cscope find t initOnce
+	    :cscope find t  initOnce
+<
+	    前者查找文本 "initOnce"，後者查找 " initOnce"。 >
+
+	    :cscope find 0 DEFAULT_TERM
+<
+	    在 Vim 5.1 的源代碼內執行以上的命令得到以下的結果:
+
+	    Cscope tag: DEFAULT_TERM
+	       #   line  filename / context / line
+	       1   1009  vim-5.1-gtk/src/term.c <<GLOBAL>>
+			 #define DEFAULT_TERM (char_u *)"amiga"
+	       2   1013  vim-5.1-gtk/src/term.c <<GLOBAL>>
+			 #define DEFAULT_TERM (char_u *)"win32"
+	       3   1017  vim-5.1-gtk/src/term.c <<GLOBAL>>
+			 #define DEFAULT_TERM (char_u *)"pcterm"
+	       4   1021  vim-5.1-gtk/src/term.c <<GLOBAL>>
+			 #define DEFAULT_TERM (char_u *)"ansi"
+	       5   1025  vim-5.1-gtk/src/term.c <<GLOBAL>>
+			 #define DEFAULT_TERM (char_u *)"vt52"
+	       6   1029  vim-5.1-gtk/src/term.c <<GLOBAL>>
+			 #define DEFAULT_TERM (char_u *)"os2ansi"
+	       7   1033  vim-5.1-gtk/src/term.c <<GLOBAL>>
+			 #define DEFAULT_TERM (char_u *)"ansi"
+	       8   1037  vim-5.1-gtk/src/term.c <<GLOBAL>>
+			 # undef DEFAULT_TERM
+	       9   1038  vim-5.1-gtk/src/term.c <<GLOBAL>>
+			 #define DEFAULT_TERM (char_u *)"beos-ansi"
+	      10   1042  vim-5.1-gtk/src/term.c <<GLOBAL>>
+			 #define DEFAULT_TERM (char_u *)"mac-ansi"
+	      11   1335  vim-5.1-gtk/src/term.c <<set_termname>>
+			 term = DEFAULT_TERM;
+	      12   1459  vim-5.1-gtk/src/term.c <<set_termname>>
+			 if (STRCMP(term, DEFAULT_TERM))
+	      13   1826  vim-5.1-gtk/src/term.c <<termcapinit>>
+			 term = DEFAULT_TERM;
+	      14   1833  vim-5.1-gtk/src/term.c <<termcapinit>>
+			 term = DEFAULT_TERM;
+	      15   3635  vim-5.1-gtk/src/term.c <<update_tcap>>
+			 p = find_builtin_term(DEFAULT_TERM);
+	    Enter nr of choice (<CR> to abort):
+
+	    這樣的輸出顯示了幾類信息:
+	    1. 標籤號碼 (例子中有 15 個)。
+	    2. 標籤所在的行號。
+	    3. 標籤所在文件的文件名。
+	    4. 標籤的上下文 (如：全局或函數名)。
+	    5. 標籤所在行的文本。
+
+    help  : 顯示一個簡單的幫助。
+
+	    用法    :cs help
+
+						*E260* *E261*
+    kill  : 終止一個 cscope 連接 (或終止所有 cscope 連接)。
+
+	    用法   :cs kill {num|partial_name}
+
+	    要終止一個連接，需要給出連接號或者部分的連接名稱。部分名稱可以
+	    是數據庫文件路徑的任何一部分。所以要當心使用這個功能！
+
+	    如果給定的連接號是 -1，那麼 所 有 的 cscope 連接都會被終止。
+
+    reset : 重新初始化所有連接。
+
+	    用法    :cs reset
+
+    show  : 顯示當前的連接。
+
+	    用法    :cs show
+
+							*:lcscope* *:lcs*
+此命令和 ":cscope" 命令相同，除了在置位選項 'cscopequickfix' 的時候，使用當前
+窗口的位置列表而不是 quickfix 列表來顯示 cscope 的結果。
+
+							*:cstag* *E257* *E562*
+如果你同時使用 cscope 和 ctags，|:cstag| 允許你在跳轉前對兩者都進行查詢。例
+如，你可以選擇先查詢 cscope 數據庫，如果無法找到匹配，再查詢標籤文件。這種做法
+的次序可以通過 |csto| 的值來調整。參見 |cscope-options|。
+
+|:cstag| 在搜索 cscope 數據庫時執行和 ":cs find g" 加上標識符一樣的操作。
+
+|:cstag| 在搜索標籤文件時執行和 |:tjump| 加上標識符一樣的操作。
+
+
+==============================================================================
+3. Cscope 選項						*cscope-options*
+
+所有 cscope 有關的選項都可以用 |:set| 命令來設定。比較理想的做法是將這些設定添
+加到你的啟動文件中 (如：.vimrc)。某些 cscope 選項僅僅在 |.vimrc| 文件內才有
+效。在 vim 啟動之後再設定它們的值沒有任何效果！
+
+							*cscopeprg* *csprg*
+'cscopeprg' 指定用來執行 cscope 的命令。缺省值是 "cscope"。例如: >
+	:set csprg=/usr/local/bin/cscope
+<
+					    *cscopequickfix* *csqf* *E469*
+{僅當編譯時加入 |+quickfix| 特性才有效}
+'cscopequickfix' 設定是否使用 quickfix 窗口來顯示 cscope 結果。這是一組用逗號
+分隔的值。每個值可以代表一個 |cscope-find| 命令 (s、g、d、c、t、e、f 或 i) 加
+一個標誌位 (+、- 或 0)。
+'+' 表示結果必須被添加到 quickfix 窗口中。'-' 表示清除上次的結果，'0' 或命令本
+身不存在表示不使用 quickfix。搜索從字符串首開始直到命令第一次出現時結束。缺省
+值是 "" (不使用 quickfix 窗口)。下面是個可能有用的值: >
+	:set cscopequickfix=s-,c-,d-,i-,t-,e-
+<
+							*cscopetag* *cst*
+若設定了 'cscopetag' 選項，":tag" 命令，CTRL-] 以及 "vim -t" 都會使用 |:cstag|
+而不是缺省的 :tag。也就是說，設定 'cst' 選項意味著你總同時搜索 cscope 數據庫和
+標籤文件。缺省值為關。例如: >
+	:set cst
+	:set nocst
+<
+							*cscopetagorder* *csto*
+'csto' 的值決定 |:cstag| 命令查找的次序。如果 'csto' 被設為 0，cscope 數據庫先
+被搜索，搜索失敗的情況下在搜索標籤文件。如果 'csto' 被設為 1，標籤文件會在
+cscope 數據庫之前被搜索。缺省值為 0。
+例: >
+	:set csto=0
+	:set csto=1
+<
+						*cscopeverbose* *csverb*
+如果 'cscopeverbose' 沒有被設定 (缺省情況)，當添加一個數據庫時，成功與否不會被
+顯示。理想的情況是，你先在 |.vimrc| 文件中復位該選項，再添加 cscope 數據庫，然
+後再置位。這樣，如果你在使用 vim 當中動態添加數據庫，你就會被 vim 告知結果。例
+如: >
+	:set csverb
+	:set nocsverb
+<
+						      *cscopepathcomp* *cspc*
+'cspc' 的值決定顯示文件路徑的多少部分。在缺省值 0 的情況下整個路徑都會被顯示。
+1 只顯示文件名，而不顯示路徑名。其它值會顯示該值表示數目的部分。例如: >
+	:set cspc=3
+會顯示文件路徑的最後 3 個部分，包括文件名本身。
+
+==============================================================================
+4. 如何在 Vim 中使用 cscope				*cscope-howtouse*
+
+首先你要做的是為你的源文件建立一個 cscope 數據庫。最簡單的做法是使用
+"cscope -b" 命令。更詳細的說明請查閱 cscope 的手冊頁。
+
+假定你已經建立了一個 cscope 數據庫，你需要將其添加 "add" 到 Vim 中來。這會建立
+一個 cscope "連接" 給 Vim 來使用。你可以把這些加入到你的 .vimrc 文件裡。也可以
+在 vim 啟動之後手動完成。例如，要添加一個 cscope 數據庫 "cscope.out"，你可以這
+樣做: >
+
+	:cs add cscope.out
+<
+
+你可以用 ":cs show" 命令來檢查一下結果。該命令會產生類似下面的結果: >
+
+ # pid	  database name			      prepend path
+ 0 28806  cscope.out			      <none>
+<
+備註:
+因為 Microsoft RTL 的缺陷，Win32 版本只能顯示 0 而不是真正的進程 ID。
+
+一旦建立了 cscope 連接，你就可以做各種查詢並得到結果。查詢所用的命令是
+":cs find"。例如: >
+
+	:cs find g ALIGN_SIZE
+<
+這樣要做很多的打字工作，所以有些麻煩。幸運的是，我們可以通過定義快捷鍵來避免過
+多的輸入。參考 |cscope-suggestions| 可以得到一些使用的建議。
+
+如果匹配結果只有一個，你會被自動帶到該處。如果匹配結果多於一個，Vim 會顯示一個
+選擇屏幕讓你來選擇一處匹配。在你跳轉到新的位置後，簡單地用 Ctrl-T 就可以跳回原
+處。
+
+
+==============================================================================
+5. 缺陷							*cscope-limitations*
+
+Vim 對 cscope 的支持僅當所在系統支持以下四個系統調用時才可用：fork()，
+pipe()，execl()，waitpid()。這意味著它基本上僅限於 Unix 系統。
+
+另外 cscope 支持在 Win32 也可以使用。更多的信息以及一個 Win32 版本的 cscope 可
+以在這裡找到:
+
+	http://iamphet.nm.ru/cscope/index.html
+
+http://cscope.sourceforge.net 的 DJGPP 編譯版本已知不能和 Vim 一起工作。
+
+硬性的限制: 在用 |:cstag| 搜索標籤文件時要執行 |:tjump|，這一點是無法配置的 (
+如：你不能選擇使用 tselect)。
+
+==============================================================================
+6. 建議的使用方法					*cscope-suggestions*
+
+將下面的設定加入到你的 .vimrc 裡 (根據你的情況調整文件路徑): >
+
+	if has("cscope")
+		set csprg=/usr/local/bin/cscope
+		set csto=0
+		set cst
+		set nocsverb
+		" add any database in current directory
+		if filereadable("cscope.out")
+		    cs add cscope.out
+		" else add database pointed to by environment
+		elseif $CSCOPE_DB != ""
+		    cs add $CSCOPE_DB
+		endif
+		set csverb
+	endif
+
+我們設定了 'cscopetag'，這樣所有的 :tag 命令就會實際上調用 :cstag。這包括
+:tag、Ctrl-] 及 "vim -t"。結果是一般的 tag 命令不僅搜索由 ctags 產生的標籤文
+件，同時也搜索 cscope 數據庫。
+
+有些用戶也許向保留原來的標籤命令，而用另外一個快捷鍵來執行 :cstag 命令。例如，
+你可以用下面的命令將 Ctrl-_ (下劃線) 映射到 :cstag: >
+
+	map <C-_> :cstag <C-R>=expand("<cword>")<CR><CR>
+
+常用的 cscope 查詢 (用 ":cs find") 包括尋找所有調用指定函數的函數以及尋找所有
+出現某個指定的 C 符號的地方。你可以參照以下的映射: >
+
+	map g<C-]> :cs find 3 <C-R>=expand("<cword>")<CR><CR>
+	map g<C-\> :cs find 0 <C-R>=expand("<cword>")<CR><CR>
+
+這些對 Ctrl-] (右方括號) 和 Ctrl-\ (反斜槓) 的映射使你可以將光標移動到你想作查
+詢的函數或 C 符號，然後快速地查詢 cscope 數據庫。
+
+或者，你也可以使用下面的方式。這些映射借鑒了 Cscope 主頁
+(http://cscope.sourceforge.net/) 上的 Vim/Cscope 教程: >
+
+	nmap <C-_>s :cs find s <C-R>=expand("<cword>")<CR><CR>
+	nmap <C-_>g :cs find g <C-R>=expand("<cword>")<CR><CR>
+	nmap <C-_>c :cs find c <C-R>=expand("<cword>")<CR><CR>
+	nmap <C-_>t :cs find t <C-R>=expand("<cword>")<CR><CR>
+	nmap <C-_>e :cs find e <C-R>=expand("<cword>")<CR><CR>
+	nmap <C-_>f :cs find f <C-R>=expand("<cfile>")<CR><CR>
+	nmap <C-_>i :cs find i ^<C-R>=expand("<cfile>")<CR>$<CR>
+	nmap <C-_>d :cs find d <C-R>=expand("<cword>")<CR><CR>
+
+	" Using 'CTRL-spacebar' then a search type makes the vim window
+	" split horizontally, with search result displayed in
+	" the new window.
+
+	nmap <C-Space>s :scs find s <C-R>=expand("<cword>")<CR><CR>
+	nmap <C-Space>g :scs find g <C-R>=expand("<cword>")<CR><CR>
+	nmap <C-Space>c :scs find c <C-R>=expand("<cword>")<CR><CR>
+	nmap <C-Space>t :scs find t <C-R>=expand("<cword>")<CR><CR>
+	nmap <C-Space>e :scs find e <C-R>=expand("<cword>")<CR><CR>
+	nmap <C-Space>f :scs find f <C-R>=expand("<cfile>")<CR><CR>
+	nmap <C-Space>i :scs find i ^<C-R>=expand("<cfile>")<CR>$<CR>
+	nmap <C-Space>d :scs find d <C-R>=expand("<cword>")<CR><CR>
+
+	" Hitting CTRL-space *twice* before the search type does a vertical
+	" split instead of a horizontal one
+
+	nmap <C-Space><C-Space>s
+		\:vert scs find s <C-R>=expand("<cword>")<CR><CR>
+	nmap <C-Space><C-Space>g
+		\:vert scs find g <C-R>=expand("<cword>")<CR><CR>
+	nmap <C-Space><C-Space>c
+		\:vert scs find c <C-R>=expand("<cword>")<CR><CR>
+	nmap <C-Space><C-Space>t
+		\:vert scs find t <C-R>=expand("<cword>")<CR><CR>
+	nmap <C-Space><C-Space>e
+		\:vert scs find e <C-R>=expand("<cword>")<CR><CR>
+	nmap <C-Space><C-Space>i
+		\:vert scs find i ^<C-R>=expand("<cfile>")<CR>$<CR>
+	nmap <C-Space><C-Space>d
+		\:vert scs find d <C-R>=expand("<cword>")<CR><CR>
+
+==============================================================================
+7. 如何獲取 Cscope 等信息				*cscope-info*
+
+如果你還沒有 cscope (你的編譯器或 OS 發佈不包括 cscope)，你可以從下面的地址免
+費下載:
+	http://cscope.sourceforge.net/
+這是 SCO 以 BSD 許可發佈的。
+
+如果你想要更新的版本，你可以購買它。根據 (舊的) nvi 文檔:
+
+	你可以用 $400 從 AT&T Software Solutions 購買無限制的許可的源碼。致電
+	+1-800-462-8146。
+
+你還可以從 World-Wide Exptools Open Sourcean 的網頁下載 cscope 13.x 及
+mlcscope 14.x (多語言 cscope，支持 C、C++、Java、lex、yacc、breakpoint
+listing、Ingres 及 SDL)。網址如下:
+	http://www.bell-labs.com/project/wwexptools/packages.html
+
+在 Solaris 2.x 上，如果你有 C 編譯器的許可，你也就有 cscope。兩者通常位於
+/opt/SUNWspro/bin。
+
+SGI 開發者也可以得到 cscope。在以下的地址搜索 cscope:
+	http://freeware.sgi.com/index-by-alpha.html
+	https://toolbox.sgi.com/toolbox/utilities/cscope/
+第二個地址僅對那些擁有 SGI toolbox 密碼的用戶有效。
+
+網上還有一個舊版本的 cscope 的克隆 (叫 "cs") 。出於各種原因，Vim 不支持該程
+序。
+
+Vim cscope 接口/支持的原作者是 Andy Kahn <ackahn@netapp.com>。原始的結構 (包括
+很少一部分代碼) 來自 nvi 的 cscope 接口。如果你在使用 Vim cscope 接口時有任何
+問題，建議，patches 等等，請與他聯繫。
+							*cscope-win32*
+這裡可以找到一個 Win32 版本的 cscope:
+	http://code.google.com/p/cscope-win32/
+
+Win32 支持是 Sergey Khorev <sergey.khorev@gmail.com> 加入的。如果你有 Win32 相
+關的問題，請聯繫他。
+
+ vim:tw=78:ts=8:ft=help:norl:

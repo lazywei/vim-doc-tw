@@ -1,0 +1,135 @@
+*os_amiga.txt*  For Vim version 7.3.  最近更新: 2010年8月
+
+
+		  VIM 參考手冊    by Bram Moolenaar
+				譯者: Willis
+				http://vimcdoc.sf.net
+
+
+							*Amiga*
+本文檔描述了 Vim 的 Amiga 版本的特點。有一節還專門討論了 |MorphOS|。
+
+備註: Amiga 的代碼還在，但沒有人維護也沒有經過測試。
+
+Amiga 上的安裝:
+- Vim "doc" 目錄賦予 "VIM:"。Vim 會查找 "VIM:doc/help.txt" 文件 (為了 help 命
+  令)。設置環境變量 $VIM 也可以。反過來，如果用到 $VIM 但它沒有定義，就用
+  "VIM:"。
+- DOS 1.3 或更早的版本: 把 "arp.library" 放在 "libs:" 裡。Vim 必須在編譯時加入
+  |+ARP| 特性。確保 newcli 和 run 在 "C:" 裡 (為了執行外部命令)。
+- 在 "c:" 或者任何在搜索路徑的目錄裡提供一個能接受帶 "-c" 的命令的外殼程序 (例
+  如，Fish disk 624 的 "Csh") (為了執行外部命令)。
+
+如果你有足夠內存，你可以使 Vim 和 csh 駐留來避免啟動延遲。方法是執行命令
+"rez csh vim"。你要把 "rezlib.library" 放在你的 "libs:" 目錄。在 2.0 下你需要
+rez 0.5 版本。
+
+如果你不用二合字母 (digraphs)，去掉 |+digraphs| 特性並重新編譯可以減少一些內存
+佔用。如果你要在其它終端下使用 Vim，可以在重新編譯時加上 TERMCAP 選項。Vim 在
+Manx 5.x 和 SAS 6.x 下能編譯通過。見 makefiles 和 feature.h。
+
+如果你發現當打開語法高亮或者使用嵌套的通配符搜索時，Vim 在某些文件上崩潰，那可
+能是由於堆棧太小。試著增加堆棧大小。在命令行上，啟動 Vim 之前，使用 Stack 命
+令。而在 Workbench 上，選擇 Vim 圖標，打開 workbench 的 "Info" 菜單，然後改變
+表單裡的 Stack 字段。
+
+如果你想要另外的顏色，設置如下的 termcap 代碼:
+	t_mr (反白文本)
+	t_md (粗體文本)
+	t_me (t_mr 和 t_md 後的正常文本)
+	t_so (突出模式的文本)
+	t_se (t_so 後的正常文本)
+	t_us (加下劃線的文本)
+	t_ue (t_us 後的正常文本)
+	t_ZH (斜體文本)
+	t_ZR (t_ZH 後的正常文本)
+
+可以使用標準 ANSI 的轉換序列。這些代碼是:
+30 灰字  40 灰底  >0 灰色背景   0 關閉所有的屬性
+31 黑字  41 黑底  >1 黑色背景   1 粗體
+32 白字  42 白底  >2 白色背景   2 變淡
+33 藍字  43 藍底  >3 藍色背景   3 斜體
+34 灰字  44 灰底  >4 灰色背景   4 下劃線
+35 黑字  45 黑底  >5 黑色背景   7 反白
+36 白字  46 白底  >6 白色背景   8 不可見
+37 藍字  47 藍底  >7 藍色背景
+
+帶 '>' 的代碼必須在最後。底色和背景顏色應該一致。這些代碼可以一起用，只要用分
+號分開。例如，要在藍色背景上顯示白色文字: >
+  :set t_me=^V<Esc>[0;32;43;>3m
+  :set t_se=^V<Esc>[0;32;43;>3m
+  :set t_ue=^V<Esc>[0;32;43;>3m
+  :set t_ZR=^V<Esc>[0;32;43;>3m
+  :set t_md=^V<Esc>[1;32;43;>3m
+  :set t_mr=^V<Esc>[7;32;43;>3m
+  :set t_so=^V<Esc>[0;31;43;>3m
+  :set t_us=^V<Esc>[4;32;43;>3m
+  :set t_ZH=^V<Esc>[3;32;43;>3m
+
+如果在一個過濾命令中使用多個命令，例如，  >
+  :r! echo this; echo that
+只有最後一個命令的輸出能看到。要補救這一點，你可以把命令組合起來。具體的做法決
+定於你用的外殼程序 (這就是為何 Vim 不能自己這麼做)。例如: >
+  :r! (echo this; echo that)
+  :r! {echo this; echo that}
+
+接受單個文件名的命令允許文件名的空格。不過能接受多個文件的命令就不行了。文件名
+內含的空格必須要用反斜槓來轉換。
+
+------------------------------------------------------------------------------
+MorphOS 下的 Vim 					*MorphOS*
+
+[本節主要由 Ali Akcaagac 負責]
+
+關於 MorphOS 版本的最新消息:
+	http://www.akcaagac.com/index_vim.html
+
+
+問題 ~
+
+有些問題不是 MorphOS 的，而更多是和 Vim 和 UN*X 有關。在隨機存儲器裡啟動 Vim
+時，它抱怨 MorphOS 給出的一個 nag requestor，只要忽略它就行。另一個問題是運行
+Vim 時，有些插件會導致一些問題，這些都可以忽略。希望將來有人能夠修正這些問題。
+
+目前，要不理這些問題，你或者可以運行: >
+
+	vim <要編輯的文件名>
+
+或者，如果你想簡單運行 Vim 而且還能享受到幫助文件等的助力，最好這麼用: >
+
+	vim --noplugins <當然你也可以加文件名>
+
+
+安裝 ~
+
+1) 請將 'VIM' 二進制碼複製到 c:
+2) 從以下位置得到 Vim 運行時代碼包:
+
+	ftp://ftp.vim.org/pub/vim/amiga/vim62rt.tgz
+
+   然後把它解壓到 MorphOS 安裝的 'Apps' 目錄。對我而言，這會建立如下的目錄結
+   構:
+
+	MorphOS:Apps/Vim/Vim62/...
+
+3) (非常重要的是) 把下面代碼加到你的 s:shell-startup。 >
+
+	;Begin VIM
+	Set VIM=MorphOS:Apps/Vim/Vim62
+	Assign HOME: ""
+	;End VIM
+
+4) 把 '.vimrc' 文件複製到 s:
+
+5) 在這個包裡還有一個叫做 'color-sequence' 的文件。它會將 MorphOS 外殼設成能顯
+   示 ANSI 顏色。請將該文件複製到 s: 並且修改 s:shell-startup 成: >
+
+	;Begin VIM
+	Set VIM=MorphOS:Apps/Vim/Vim62
+	Assign HOME: ""
+	Execute S:Color-Sequence
+	Cls
+	;End VIM
+
+<
+ vim:tw=78:ts=8:ft=help:norl:

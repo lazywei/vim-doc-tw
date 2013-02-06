@@ -1,0 +1,290 @@
+*scroll.txt*    For Vim version 7.3.  最近更新: 2010年7月
+
+
+		     Vim 參考手冊    作者：Bram Moolenaar
+	   譯者: iCrazy <icrazy@ustc.edu>，tocer  http://vimcdoc.sf.net
+
+
+滾屏						*scrolling*
+
+這些命令是用來移動窗口中的內容的。如果光標的位置移出了窗口，那麼它會帶動窗口的
+內容移動幾行 (行數由 'scrolloff' 選項指定)，使光標回到窗口裡。這裡，我們定義一
+頁為窗口的行數減 2。下面這些命令的助記符甚易混淆。請記住這些命令所指的是視窗
+(緩衝區中您可以看到的那一部分) 在緩衝區裡向上移動還是向下移動。當窗口在緩衝區
+裡向上移動的時候，窗口中的文字朝您屏幕的下方移動。
+
+請參閱用戶手冊的第 |03.7| 節，那裡有一些介紹。
+
+1. 向下滾屏			|scroll-down|
+2. 向上滾屏			|scroll-up|
+3. 相對於光標滾屏		|scroll-cursor|
+4. 水平滾動			|scroll-horizontal|
+5. 同步滾屏			|scroll-binding|
+6. 用鼠標滾輪滾屏		|scroll-mouse-wheel|
+
+==============================================================================
+1. 向下滾屏					*scroll-down*
+
+下面的這些命令使編輯視窗 (緩衝區中您可以看到的那一部分) 向下移動 (這樣您就可以
+看到緩衝區更多下方的文本行)：
+
+							*CTRL-E*
+CTRL-E			使窗口在緩衝區中向下滾動 [count] 行。
+			助記：額外 (Extra) 的行。
+
+							*CTRL-D*
+CTRL-D			使窗口在緩衝區中向下滾動。滾動的行數由 'scroll' 選項指
+			定 (默認設置為半個屏幕)。如果指定了 [count]，則會先把
+			'scroll' 選項設為 [count]。同時，光標試圖在文件中向下
+			移動相同的行數 (有行迴繞或者碰到文件結束時行數會有差
+			異) 。當光標處於緩衝區最後一行時，這個命令無效，並且系
+			統會發出一聲蜂鳴。
+			參看 'startofline' 選項。
+			助記：Downwards。
+			{Vi: Vim 滾動 'scroll' 屏幕行，而不是文件行；有行迴繞
+			時兩者會有差異}
+			
+<S-Down>	或				*<S-Down>* *<kPageDown>*
+<PageDown>	或				*<PageDown>* *CTRL-F*
+CTRL-F			使窗口在緩衝區中向下滾動 [count] 頁。
+			參看 'startofline' 選項。
+			如果只有一個窗口，可能使用 'windows' 選項的值。
+			助記：Forwards。
+
+							*z+*
+z+			不指定 [count]: 重繪，在窗口中顯示下一頁的內容 (使當前
+			窗口之下的一行顯示在窗口最上方)。同時把光標放在那一行
+			第一個非空白字符上。
+			指定 [count]: 和 "z<CR>" 一樣。
+
+==============================================================================
+2. 向上滾屏					*scroll-up*
+
+下面的這些命令使編輯視窗 (緩衝區中您可以看到的那一部分) 向上移動 (這樣您就可以
+看到緩衝區更多上方的文本行)：
+
+							*CTRL-Y*
+CTRL-Y			使窗口在緩衝區中向上滾動 [count] 行。
+			備註: 如果您使用 MS-Windows，組合鍵 CTRL-Y 會被重新映
+			射為重做功能。
+
+							*CTRL-U*
+CTRL-U			使窗口在緩衝區中向上滾動。滾動的行數由 'scroll' 選項指
+			定 (默認設置為半個屏幕)。如果指定了 [count]，則會先把
+			'scroll' 選項設為 [count]。同時，光標試圖在文件中向上
+			移動相同的行數 (有行迴繞或者碰到文件結束時 (譯者注: 當
+			為文件開始之誤) 行數會有差異) 。當光標處於緩衝區第一行
+			時，這個命令無效，並且系統會發出一聲蜂鳴。
+			參看 'startofline' 選項。
+			助記：Upwards。
+			{Vi: Vim 滾動 'scroll' 屏幕行，而不是文件行；有行迴繞
+			時兩者會有差異}
+
+<S-Up>		或					*<S-Up>* *<kPageUp>*
+<PageUp>	或					*<PageUp>* *CTRL-B*
+CTRL-B			使窗口在緩衝區中向上滾動 [count] 頁。
+			參看 'startofline' 選項。
+			如果只有一個窗口，可能使用 'windows' 選項的值。
+			助記：Backwards。
+
+							*z^*
+z^			不指定 [count]: 重繪，在窗口中顯示上一頁的內容 (使當前
+			窗口之上的一行顯示在窗口最下方)。同時把光標放在那一行
+			第一個非空白字符上。
+			指定 [count]: 先滾動文本，使得緩衝區第 [count] 行顯示
+			在窗口底部，然後重繪，使得當時處於窗口頂端的文本顯示在
+			窗口的底部。同時把光標放在那一行第一個非空白字符上。
+
+==============================================================================
+3. 相對於光標滾屏				*scroll-cursor*
+
+以下的命令重新定位編輯視窗 (緩衝區中您可以看到的那一部分)，但仍維持光標留在當
+前行。
+
+							*z<CR>*
+z<CR>			重繪，使第 [count] 行顯示在窗口頂端 (默認為光標所在的
+			行)。光標停留在那一行第一個非空白字符上。
+
+							*zt*
+zt			類似 "z<CR>"，不過光標停留在相同的列上。{Vi 無此功能}
+
+							*zN<CR>*
+z{height}<CR>		重繪，使得窗口有 {height} 行高。當屏幕刷新速度很慢的時
+			候，這對減少行數很有用。不能使窗口的高度超過屏幕的實際
+			高度。
+
+							*z.*
+z.			重繪，使第 [count] 行顯示在窗口中部 (默認為光標所在的
+			行)。光標停留在那一行第一個非空白字符上。
+
+							*zz*
+zz			類似 "z."，不過光標停留在相同的列上。注意：如果打開了
+			caps-lock，這個命令就變成了 "ZZ"：寫緩衝區並退出！
+			{Vi 無此功能}
+			
+							*z-*
+z-			重繪，使第 [count] 行顯示在窗口底部 (默認為光標所在的
+			行)。光標停留在那一行第一個非空白字符上。
+
+							*zb*
+zb			類似 "z-"，不過光標停留在相同的列上。{Vi 無此功能}
+
+==============================================================================
+4. 水平滾動				*scroll-horizontal*
+
+使用以下四個命令時，鼠標會跟隨屏幕而移動。如果光標移出了屏幕，它就會落在屏幕中
+距它最近的那個字符上。忽略 'sidescroll' 選項的值。
+
+z<Right>    或						*zl* *z<Right>*
+zl			使文本視圖向右移動 [count] 個字符，也就是使文本向左滾
+			動 [count] 個字符。僅當 'wrap' 為關時有效。
+			{Vi 無此功能}
+			
+z<Left>      或						*zh* *z<Left>*
+zh			使文本視圖向左移動 [count] 個字符，也就是使文本向右滾
+			動 [count] 個字符。僅當 'wrap' 為關時有效。
+			{Vi 無此功能}
+
+							*zL*
+zL			使文本視圖向右移動半個屏幕寬度，也就是使文本向左滾動半
+			個屏幕寬度。僅當 'wrap' 為關時有效。{Vi 無此功能}
+
+							*zH*
+zH			使文本視圖向左移動半個屏幕寬度，也就是使文本向右滾動半
+			個屏幕寬度。僅當 'wrap' 為關時有效。{Vi 無此功能}
+
+以下兩個命令僅僅在屏幕上滾動文本，光標不會移動。
+
+							*zs*
+zs			水平滾動文本，使光標置於屏幕的開始處 (最左側)。僅當
+			'wrap' 為關時有效。{Vi 無此功能}
+
+							*ze*
+ze			水平滾動文本，使光標置於屏幕的結束處 (最右側)。僅當
+			'wrap' 為關時有效。{Vi 無此功能}
+
+==============================================================================
+5. 同步滾屏				*scroll-binding*
+
+有時候，我們希望將兩個或多個窗口綁在一起，這樣，在一個窗口滾屏時，其他的窗口都
+會跟著一起滾屏。在 Vim 中，可以通過設置針對不同窗口的 'scrollbind' 選項來達到
+這個目的。當一個置位 'scrollbind' 選項的窗口滾屏時，其它置位 'scrollbind' 選項
+的窗口會同步滾屏 (如果可能的話)。選項 'scrollbind' 的行為通過 'scrollopt' 選項
+可以修改。
+
+使用滾動條時進行滾動時，只有帶焦點的窗口 (光標所在的窗口) 才會執行綁定。因而，
+不用復位選項，您也可以在一段時間內避免滾動綁定的發生。
+
+如果一個窗口還置位了 'diff' 選項，則滾屏綁定利用 2 個緩衝區中的差異來精確同步
+它們的位置。否則，將會使用下面的方式：
+
+							*scrollbind-relative*
+每一個置位了 'scrollbind' 的窗口都會記錄它的 "相對偏移"，可以把它看作當前窗口
+和另一個窗口垂直滾屏位置上的差異。當一個置位了 'scrollbind' 的窗口被要求進行超
+越其文本的開始和結束極限的滾屏時，這個窗口不再繼續滾屏，但是它會記住超過極限的
+數量。窗口記住了這些信息是為了將來能維持同樣的相對偏移，不管是否曾經被要求過進
+行超過其極限的滾屏。
+
+但是，當一個置位了 'scrollbind' 且具有一個超過其緩衝區極限的相對偏移的窗口獲得
+了光標焦點的時候，其他置位了 'scrollbind' 的窗口就必須根據當前窗口的相對偏移，
+跳轉到相應的位置。這種行為可以通過清除 'scrollopt' 選項中的 'jump' 標誌位來改
+變。
+
+						*syncbind* *:syncbind* *:sync*
+:syncbind		強制所有 'scrollbind' 窗口具有相同的相對偏移。即：當
+			一個窗口滾屏到了它緩衝區的頂部時，所有的 'scrollbind' 
+			窗口都會滾屏到它們緩衝區的頂部。
+			
+							*scrollbind-quickadj*
+當使用鍵盤命令來垂直的滾動一個窗口，或用垂直滾動條來滾動一個具有光標焦點的窗口
+時， 'scrollbind' 標誌是起作用的。但是，當用垂直滾動條來滾動一個不具有光標焦點
+的窗口時，'scrollbind' 標誌被忽略。這樣就可以對 'scrollbind' 窗口的相對偏移量
+進行快速的調整。
+
+==============================================================================
+6. 用鼠標滾輪滾屏				*scroll-mouse-wheel*
+
+當您的鼠標有一個滾輪時，它在 GUI 方式下的 Vim 中應該可以正常工作。它怎麼工作取
+決於您的系統。它在 xterm 中也可能可以工作，參見：|xterm-mouse-wheel|。缺省只支
+持垂直滾輪，但有些 GUI 也支持橫向滾輪。
+
+Win32 GUI 的滾動功能是通過硬編碼實現的。它的效果就像在拖曳當前窗口的滾動條。具
+體滾多少行取決於您的鼠標驅動程序。如果滾屏功能造成了輸入焦點的問題，請看：
+|intellimouse-wheel-problems|。
+
+而對 X11 GUI (Motif、Athena 和 GTK) 而言，滾動滾輪產生 <ScrollWheelDown>、
+<ScrollWheelUp>、<ScrollWheelLeft> 和 <ScrollWheelRight> 的按鍵動作。這些鍵的
+默認行為如下：
+    <ScrollWheelUp>	    向上滾動三行	*<ScrollWheelUp>*
+    <S-ScrollWheelUp>	    向上滾動一頁	*<S-ScrollWheelUp>*
+    <C-ScrollWheelUp>	    向上滾動一頁	*<C-ScrollWheelUp>*
+    <ScrollWheelDown>	    向下滾動三行	*<ScrollWheelDown>*
+    <S-ScrollWheelDown>	    向下滾動一頁	*<S-ScrollWheelDown>*
+    <C-ScrollWheelDown>	    向下滾動一頁	*<C-ScrollWheelDown>*
+    <ScrollWheelLeft>	    向左滾動六列	*<ScrollWheelLeft>*
+    <S-ScrollWheelLeft>	    向左滾動一頁	*<S-ScrollWheelLeft>*
+    <C-ScrollWheelLeft>	    向左滾動一頁	*<C-ScrollWheelLeft>*
+    <ScrollWheelRight>	    向右滾動六列	*<ScrollWheelRight>*
+    <S-ScrollWheelRight>    向右滾動一頁	*<S-ScrollWheelRight>*
+    <C-ScrollWheelRight>    向右滾動一頁	*<C-ScrollWheelRight>*
+它們應該適用於所有模式，編輯命令行時除外。
+
+注意 僅當 'nowrap' 置位時橫向滾動可用。此外，除非 'guioptions' 設置了 "h" 標誌
+位，如果光標行將要滾動到屏幕之外，移動光標到最長的可見行 (和橫向滾動條的工作方
+式類似)。
+
+您可以通過鍵盤映射來改變缺省行為。例如，要使得普通模式下滾輪一次滾動一行或半
+頁: >
+   :map <ScrollWheelUp> <C-Y>
+   :map <S-ScrollWheelUp> <C-U>
+   :map <ScrollWheelDown> <C-E>
+   :map <S-ScrollWheelDown> <C-D>
+您也可以使用 Alt 和 Ctrl 修飾符。
+
+自然，這些功能僅在 Vim 可以獲取滾動事件時才可以使用。您可以使用 "xev" 程序來確
+定這些是否功能有效。
+
+當您使用 XFree86 時，文件 /etc/XF86Config 中必須有匹配您使用的鼠標的正確條目。
+就 FreeBSD 來說，這個條目適用於一款羅技滾輪鼠標： >
+    Protocol     "MouseMan"
+    Device       "/dev/psm0"
+    ZAxisMapping 4 5
+欲瞭解更多的信息，請看 XFree86 的文檔。
+
+						*<MouseDown>* *<MouseUp>*
+<MouseDown> 和 <MouseUp> 鍵已廢棄。用 <ScrollWheelUp> 來代替 <MouseDown>，
+<ScrollWheelDown> 來代替 <MouseUp>。
+
+							*xterm-mouse-wheel*
+如前所述，您僅需要使滾輪鼠標在您的 Xserver 上工作正常，它就可以在一個新的
+xterm 中工作。
+
+為了在一個老的 xterm 中使用您的滾輪，您需要做以下工作：
+1. 如前所述，使它在您的 Xserver 上工作正常。
+2. 給 xterm 添加轉換，使得 xterm 可以用轉義序列 (escape sequence) 來傳遞一個滾
+   屏事件。
+3. 給 Vim 添加映射，來把這些轉義序列解釋為 <ScrollWheelDown>、<ScrollWheelUp>
+   鍵。
+
+把以下代碼添加到您的 ~.Xdefaults 文件 (或者其他保存您 X 資源的文件) 中來進行轉
+換: >
+
+  XTerm*VT100.Translations:		#override \n\
+		s<Btn4Down>: string("0x9b") string("[64~") \n\
+		s<Btn5Down>: string("0x9b") string("[65~") \n\
+		<Btn4Down>: string("0x9b") string("[62~") \n\
+		<Btn5Down>: string("0x9b") string("[63~") \n\
+		<Btn4Up>: \n\
+		<Btn5Up>:
+
+把這些映射加到您的 vimrc 文件： >
+	:map <M-Esc>[62~ <ScrollWheelUp>
+	:map! <M-Esc>[62~ <ScrollWheelUp>
+	:map <M-Esc>[63~ <ScrollWheelDown>
+	:map! <M-Esc>[63~ <ScrollWheelDown>
+	:map <M-Esc>[64~ <S-ScrollWheelUp>
+	:map! <M-Esc>[64~ <S-ScrollWheelUp>
+	:map <M-Esc>[65~ <S-ScrollWheelDown>
+	:map! <M-Esc>[65~ <S-ScrollWheelDown>
+<
+ vim:tw=78:ts=8:ft=help:norl:

@@ -1,0 +1,94 @@
+*howto.txt*	For Vim version 7.3.  最近更新: 2006年5月
+
+
+		     Vim 參考手冊    作者：Bram Moolenaar
+	   譯者: iCrazy <icrazy@ustc.edu>  http://vimcdoc.sf.net
+
+
+如何……					*howdoi* *how-do-i* *howto* *how-to*
+
+|tutor|			入門
+|:quit|			退出？我被困住了，請幫幫我！
+|initialization|	初始化 Vim
+|vimrc-intro|		寫一個 Vim 腳本文件 (vimrc)
+|suspend|		掛起 Vim
+|usr_11.txt|		在一次崩潰後恢復
+|07.4|			在覆蓋我的文件時保留一個備份
+
+|usr_07.txt|		編輯文件
+|23.4|			編輯二進制文件
+|usr_24.txt|		插入文本
+|deleting|		刪除文本
+|usr_04.txt|		改變文本
+|04.5|			複製和移動文本
+|usr_25.txt|		給文本排版
+|30.6|			給註釋排版
+|30.2|			縮進 C 程序
+|25.3|			自動設置縮進
+
+|usr_26.txt|		重複執行命令
+|02.5|			撤銷和重做
+
+|usr_03.txt|		在文本中移動
+|word-motions|		基於單詞的移動
+|left-right-motions|	左右移動
+|up-down-motions|	上下移動
+|object-motions|	基於文本對象的移動
+|various-motions|	其它移動方式
+|object-select|		基於文本對象的選擇
+|'whichwrap'|		移動時跳過換行符
+|'virtualedit'|		移動到沒有文本的地方
+|usr_27.txt|		指定查找的模式
+|tags-and-searches|	進行標籤和特殊查找
+|29.4|			在包含文件中查找變量、函數或宏
+|K|			查找光標處關鍵詞的手冊頁
+
+|03.7|			滾屏
+|'sidescroll'|		水平/豎直方向滾屏
+|'scrolloff'|		設置可見的上下文行數
+
+|mode-switching|	切換模式
+|04.4|			使用可視模式
+|'insertmode'|		以插入模式啟動 Vim
+
+|40.1|			映射熱鍵
+|24.7|			創建縮寫
+
+|ins-expandtab|		在插入模式下用空格擴展製表符
+|i_CTRL-R|		在插入模式下插入寄存器的內容
+|24.3|			在插入模式下自動補全單詞
+|25.1|			斷開過長的行
+
+|20.1|			編輯命令行
+|20.3|			命令行自動補全
+|'cmdheight'|		增加命令行的高度
+|10.3|			指定命令行範圍
+|40.3|			指定在 讀/寫 或 進入/離開 緩衝區/窗口 之前/之後
+			自動執行命令
+
+|'autowrite'|		自動存盤
+|30.1|			加速 編輯-編譯-編輯 循環，在 Vim 裡面編譯和修正錯誤
+
+|options|		設置選項
+|auto-setting|		自動設置選項
+|term-dependent-settings| 設置依賴於終端名稱的選項
+|save-settings|		保存設置
+|:quote|		對我的 .vim 文件進行註釋
+|'helpheight'|		調整默認的幫助高度
+|'highlight'|		設置各種高亮模式
+|'title'|		設置窗口標題
+|'icon'|		設置窗口圖標標題
+|'report'|		避免看到每一行上的改變信息
+|'shortmess'|		避免按回車 |hit-enter| 提示
+
+|mouse-using|		在 Vim 中使用鼠標
+|usr_08.txt|		管理多窗口和緩衝區
+|gui.txt|		使用 GUI
+
+|您 (還) 不能！|	用 Vim 洗盤子 :)
+
+|usr_06.txt|		打開語法高亮
+|2html.vim|		把一個彩色的文件轉換成 HTML
+|less|			用 Vim 模擬 less 或 more，但帶有語法高亮
+
+ vim:tw=78:ts=8:ft=help:norl:

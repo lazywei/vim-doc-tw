@@ -1,0 +1,181 @@
+*os_os2.txt*    For Vim version 7.3.  最近更新: 2006年7月
+
+
+		  VIM 參考手冊    by Paul Slootman
+				譯者: Willis
+				http://vimcdoc.sf.net
+
+
+							*os2* *OS2* *OS/2*
+本文討論 OS/2 版本的 Vim 的特點。
+目前，還沒有直接基於 PM 的 Vim GUI 版本，也即: OS/2 版本只有控制台界面的。不
+過，現在有了一個 Win32s-兼容的 GUI 版本，這是由 Warp 4 (支持 Win32s) 的擁有者
+們在 Win-OS/2 會話中實現的。本文所記錄的，則完全是針對直接的控制台版本而言的。
+
+注意
+
+這個 OS/2 的移植版本對我和其他的一些 OS/2 用戶來說都沒有問題。不過，因為我還沒
+有得到足夠多的反饋，所以既有可能確實沒有 (OS/2 專門的) 漏洞存在 (除了以下提到
+的那些以外)，也有可能只是沒有人有機會創造一個存在漏洞的環境而已。在 Dos 和
+Unix 模式下的文件讀寫、二進制、還有 FAT 處理看起來都工作正常，而這些是最有可能
+出問題的地方。
+
+一個已知的問題是 Vim 打開的文件被從 Vim 的外殼轉換技術執行的其他程序所繼承。
+尤其，這會使得 Vim 無法刪除與外部程序同時打開的緩衝區的交換文件，直到外部程序
+結束為止。那時，交換文件是可以刪除了，但是如果 Vim 一開始沒法做的話，那就不可
+能再去做了。因而，你會在重新啟動 Vim 編輯同一個文件時得到警告說別的 Vim 會話正
+在編輯同一個文件。比如，執行 "!start epm"。退出 Vim，重新啟動 Vim，打開上次
+epm 啟動的時候緩衝區裡的那個文件，就會看到了這個問題。我正在克服這一問題！
+
+第二個問題，是在通過網絡訪問 OS/2 系統時，Vim 不瞭解這一情形。比如，在一個
+Unix系統下用 telnet 訪問，打開 Vim。看起來，這個問題是因為 OS/2 _有時_ 會識別
+功能/光標鍵，並試圖把它們轉換成 "正常" 的 PC 鍵盤產生的 OS/2 的相應代碼。我在
+測試一個解決方法 (把 OS/2 代碼還原成正確的功能鍵)，但目前我還不能倉促地給出明
+確的結論 (順便提一下，我在 Warp 3 上工作)。同時，十分歡迎你們的任何幫助。
+
+預 備 條 件
+
+要執行 Vim，你需要 emx 運行環境 (至少 rev. 0.9b)。這可以如下得到 (可以詢問
+Archie): 
+
+    emxrt.zip     emx 運行包
+
+我已經附帶了一個 emx.dll，它應該複製到你的 LIBPATH 裡面的一個目錄裡。Emx 是
+GPL的，但 emx.dll 庫不是 (要瞭解這對你意味著什麼，讀一下 COPYING.EMX)。
+
+這個 emx.dll 來自 emxfix04.zip 包。很不幸，這個包有一個問題，哦，我是說有一個
+POSIX 的關於 select() 函數的特色。3.27 以前的 Vim 版本在啟動的時候 (準確的說，
+是在執行 vimrc 的時候) 會掛起。如果這發生了，多按幾次 <Enter> 直到 Vim 開始工
+作為止。下一步，用一個新一點的 Vim 吧！
+
+幫 助 和 VIMRC 文 件
+
+如果你解壓包含 Vim 的壓縮包，然後直接在解壓完的地方運行 Vim，Vim 應該就能找到
+你的運行時文件和 .vimrc，無需任何設置。
+
+如果你把可執行文件和運行時文件分開放，那麼你需要設置 VIM 環境變量來定位幫助文
+件和你的 .vimrc 的位置。在 CONFIG.SYS 裡放入這一行: >
+
+  SET VIM=c:/local/lib/vim
+
+把你的 .vimrc 和其他的 Vim 文件放在這個目錄裡。把運行時文件也放進來。每個版本
+的 Vim 都有自己的運行時目錄，就像這樣 "c:/local/lib/vim/vim54"。現在，你的 Vim
+的文件結構應當像這樣:
+
+	c:/local/lib/vim/.vimrc
+	c:/local/lib/vim/vim54/filetype.vim
+	c:/local/lib/vim/vim54/doc/help.txt
+	etc.
+
+請 注意: .vimrc 可能在把 OS/2 安裝在 FAT 文件系統的那些環境裡叫做 _vimrc。Vim
+會先查找 .vimrc，如過找不到，再在同一個地方找 _vimrc。.vimrc 或者 _vimrc 的存
+在與否影響 'compatible' 選項的設置，這會有很多意想不到的後果。參見
+|'compatible'|。
+
+如果你在網絡驅動器上運行 OS/2，那麼你可以把 Vim 安裝在 網絡驅動器上 (包括
+.vimrc；這被稱為 "系統" vimrc 文件)，然後還可以用個人的 .vimrc ("用戶" vimrc
+文件)。它應該在 HOME 環境變量所指定的目錄下。
+
+文 件 名 中 的 環 境 變 量
+
+在文件名裡使用 ~ 相當於使用 HOME 環境變量，所以 ":e ~/textfile" 會編輯 HOME 目
+錄下面的 "textfile" 文件。另外，你也可以用別的環境變量，比如，":n $SRC/*.c"。
+
+HOME 環境變量還用於定位 .viminfo 文件 (參見 |viminfo-file|)。還沒有 FAT 文件系
+統下的 .viminfo支持，對不起了。不過，你自己可以加上 -i 啟動標誌位來設定 (比如，
+"vim -i $HOME/_viminfo")。
+
+如果 HOME 環境變量沒有設置，缺省值是 "C:/"。
+
+反 斜 槓
+
+是用斜槓 ('/') 還是反斜槓 ('\') 可能是個問題 (更多說明在 |dos-backslash| 裡)，
+但大部分情況下 Vim 做的是那 "正確的事"。Vim 自己在文件名裡用反斜槓，但會很高興
+地接受鍵入的正斜槓。(事實上，有時這樣更方便！)
+
+臨 時 文 件
+
+臨時文件 (對過濾命令有用) 被放在如下列表裡第一個存在並且能創建文件的目錄中:
+	$TMP
+	$TEMP
+	C:\TMP
+	C:\TEMP
+	當前目錄
+
+
+終 端 設 置
+
+							*os2ansi*
+要在 TERM 環境變量裡用 "os2ansi" (或者乾脆不要設，因為缺省值就是正確的)。如果
+你因為別的應用的需要把 TERM 設為別的值，你可以在 .vimrc 裡把終端類型設為
+os2ansi。問題是 OS/2 的 ANSI 模擬限制很多 (比如，它沒有插入/刪除行)。
+
+如果你確實想用別的 TERM 賦值 (比如因為別的程序)，確保它的 termcap 入口有正確的
+鍵盤映射。emx 發佈的 termcap.dat 並不一定總會有。以下是你希望的 termcap 入口裡
+需要使光標和命名的功能鍵 (比如 pagedown)工作的一些需要的設置: >
+
+	:ku=\316H:kd=\316P:kl=\316K:kr=\316M:%i=\316t:#4=\316s:\
+	:kD=\316S:kI=\316R:kN=\316Q:kP=\316I:kh=\316G:@7=\316O:\
+	:k1=\316;:k2=\316<:k3=\316=:k4=\316>:k5=\316?:k6=\316@:\
+	:k7=\316A:k8=\316B:k9=\316C:k;=\316D:
+
+
+Paul Slootman
+
+
+43 行 窗 口
+
+Stevan Tryon 給出一個關於如果在大窗口裡運行 Vim 的建議:
+
+當我在一個象 PMMail 那樣的 OS/2 WPS 應用裡調用 Vim 的時候，它調入缺省的 25-行
+模式。要得到一個更有用的窗口大小，我做好了一個外部編輯命令 "vimbig.cmd"，它接
+著調用 "vimbig2.cmd"。有些強來和不太自然了，也許，不過它能用。
+
+vimbig.cmd: >
+   @echo off
+   start "Vi Improved" /f vimbig2.cmd %1 %2 %3 %4
+
+vimbig2.cmd: >
+   @echo off
+   mode 80,43
+   vim.exe %1 %2 %3 %4
+   exit
+<
+
+剪 貼 板 支 持 (Alexander Wagner 提供)
+
+OS/2 的 Vim 沒有對系統剪貼板的直接支持。要允許這樣的訪問，你需要一個附加的工
+具: 通過一個 vio 應用來訪問剪貼板。Stefan Gruendel 的免費軟件包 clipbrd.zip
+就可以。你可以從這個地方下載到編譯好的可執行碼和所有的源代碼:
+	http://www.os2site.com/sw/util/clipboard/index.html
+	http://download.uni-hd.de/ftp/pub/os2/pmtools/
+
+它的安裝很簡單: 只要把包裡的兩個可執行程序放到你的 PATH 裡面的一個目錄，Vim 就
+可以從的你的任何工作目錄裡訪問他們了。
+
+要從剪貼板裡複製文本到你的 Vim 會話裡，可用 :r 命令。只要從 Vim 裡如下調用
+clipbrd.exe: >
+
+	:r !clipbrd -r
+
+要從 Vim 中把文本複製到剪貼板，只要用通常的 vim-方式 標記文本，然後調用: >
+
+	:!clipbrd -w
+
+它會把你的選擇區複製到 OS/2 的剪貼板裡。
+
+為了方便應用，你也許想加為這些命令加上映射？比如，用 F11 把剪貼板的內容粘貼到
+Vim 裡，用 F12 把選擇的文本複製到剪貼板去。那你可以: >
+
+	if has("os2")
+	  imap <F11>     <ESC>:r !clipbrd -r<CR>i
+	  vmap <F12>     :!clipbrd -w<cr>
+	else
+	  imap <F11>     <ESC>"*p<CR>i
+	  vmap <F12>     "*y
+	endif
+
+這樣就可以保證只有在 OS/2 下會調用 clipbrd 命令，而其他環境下用內建的機制 (要
+讓 Vim 每次都能記住這些，把這幾行放到你的 .vimrc 裡)。
+
+ vim:tw=78:ts=8:ft=help:norl:

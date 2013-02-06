@@ -1,0 +1,133 @@
+*os_qnx.txt*    For Vim version 7.3.  最近更新: 2006年2月
+
+
+		  VIM 參考手冊    by Julian Kinraid
+				譯者: Willis
+				http://vimcdoc.sf.net
+
+
+							*QNX* *qnx*
+
+1. 概述				|qnx-general|
+2. 編譯 Vim			|qnx-compiling|
+3. 終端支持			|qnx-terminal|
+4. Photon GUI			|photon-gui|
+5. Photon 字體			|photon-fonts|
+6. 漏洞和待做的事情
+
+==============================================================================
+
+1. 概述							*qnx-general*
+
+QNX 上的 Vim 和其他的 unix 版本行為大致相同。 |os_unix.txt|
+
+
+2. 編譯 Vim						*qnx-compiling*
+
+Vim 可以用通常的 configure/make 方法編譯。如果你要編譯 X11 的版本，在配置
+(configure) 時加入 --with-x 選項。否則，不需要任何參數。或者，加入
+--enable-gui=photon 以得到 Photon GUI 的支持。執行 ./configure --help，看看還
+有什麼特性你希望打開或者關閉。
+
+
+3. 終端支持						*qnx-terminal*
+
+如果鼠標和剪貼板選項在編譯時加入的話 (通常如此)，Vim 可以提供 pterm 這兩方面的
+支持。
+
+影響鼠標設置的選項有 |'mouse'| 和 |'ttymouse'|。在使用鼠標時，如果你按住
+shift、ctrl、或是 alt，pterm 自己會處理鼠標事件。它會選擇文本，和 Vim 所做的無
+關。
+
+如果鼠標可以使用，你按住 Alt-RightMouse (Alt + 鼠標右鍵) 可以打開 pterm 菜單。
+要關閉 Vim 的鼠標支持，把 mouse 選項置空，即 set mouse=
+
+
+4. Photon GUI						*photon-gui*
+
+要啟動 Vim 的 GUI 版本，你可以運行 gvim 或者 vim -g。否則運行的是終端版本。更
+多的信息可見 - |gui-x11-start|
+
+支持的特性有:
+	:browse 命令					|:browse|
+	:confirm 命令					|:confirm|
+	光標閃爍					|'guicursor'|
+	菜單、彈出式菜單和菜單優先順序			|:menu|
+							|popup-menu|
+							|menu-priority|
+	工具欄						|gui-toolbar|
+							|'toolbar'|
+	字體選擇工具 (:set guifont=*)			|photon-fonts|
+	鼠標聚焦					|'mousefocus'|
+	鼠標隱藏					|'mousehide'|
+	鼠標圖標形狀					|'mouseshape'|
+	剪貼板						|gui-clipboard|
+
+還未完成的特性:
+	若干國際化支持，包括波斯語和希伯來文字的支持，
+	不同的編碼，等等。
+
+	本幫助文件
+
+不支持的特性:
+	查找和替換窗口					|:promptfind|
+	可卸的菜單	
+
+	其他我還沒有想及的恕難加入
+
+
+5. Photon 字體						*photon-fonts*
+
+你可以在 gui 中用 guifont 選項設置字體 >
+	:set guifont=Lucida\ Terminal
+<
+該字體須是等寬字體，字體名如有空格，應以 '\' 轉義之。缺省字體是 PC Terminal, 8
+號字。用 '*' 作為字體名會打開一個標準的 Photon 字體選擇工具，然後你可以從中選
+擇一個字體。
+
+在字體名後面，你可以附加可選的控制字體大小和風格的選項，設置之間用 ':' 分隔。
+不是所有的字體都支持所有的風格。
+
+這些選項是，
+    s{size}	字體大小 {size}
+    b		粗體字
+    a		抗鋸齒字體
+    i		斜體字
+
+示例:
+
+設定 monospace 10號抗鋸齒字體 >
+	:set guifont=monospace:s10:a
+<
+設定 Courier 12號粗體斜體字 >
+	:set guifont=Courier:s12:b:i
+<
+從選擇工具挑選字體 >
+	:set guifont=*
+<
+
+
+6. 漏洞和待做的事情
+
+已知問題:
+	- Vim 有時在執行外部程序時不響應。繞開的方法是把下面這行加入到你的
+	  |vimrc| 文件中: >
+		set noguipty
+
+漏洞:
+	- 菜單高亮還有些許問題
+	- 在使用 phiditto/phinows 等的時候，如果你用的字體不支持粗體屬性而 Vim
+	  要顯示粗體字，情況就會弄亂。
+	- 光標有時候很難看得到。
+	- 一些我可以解決的小問題 :)
+
+待做:
+	- 改進多語言支持。
+	- 在菜單和工具欄中加入設置字體的選項。
+	- 查找和替換對話框。
+	- 客戶/服務器方面的功能。
+	- 也許要做可卸下的菜單。
+
+	- 在啟動外部程序時，不要使用帶 spawn() 的 fork()。
+
+ vim:tw=78:sw=4:ts=8:ts=8:ft=help:norl:

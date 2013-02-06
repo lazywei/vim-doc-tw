@@ -1,0 +1,1228 @@
+*quickfix.txt*  For Vim version 7.3.  最近更新：2010年7月
+
+
+		  VIM REFERENCE MANUAL    by Bram Moolenaar
+
+		  譯者: wandys、Willis	http://vimcdoc.sf.net
+
+
+本主題曾在用戶手冊的 |30.1| 節有所介紹。
+
+1. 使用 QuickFix 命令			|quickfix|
+2. 出錯窗口				|quickfix-window|
+3. 使用多個錯誤列表			|quickfix-error-lists|
+4. 使用 :make				|:make_makeprg|
+5. 使用 :grep				|grep|
+6. 選擇編譯器				|compiler-select|
+7. 錯誤格式				|error-file-format|
+8. 目錄棧				|quickfix-directory-stack|
+9. 特定錯誤格式				|errorformats|
+
+{Vi 沒有這些命令}
+
+如編譯時沒有指定 |+quickfix| 則無法使用 quickfix 相關命令。
+
+=============================================================================
+1. 使用 QuickFix 命令			*quickfix* *Quickfix* *E42*
+
+Vim 有一個特殊的模式用來加快 編輯-編譯-編輯 循環。這是受到 Amiga 系統上 Manx
+的 Aztec C 編譯器的 quickfix 選項的啟發。它會將編譯器產生的出錯信息保存到一個
+文件中並用 Vim 跳轉到各個錯誤。無需記住所有的出錯信息，你可以檢查每一個錯誤並
+對其修正。
+
+Vim 裡，quickfix 命令的使用更廣泛，它可以找到文件各種位置的列表。例如，
+|:vimgrep| 尋找模式的匹配。在腳本裡，用 |getqflist()| 函數可以得到這些位置。這
+樣你可以比編輯/編譯/修正循環做更多的事情！
+
+如果你是在 Amiga 系統上使用 Manx 的 Aztec C 編譯器，參考 |quickfix-manx| 以配
+合 Vim 使用。如果使用其它的編譯器，你需要將出錯信息保存到一個文件中然後用
+"Vim -q filename" 啟動 Vim。一個簡便的方法是使用 |:make| 命令 (見下)。你需要設
+定 'errorformat'，使其和編譯器產生的出錯信息格式一致 (見 |errorformat|)。
+
+						*location-list* *E776*
+位置列表和 quickfix 列表類似，包含了文件中各種位置的列表。位置列表和窗口相關
+聯，而每個窗口都要單獨的位置列表。一個位置列表只能和一個窗口相關聯。位置列表和
+quickfix 列表相互獨立。
+
+如果包含位置列表的窗口被分割，新窗口得到該位置列表的一個備份。如果一個位置列表
+不再被引用，該位置列表被刪除。
+
+以下 quickfix 命令可供使用。位置列表命令和 quickfix 命令類似，把 quickfix 命令
+裡的 'c' 前綴換成 'l' 就行了。
+
+							*:cc*
+:cc[!] [nr]		顯示錯誤 [nr]。如果不指定 [nr]，將再次顯示相同的錯誤。
+			如果不指定 [!]，則以下情況發生時無法跳轉到另一個緩衝
+			區: 若 'hidden' 和 'autowrite' 選項沒被設定並且當前緩
+			沖區只有一個窗口且被修改。
+			當指定 [!] 跳轉到另一個緩衝區時，當前緩衝區的修改會丟
+			失，除非設定了 'hidden' 或該緩衝區還有其它窗口。
+			當跳轉到另一個緩衝區時，會受到 'switchbuf' 有關設定的
+			影響。
+
+							*:ll*
+:ll[!] [nr]		和 ":cc" 類似，但使用當前窗口的位置列表而不是 quickfix
+			列表。
+
+							*:cn* *:cnext* *E553*
+:[count]cn[ext][!]d	顯示含有文件名的列表中的往後第 [count] 個錯誤。如果沒
+			有文件名，則跳轉到往後第 [count] 個錯誤。有關 [!] 和
+			'switchbuf'，參見 |:cc|。
+
+							*:lne* *:lnext*
+:[count]lne[xt][!]	和 ":cnext" 類似，但使用當前窗口的位置列表而不是
+			quickfix 列表。
+
+:[count]cN[ext][!]			*:cp* *:cprevious* *:cN* *:cNext*
+:[count]cp[revious][!]	顯示含有文件名的列表中的往前第 [count] 個錯誤。如果沒
+			有文件名，則跳轉到往前第 [count] 個錯誤。有關 [!] 和
+			'switchbuf'，參見 |:cc|。
+
+				
+:[count]lN[ext][!]			*:lp* *:lprevious* *:lN* *:lNext*
+:[count]lp[revious][!]	和 ":cNext" 與 ":cprevious" 類似，但使用當前窗口的位置
+			列表而不是 quickfix 列表。
+
+							*:cnf* *:cnfile*
+:[count]cnf[ile][!]	顯示含有文件名的列表中往後第 [count] 個文件中的首個錯
+			誤。如果沒有文件名或是列表中沒有下一個文件，則跳轉到往
+			後第 [count] 個錯誤。有關 [!] 和 'switchbuf'，參見
+			|:cc|。
+
+
+							*:lnf* *:lnfile*
+:[count]lnf[ile][!]	和 ":cnfile" 類似，但使用當前窗口的位置列表而不是
+			quickfix 列表。
+
+:[count]cNf[ile][!]			*:cpf* *:cpfile* *:cNf* *:cNfile*
+:[count]cpf[ile][!]	顯示含有文件名的列表中往前第 [count] 個文件中的最後一
+			個錯誤。如果沒有文件名或是列表中沒有下一個文件，則跳轉
+			到往前第 [count] 個錯誤。有關 [!] 和 'switchbuf'，參見
+			|:cc|。
+
+
+:[count]lNf[ile][!]			*:lpf* *:lpfile* *:lNf* *:lNfile*
+:[count]lpf[ile][!]	和 ":cNfile" 與 ":cpfile" 類似，但使用當前窗口的位置列
+			表而不是 quickfix 列表。
+
+							*:crewind* *:cr*
+:cr[ewind][!] [nr]	顯示錯誤 [nr]。如果沒指定 [nr]，則顯示_首_個錯誤。參見
+			|:cc|。
+
+							*:lrewind* *:lr*
+:lr[ewind][!] [nr]	和 ":crewind" 類似，但使用當前窗口的位置列表而不是
+			quickfix 列表。
+
+							*:cfirst* *:cfir*
+:cfir[st][!] [nr]	和 ":crewind" 相同。
+
+							*:lfirst* *:lfir*
+:lfir[st][!] [nr]	和 ":lrewind" 相同。
+
+							*:clast* *:cla*
+:cla[st][!] [nr]	顯示錯誤 [nr]。如果沒指定 [nr]，則顯示最後一個錯誤。參
+			見 |:cc|。
+
+							*:llast* *:lla*
+:lla[st][!] [nr]	和 ":clast" 類似，但使用當前窗口的位置列表而不是
+			quickfix 列表。
+
+							*:cq* *:cquit*
+:cq[uit][!]		以錯誤碼退出 Vim。這樣編譯器就不會再次編譯相同文件。
+			_警告_: 對文件的所有改動都會丟失！即使沒有 [!] 也是如
+			此。類似於 ":qall!" |:qall|，但 Vim 返回非零退出碼。
+
+							*:cf* *:cfile*
+:cf[ile][!] [errorfile]	讀入錯誤文件並跳轉到首個錯誤。以 -q 選項啟動 Vim 時會
+			自動這樣處理。用這個命令，你就可以在編譯的同時繼續用
+			Vim 編輯。如果你指定錯誤文件名，那麼 'errorfile' 選擇
+			將被設定為 [errorfile]。有關 [!]，參見 |:cc|。
+
+							*:lf* *:lfile*
+:lf[ile][!] [errorfile]	和 ":cfile" 類似，但使用當前窗口的位置列表而不是
+			quickfix 列表。
+			你不能用 -q 命令行選項設置位置列表。
+
+
+:cg[etfile] [errorfile]					*:cg* *:cgetfile*
+			讀入錯誤文件。和 ":cfile" 類似，只是不跳轉到首個錯誤。
+
+			
+:lg[etfile] [errorfile]					*:lg* *:lgetfile*
+			和 ":cgetfile" 類似，但使用當前窗口的位置列表而不是
+			quickfix 列表。
+
+							*:caddf* *:caddfile*
+:caddf[ile] [errorfile]	讀入錯誤文件，把錯誤文件裡的錯誤加到當前 quickfix 列表
+			中。如果 quickfix 列表不存在，建立新的列表。
+
+							*:laddf* *:laddfile*
+:laddf[ile] [errorfile]	和 ":caddfile" 類似，但使用當前窗口的位置列表而不是
+			quickfix 列表。
+
+						*:cb* *:cbuffer* *E681*
+:cb[uffer][!] [bufnr]	從當前緩衝區讀入錯誤列表。如果給出 {bufnr}，它必須是已
+			經載入的緩衝區號。這時使用該緩衝區，而不是當前緩衝區。
+			可以指定使用的行範圍。否則使用緩衝區的所有行。
+			[!] 部分見 |:cc|。
+
+						*:lb* *:lbuffer*
+:lb[uffer][!] [bufnr]	和 ":cbuffer" 類似，但使用當前窗口的位置列表而不是
+			quickfix 列表。
+
+						*:cgetb* *:cgetbuffer*
+:cgetb[uffer] [bufnr]	從當前緩衝區讀入錯誤列表。類似於 ":cbuffer"，只是不跳
+			轉到首個錯誤。
+
+						*:lgetb* *:lgetbuffer*
+:lgetb[uffer] [bufnr]	和 ":cgetbuffer" 類似，但使用當前窗口的位置列表而不是
+			quickfix 列表。
+
+							*:caddb* *:caddbuffer*
+:caddb[uffer] [bufnr]	讀入當前緩衝區的錯誤列表，把這些錯誤加到當前 quickfix
+			列表中。如果 quickfix 列表不存在，建立新的列表。其它部
+			分和 ":cbuffer" 相同。
+
+							*:laddb* *:laddbuffer*
+:laddb[uffer] [bufnr]	和 ":caddbuffer" 類似，但使用當前窗口的位置列表而不是
+			quickfix 列表。
+
+							*:cex* *:cexpr* *E777*
+:cex[pr][!] {expr}	用 {expr} 的計算結果建立 quickfix 列表並跳轉到首個錯
+			誤。如果 {expr} 是字符串，那麼字符串裡每個換行符結尾的
+			行用 'errorformat' 進行處理，其結果用來產生 quickfix
+			列表。如果 {expr} 是列表類型，那麼列表裡的每個字符串項
+			目被處理並加到 quickfix 列表裡。列表裡的非字符串項目被
+			忽略。[!] 部分見 |:cc|。
+			示例: >
+				:cexpr system('grep -n xyz *')
+				:cexpr getline(1, '$')
+<
+							*:lex* *:lexpr*
+:lex[pr][!] {expr}	和 ":cexpr" 類似，但使用當前窗口的位置列表而不是
+			quickfix 列表。
+
+							*:cgete* *:cgetexpr*
+:cgete[xpr] {expr}	用 {expr} 的計算結果建立 quickfix 列表。和 ":cexpr" 類
+			似，只是不跳轉到首個錯誤。
+
+							*:lgete* *:lgetexpr*
+:lgete[xpr] {expr}	和 ":cgetexpr" 類似，但使用當前窗口的位置列表而不是
+			quickfix 列表。
+
+							*:cad* *:caddexpr*
+:cad[dexpr] {expr}	把 {expr} 的計算結果行加到當前 quickfix 列表中。如果
+			quickfix 列表不存在，建立新的列表。不改變當前的光標位
+			置。詳情見 |:cexpr|。
+			示例: >
+    :g/mypattern/caddexpr expand("%") . ":" . line(".") .  ":" . getline(".")
+<
+							*:lad* *:laddexpr*
+:lad[dexpr] {expr}	和 ":caddexpr" 類似，但使用當前窗口的位置列表而不是
+			quickfix 列表。
+
+							*:cl* *:clist*
+:cl[ist] [from] [, [to]]
+			顯示所有有效的錯誤 (參見 |quickfix-valid)。
+			如果 [from] 和/或 [to] 被指定，則顯示指定範圍內的錯
+			誤。負數從最後一個錯誤向前算起，-1 為最後一個錯誤。當
+			跳轉到另一個緩衝區時，會受到 'switchbuf' 有關設定的影
+			響。
+
+:cl[ist]! [from] [, [to]]
+			顯示所有的錯誤。
+
+							*:lli* *:llist*
+:lli[st] [from] [, [to]]
+			和 ":clist" 類似，但使用當前窗口的位置列表而不是
+			quickfix 列表。
+
+:lli[st]! [from] [, [to]]
+			列出當前窗口的位置列表的所有項目。
+
+如果你插入或刪除行，大部分錯誤仍能被正確的找到，因為隱藏標記會被使用。有時，當
+標記由於某種原因被刪除，"line changed" 信息會顯示以警告你出錯位置可能有誤。如
+果你退出並重新運行 Vim，標記會丟失，而出錯位置也可能不再正確。
+
+如果 vim 內建 |+autocmd| 支持，可以在 quickfix 命令 (':make'、':grep' 等) 執行
+前後使用兩個自動命令。詳見 |QuickFixCmdPre| 和 |QuickFixCmdPost|。
+
+						*QuickFixCmdPost-example*
+如果 'encoding' 不同於 locale，錯誤信息可能和 Vim 使用的編碼不同。以下代碼可以
+進行消息的轉換: >
+	function QfMakeConv()
+	   let qflist = getqflist()
+	   for i in qflist
+	      let i.text = iconv(i.text, "cp936", "utf-8")
+	   endfor
+	   call setqflist(qflist)
+	endfunction
+
+	au QuickfixCmdPost make call QfMakeConv()
+
+
+=============================================================================
+2. 出錯窗口					*quickfix-window*
+
+					    *:cope* *:copen* *w:quickfix_title*
+:cope[n] [height]	打開一個窗口顯示當前的錯誤列表。
+			如果指定 [height]，窗口設為指定高度 (如果有空間的話)，
+			否則窗口為 10 行高。
+			該窗口含有一個特殊的緩衝區，'buftype' 為 "quickfix"。
+			不要修改此選項！ 如果已有了一個 quickfix 窗口，它將成
+			為當前窗口。不可能再打開第二個 quickfix 窗口。該窗口會
+			設置 w:quickfix_title 變量為生成 quickfix 列表的命令。
+			可用於通過適當地調整 'statusline' 來定制狀態行。
+
+							*:lop* *:lopen*
+:lop[en] [height]	打開一個窗口顯示當前窗口的位置列表。只有當前窗口有位置
+			列表的情況才能用。你可以同時打開多於一個的位置列表窗
+			口。除此以外，和 ":copen" 相同。
+
+							*:ccl* *:cclose*
+:ccl[ose]		關閉 quickfix 窗口。
+
+							*:lcl* *:lclose*
+:lcl[ose]		關閉顯示當前窗口的位置列表的窗口。
+
+							*:cw* *:cwindow*
+:cw[indow] [height]	當存在可以識別的錯誤時，打開窗口。如果該窗口已經打開且
+			沒有可識別的錯誤，則將此窗口關閉。
+
+							*:lw* *:lwindow*
+:lw[indow] [height]	和 ":cwindow" 類似，但使用當前窗口的位置列表而不是
+			quickfix 列表。
+
+quickfix 窗口一般會在屏幕的底端。如果有垂直分割，它會在最右邊窗口的底端。
+要使其獲得最大寬度: >
+	:botright cwindow
+你可以用 |windows-moving| 命令來移動窗口。
+比如，將它移動到頂端: CTRL-W K
+'winfixheight' 選項會被設定，也就是說窗口會盡可能的保持它原來的高度，而忽略
+'winheight' 和 'equalalways' 選項。你可以手動改變其高度 (例如，用鼠標拖動它上
+方的狀態行)。
+
+在 quickfix 窗口中，每一行是一個錯誤。行號和錯誤號相等。你可以用 ":.cc" 跳轉到
+當前光標處的錯誤，按 <Enter> 鍵或是雙擊鼠標有同樣的效果。在 quickfix 窗口上方
+會開一窗口顯示含有錯誤的文件。如果已有為該文件打開的窗口，則使用該窗口。如果已
+打開窗口的緩衝區已被修改，而錯誤出在另一個文件中，則不能完成向出錯處的跳轉。你
+需要首先確定窗口含有一個可被放棄的緩衝區。
+					*CTRL-W_<Enter>* *CTRL-W_<CR>*
+你可以用 CTRL-W <Enter> 來打開新窗口並在那裡跳轉到錯誤。
+
+當 quickfix 窗口被填充後，將會觸發兩個自動命令事件。首先，'filetype' 選項會被
+設為 "qf"，這會觸發 FileType 事件。然後 BufReadPost 事件會被觸發，緩衝區名為
+"quickfix"。這可以用來完成一些在錯誤列表上的操作。比如: >
+	au BufReadPost quickfix  setlocal modifiable
+		\ | silent exe 'g/^/s//\=line(".")." "/'
+		\ | setlocal nomodifiable
+這會在每行開始添加行號。注意 ":s" 命令中 "\=" 的使用，它是為了計算表達式。
+同時激活 BufWinEnter 事件，還是用 "quickfix" 作為緩衝區名。
+
+備註: 在 quickfix 窗口中作更改對出錯列表不起作用。'modifiable' 選項關閉以免作
+出更改。如果你堅持還是要刪除或是插入行，文本和錯誤號的關係就會混亂。如果真的想
+這麼做，你可以將 quickfix 窗口的內容保存到一個文件中然後用 ":cfile" 命令將其解
+析並指定其作為新的錯誤列表。
+
+						*location-list-window*
+位置列表窗口顯示位置列表裡的項目。如果打開位置列表窗口，它建立在當前窗口之下，
+並顯示當前窗口的位置列表。位置列表窗口和 quickfix 窗口類似，除了你可以同時打開
+多於一個位置列表窗口以外。如果你在這個窗口裡使用位置列表命令，使用的是其中顯示
+的位置列表。
+
+當你從位置列表窗口裡選擇文件時，採用下面的步驟以尋找編輯該文件的窗口:
+
+1. 如果該位置列表窗口顯示的位置列表所屬的窗口存在，用該窗口打開文件。
+2. 如果上面的步驟失敗並且文件已經在另外的窗口裡打開，使用那個窗口。
+3. 如果上面的步驟失敗，使用已經存在且顯示的緩衝區沒有置位 'buftype' 的窗口。
+4. 如果上面的步驟失敗，用新窗口編輯文件。
+
+在所有這些情形下，如果選擇窗口的位置列表還沒有設置，那麼它被設置為位置列表窗口
+裡顯示的位置列表。
+
+=============================================================================
+3. 使用多個錯誤列表					*quickfix-error-lists*
+
+到目前為止，我們都假定只有一個錯誤列表。實際上最近使用的 10 個錯誤列表都會被記
+住。當開始一個新的列表時，前面的列表會被自動保存。有兩個命令可以用來訪問舊的錯
+誤列表。它們會將其中一個已經使用的錯誤列表指定為當前列表。
+
+						*:colder* *:col* *E380*
+:col[der] [count]	到前一個舊的錯誤列表。如果指定 [count]，則執行 [count]
+			次。如果已經到達最舊的列表，則報錯。
+
+						*:lolder* *:lol*
+:lol[der] [count]	和 ":colder" 類似，但使用當前窗口的位置列表而不是
+			quickfix 列表。
+
+						*:cnewer* *:cnew* *E381*
+:cnew[er] [count]	到下一個新的錯誤列表。如果指定 [count]，則執行 [count]
+			次。如果已經到達最新的列表，則報錯。
+
+						*:lnewer* *:lnew*
+:lnew[er] [count]	和 ":cnewer" 類似，但使用當前窗口的位置列表而不是
+			quickfix 列表。
+
+當增加一個新的錯誤列表時，它會成為當前列表。
+
+如果使用 ":colder" 後又使用 ":make" 或 ":grep" 來增加一個錯誤列表，那麼原來的
+一個較新列表會被覆蓋。這在使用 ":grep" (見 |grep|) 時相當有用。如果你想保留最
+近的錯誤列表，先要使用 ":cnewer 99" 命令。
+
+=============================================================================
+4. 使用 :make						*:make_makeprg*
+
+							*:mak* *:make*
+:mak[e][!] [arguments]	1. 如果 Vim 編譯時帶 |+autocmd|，執行所有相關的
+			   |QuickFixCmdPre| 自動命令。
+			2. 如果設定 'autowrite'，則寫入所有修改過的緩衝區。
+			3. 根據 'makeef' 的值產生錯誤文件。如果 'makeef' 值不
+			   包含 "##" 且此文件已存在，則該文件會被先刪除。
+			4. 'makeprg' 選項指定的程序 (缺省為 "make") 被啟動，
+			   [arguments] 為其參數。其輸出被儲存到錯誤文件名 (如
+			   是 Unix，也會在屏幕上顯示)。
+			5. 錯誤文件以 'errorformat' 格式讀入。
+			6. 如果 Vim 編譯時帶 |+autocmd|，執行所有相關的
+			   |QuickFixCmdPost| 自動命令。
+			   見下例。
+			7. 如果沒指定 [!]，則跳轉到首個錯誤。
+			8. 錯誤文件被刪除。
+			9. 你現在可以用 |:cnext|，|:cprevious| 等命令在錯誤間
+			   移動。見上。
+			本命令不接受註釋，所有的 " 將被視為參數的一部分。
+
+							*:lmak* *:lmake*
+:lmak[e][!] [arguments]
+			和 ":make" 類似，但使用當前窗口的位置列表而不是
+			quickfix 列表。
+
+":make" 命令執行 'makeprg' 選項指定的程序。這會通過將命令傳遞給 'shell' 指定的
+shell 完成。基本就像輸入下面的命令一樣：
+
+	":!{makeprg} [arguments] {shellpipe} {errorfile}"。
+
+{makeprg} 是 'makeprg' 選項指定的一個字符串。並非只是 "make"，所有的命令都可被
+使用。'%' 和 '#' 會像在命令行中一樣被展開。你可以用 "%<" 表示不含擴展名的當前
+文件名，用 "#<" 表示不含擴展名的輪換文件名。例如： >
+   :set makeprg=make\ #<.o
+
+[arguments] 為 ":make" 之後輸入的所有字符。
+{shellpipe} 是 'shellpipe' 選項值。
+{errorfile} 是 'makeef' 選項值 (## 會被一個唯一字符串取代)。
+
+在設定 {makeprg} 時，佔位符 "$*" 可用來指代 [arguments]，這樣就可以在這些參數
+之後加上其它字符。這時，$* 被所有參數取代。比如: >
+   :set makeprg=latex\ \\\\nonstopmode\ \\\\input\\{$*}
+或更簡單些: >
+   :let &mp = 'latex \\nonstopmode \\input\{$*}'
+"$*" 可被使用多次: >
+   :set makeprg=gcc\ -o\ $*\ $*
+
+'shellpipe' 在 Amiga、MS-DOS 以及 Win32 系統上缺省為 ">"。這就是說編譯器的輸出
+會保存在一個文件中而不在屏幕中直接顯示。在 Unix 系統上，會用到 "| tee"。輸出在
+被保存在文件中的同時也會顯示在屏幕上。取決於所使用的 shell，"|& tee" 或是
+"2>&1| tee" 為缺省值，這樣 stderr 輸出也被包括。
+
+如果 'shellpipe' 為空，{errorfile} 將被忽略。這對那些自身將輸出寫入文件的編譯
+器很有用 (比如，Manx 的 Aztec C)。
+
+
+用 QuickFixCmdPost 來修正編碼 ~
+
+'encoding' 可能不同於編譯程序產生的信息的編碼，下例說明 Vim 讀入錯誤信息後如何
+修正之: >
+
+	function QfMakeConv()
+	   let qflist = getqflist()
+	   for i in qflist
+	      let i.text = iconv(i.text, "cp936", "utf-8")
+	   endfor
+	   call setqflist(qflist)
+	endfunction
+
+	au QuickfixCmdPost make call QfMakeConv()
+
+(Faque Cheng 提供示例)
+
+==============================================================================
+5. 使用 :vimgrep 和 :grep				*grep* *lid*
+
+Vim 有兩種尋找模式匹配的方式: 內部方式和外部方式。內部 grep 的優點是能適用於所
+有系統並且使用強大的 Vim 搜索模式。外部 grep 程序可用於 Vim grep 實現不了你需
+要的功能的場合。
+
+內部方法會慢一些，因為文件要先讀入內存。優點是:
+- 就像編輯文件一樣，自動識別換行符和編碼。
+- 使用 Vim 搜索模式。可以使用多行模式。
+- 如果打開了插件: 可以搜索壓縮和遠程文件。
+	|gzip| |netrw|
+
+要能夠這麼做，Vim 需要載入每個文件，就像編輯它們那樣。如果文件裡沒有匹配，相應
+的緩衝區又會被徹底刪除。這裡忽略 'hidden' 選項，以避免搜索許多文件時內存或文件
+描述符的溢出。不過如果使用 |:hide| 命令修飾符，緩衝區保持載入狀態。這使得其後
+在相同文件裡的搜索快得多。
+
+
+5.1 使用 Vim 的內部 grep
+
+					*:vim* *:vimgrep* *E682* *E683*
+:vim[grep][!] /{pattern}/[g][j] {file} ...
+			在文件 {file} ... 裡搜索模式 {pattern}，並用匹配結果設
+			置錯誤列表。
+			如果沒有 'g' 標誌位，每行只加一次。
+			如果有 'g'，每個匹配都被加入。
+
+			{pattern} 是 Vim 的搜索模式。除了用 / 之外，任何非 ID 
+			字符 (見 |'isident') 都可以用來包圍該模式，只要在
+			{pattern} 裡不出現就行了。
+			適用 'ignorecase'。要否決該設置，在模式裡用 |/\c| 來忽
+			略大小寫或 |/\C| 來匹配大小寫。
+			不使用 'smartcase'。
+
+			如果命令前面帶數字，它定義要尋找的最大匹配數目。這樣，
+			":1vimgrep pattern file" 只會找到第一個。這可以用於只
+			想檢查是否有匹配而在找到後能快速退出的場合。
+
+			如果沒有 'j' 標誌位，Vim 跳到第一個匹配上。
+			如果有 'j'，只更新 quickfix 列表。
+			如果有 [!]，放棄當前緩衝區的任何修改。
+
+			大約每過一秒，顯示正在搜索的文件名，讓你瞭解當前的進展
+			情況。
+			例如: >
+				:vimgrep /an error/ *.c
+				:vimgrep /\<FileName\>/ *.h include/*
+				:vimgrep /myfunc/ **/*.c
+<			"**" 的使用可見 |starstar-wildcard|。
+
+:vim[grep][!] {pattern} {file} ...
+			同上，但不用非 ID 的字符包圍模式，而只用空白分隔。該模
+			式必須以 ID 字符開頭。
+			例如: >
+				:vimgrep Error *.c
+<
+							*:lv* *:lvimgrep*
+:lv[imgrep][!] /{pattern}/[g][j] {file} ...
+:lv[imgrep][!] {pattern} {file} ...
+			和 ":vimgrep" 類似，但使用當前窗口的位置列表而不是
+			quickfix 列表。
+
+						*:vimgrepa* *:vimgrepadd*
+:vimgrepa[dd][!] /{pattern}/[g][j] {file} ...
+:vimgrepa[dd][!] {pattern} {file} ...
+			和 ":vimgrep" 類似，但不是建立新的錯誤列表，而是附加到
+			現有的列表之後。
+
+						*:lvimgrepa* *:lvimgrepadd*
+:lvimgrepa[dd][!] /{pattern}/[g][j] {file} ...
+:lvimgrepa[dd][!] {pattern} {file} ...
+			和 ":vimgrepadd" 類似，但使用當前窗口的位置列表而不是
+			quickfix 列表。
+
+5.2 外部 grep
+
+Vim 可以和 "grep" 或類似 grep 的程序 (比如 GNU id-utils) 交互，其方式和與編譯
+器交互方式類似。
+
+[Unix 小常識: Unix 上 "grep" 命令的名字來源於 ":g/re/p"，其中 "re" 是正則表達
+式 (Regular Expression) 的意思。]
+
+							    *:gr* *:grep*
+:gr[ep][!] [arguments]	和 ":make" 類似，但以 'grepprg' 替代 'makeprg'，以
+			'grepformat' 替代 'errorformat'。
+			如果 'grepprg' 是 "internal"，這等價於 |:vimgrep|。
+			注意 這時模式必須用分隔字符包圍。
+
+							    *:lgr* *:lgrep*
+			
+:lgr[ep][!] [arguments]	和 ":grep" 類似，但使用當前窗口的位置列表而不是
+			quickfix 列表。
+
+							*:grepa* *:grepadd*
+:grepa[dd][!] [arguments]
+			和 ":grep" 類似，但不另建一個新的錯誤列表，只是將匹配
+			附加到當前列表中。
+			比如: >
+				:call setqflist([])
+				:bufdo grepadd! something %
+<			第一個命令新建一個空的錯誤列表。第二個命令對每個列出的
+			緩衝區執行 "grepadd"。注意 ! 的使用是避免 ":grepadd"
+			跳轉到首個錯誤，|:bufdo| 不允許這樣。
+			一個使用參數列表並在沒有匹配文件時不報錯的例子: >
+                                :silent argdo try 
+				  \ | grepadd! something %
+				  \ | catch /E480:/
+				  \ | endtry"
+
+							*:lgrepa* *:lgrepadd*
+:lgrepa[dd][!] [arguments]
+			和 ":grepadd" 類似，但使用當前窗口的位置列表而不是
+			quickfix 列表。
+
+5.3 設定外部 grep
+
+如果你已安裝了一個標準的 "grep" 程序，:grep 命令會以缺省方式運行。格式和標準命
+令很類似: >
+
+	:grep foo *.c
+
+會對每個 .c 文件搜索字符串 "foo"。:grep 的參數直接傳遞給 "grep" 程序，這樣你就
+可以使用 "grep" 支持的任何選項。
+
+缺省狀態下，:grep 會以 -n 參數啟動 grep (顯示文件和行號)。你可以通過設定
+'grepprg' 對此改變。在以下這些情況下你需要設定 'grepprg'：
+
+a)	你在使用一個不叫 "grep" 的程序。
+b)	你需要以絕對路逕啟動 grep。
+c)	你想自動傳遞某些參數 (比如，忽略大小寫)。
+
+"grep" 執行後，Vim 會用 'grepformat' 選項解析其結果。該選項和 'errorformat' 的
+工作方式相同。如果你的 grep 輸出不是標準格式或是你使用具有特定格式的程序，你可
+以通過設定 'errorformat' 來改變缺省值。
+
+解析完結果，Vim 會載入第一個含有匹配的文件並跳轉到相應行，與在 |quickfix| 模式
+中跳轉到一個編譯錯誤的方式相同。你可以使用 |:cnext|，|:clist| 等命令來查看其它
+的匹配。
+
+
+5.4 配合 id-utils 使用 :grep
+
+你可以設定 :grep 來使用 GNU id-utils: >
+
+	:set grepprg=lid\ -Rgrep\ -s
+	:set grepformat=%f:%l:%m
+
+然後: >
+	:grep (regexp)
+
+結果就像你所期望的那樣。
+(只要你記得首先 mkid :)
+
+
+5.5 用 :vimgrep 或 :grep 瀏覽源代碼
+
+使用 Vim 保存的錯誤列表，你可以查找某些函數或是其調用的其它函數。舉個例子，如
+果你要對 read_file() 函數添加一個參數，可以輸入下面的命令: >
+
+	:vimgrep /\<read_file\>/ *.c
+
+你可以用 ":cn" 在一系列匹配中跳轉，然後加上所需要的參數。在某個地方，你需要從
+上一級函數 msg() 得到這個新的參數，因此也要對它做出修改: >
+
+	:vimgrep /\<msg\>/ *.c
+
+在修改 msg() 函數的同時，你又找到另一個需要從上級函數中獲得該參數的函數。你可
+以用 ":vimgrep" 命令找到這些函數。當完成一個函數後，你可以用: >
+
+	:colder
+
+來跳轉到上一個函數。
+
+這就像瀏覽一棵樹一樣，":vimgrep" 每深入一層，就創建新的分支。":colder" 跳轉到
+上一層。你可以混合使用 ":vimgrep" 和 ":colder"，以樹型方式來瀏覽所有的位置。如
+果經常這麼做，你不需寫一個 "todo list" 就能找到所有的位置。
+
+=============================================================================
+6. 選擇編譯器						*compiler-select*
+
+						*:comp* *:compiler* *E666*
+:comp[iler][!] {name}		為 {name} 編譯器設定相關選項。
+				當沒有 "!" 時設定只作用於當前緩衝區。如果使用
+				了 "!" 則修改全局選項的值。
+				如果你對於 "file.foo" 使用 ":compiler foo" 然
+				後對另外一個緩衝區使用了 ":compiler! bar"，Vim
+				會繼續對 "file.foo" 文件使用 foo。
+				{僅當編譯時指定 |+eval|特性才有效}
+
+
+在 "compiler" 目錄中的 Vim 插件被用來為選擇的編譯器設定各種選項。對
+":compiler" 設定局部選項，對 ":compiler!" 設定全局選項。
+
+							*current_compiler*
+為了支持老版本的 Vim，這些插件總使用 "current_compiler" 而不是
+"b:current_compiler"。這個命令實際上做的是：
+
+- 刪除 "current_compiler" 和 "b:current_compiler" 變量。
+- 定義 "CompilerSet" 用戶命令。對 "!" 使用 ":set"，沒有 "!" 使用 ":setlocal"。
+- 執行 ":runtime! compiler/{name}.vim"。插件應該使用 "CompilerSet" 來做各種設
+  定並將編譯器的名字賦給 "current_compiler"。
+- 刪除 "CompilerSet" 用戶命令。
+- 將 "b:current_compiler" 設為 "current_compiler" 的值。
+- 沒有 "!" 的話 "current_compiler" 的舊值會被恢復。
+
+
+如要編寫編譯器插件，請參考 |write-compiler-plugin|。
+
+
+GCC					*quickfix-gcc*	*compiler-gcc*
+
+GCC 編譯器有一個變量可以設置:
+
+g:compiler_gcc_ignore_unmatched_lines
+				忽略不匹配 GCC 定義的任何模式的行。如果 make
+				運行的命令的輸出產生誤判 (false positive)。
+
+
+MANX AZTEC C				*quickfix-manx* *compiler-manx*
+
+要使 Vim 和 Amiga 上的 Manx Aztec C 編譯器工作，需要以下步驟：
+- 設定 CCEDIT 環境變量： >
+	mset "CCEDIT=vim -q"
+- 用 -qf 選項編譯。如果編譯器發現任何錯誤，Vim 被啟動，光標定位在首個錯誤處。
+  錯誤信息會在最後一行顯示。你可以用上面提到的命令跳轉到其它的錯誤，對其修定並
+  存盤。
+- 如果正常退出 Vim，編譯器會再次編譯相同文件。如果用 :cq 命令退出，編譯器就會
+  終止。如果不能修定錯誤或是需要先編譯其它的文件，你可以這樣做。
+
+在 Amiga 系統上，QuickFix 模式會有某些限制。編譯器只能在錯誤文件中寫入前 25 個
+錯誤 (Manx 的文檔沒有說明怎樣才能寫入更多)。如果想查找其它的錯誤，你需要首先修
+定一些錯誤並退出編譯器。重新編譯後，剩下的錯誤 (最多 25 個) 就會找到。
+
+如果 Vim 是在編譯器中啟動的，:sh 和一些 :! 命令不能工作，因為 Vim 是和編譯器在
+同一個進程中運行而 stdin (標準輸入) 此時不在交互狀態。
+
+
+PERL					*quickfix-perl* *compiler-perl*
+
+Perl 編譯器插件並不實際編譯，而是調用 Perl 的內部語法檢查功能並分析結果來得到
+可能的錯誤，以便你能在 quick-fix 模式中修正。
+
+不管檢查的文件裡是否有 "no warnings" 或 "$^W = 0"，警告還會產生。要關閉之，設
+置 g:perl_compiler_force_warnings 為零值。例如: >
+	let g:perl_compiler_force_warnings = 0
+
+
+PYUNIT 編 譯 器						*compiler-pyunit*
+
+這其實不是一個編譯器，而是一個為 Python 語言而設的單元測試工具。從版本 2.0
+起，它就在標準的 Python 發佈中。對老版本，你可以在這裡獲得:
+http://pyunit.sourceforge.net。
+
+當你運行測試時，Vim 會解析錯誤並進入到 quick-fix 模式。
+
+不幸的是，沒有一個運行測試的標準方法。
+一般都會用使用 alltest.py。我們就知道這麼多。
+有關 'makeprg' 選項就可以這樣設定:
+ setlocal makeprg=./alltests.py " 執行全套測試
+ setlocal makeprg=python %      " 執行單個測試用例
+
+另外，參考 http://vim.sourceforge.net/tip_view.php?tip_id=280。
+
+
+TEX 編 譯 器						*compiler-tex*
+
+Vim 發佈版本中的 Tex 編譯器 ($VIMRUNTIME/compiler/tex.vim) 可以處理各種風格的
+TeX 格式。如果編譯器在當前目錄找到文件 "Makefile" 或 "makefile"，它將假定你希
+望用 make 來處理 *TeX 文件，而 makefile 已經做好了各種設定。這種情況下編譯器會
+將 'errorformat' 設定為 *TeX 的輸出格式並將 'makeprg' 保留原樣。如果
+"Makefile" 和 "makefile" 都找不到，編譯器就不會使用 make。你可以通過定義
+b:tex_ignore_makefile 或 g:tex_ignore_makefile 來強制編譯器忽略 makefile (Vim
+只檢查這兩個變量存在與否)。
+
+如果編譯器選擇了不使用 make，它必須選擇一個正確的程序來處理你的輸入。如果變量
+b:tex_flavor 或 g:tex_flavor (依此優先順序) 存在，它將為 :make (即為所要運行的
+命令) 定義 TeX 風格；如果這兩個變量都不存在，將會使用缺省的 "latex"。比如，當
+編輯以 AMS-TeX 格式編寫的 chapter2.tex (被 \input 進入 mypaper.tex 中) 時: >
+
+	:let b:tex_flavor = 'amstex'
+	:compiler tex
+<	[editing...] >
+	:make mypaper
+<
+注意，你必須將所處理文件的文件名作為參數 (為了在編輯被 \input 或 \include 的文
+件時能處理正確的文件；我們期待任何可移植的能不用參數就可以替代 % 的解決方案)。
+這與 make 指定目標而非源的語法是相悖的，但你可以指定不含擴展名 ".tex" 的文件名
+filename，來表示 "make filename.dvi 或 filename.pdf 或 filename.其它_目標_擴展
+名"，具體名字視編譯器而定。
+
+備註: tex 命令行格式對 MikTeX (Srinath Avadhanula 報告) 和 teTeX (Artem
+Chuprina 測試) 都適用。要使 |errorformat-LaTeX| 對不同 shell 不同 OS 都適用太
+過複雜，因此不允許使用其它的 TeX 的選項。如果你的 TeX 不支持
+"-interaction=nonstopmode"，請在命令行中用其它的方式表示 \nonstopmode。
+
+=============================================================================
+7. 錯誤格式						*error-file-format*
+
+					*errorformat* *E372* *E373* *E374*
+						*E375* *E376* *E377* *E378*
+'errorformat' 選項指定可識別出的一系列格式。首個匹配的格式會被使用。你可以為編
+譯器產生的不同信息添加不同格式，或是為多個編譯器添加項目。參見 |efm-entries|。
+
+'errorformat' 裡的每一項是一個類似 scanf 的格式字符串。首先，你需要瞭解 scanf
+是如何工作的。請查看你的 C 編譯器文檔。下面你可以看到 Vim 能理解 % 的條目。其
+它的無效。
+
+'errorformat' 中的特殊字符是逗號和反斜槓，參見 |efm-entries|。注意按本義出現的
+字符 "%" 用 "%%" 來匹配，而不用反斜槓來轉義。
+
+備註: 缺省忽略大小寫差別。如果要匹配大小寫，在模式中加入 "\C"，參見 |/\C|。
+
+
+基 本 條 目
+
+	%f		文件名 (期待字符串 (譯者注: 以下 "期待" 二字從略))
+	%l		行號 (數字)
+	%c		列號 (代表錯誤中字符列的數字，(<tab> 為一個字符列))
+	%v		虛擬列號 (代表錯誤中屏幕列的數字，(<tab> 等於 8 個屏幕
+			列))
+	%t		錯誤類型 (單個字符)
+	%n		錯誤號 (數字)
+	%m		錯誤信息 (字符串)
+	%r		匹配 "餘下的" 的單行文件信息 %O/P/Q
+	%p		指針行 ('-'、'.' 或是 ' ' 的序列，用其長度指定列號)
+	%*{conv}	任何 scanf 免於賦值的轉換
+	%%		單個 '%' 字符
+	%s		搜索文本 (字符串)
+
+"%f" 轉換可能依賴於當前 'isfname' 的設定。"~/" 被擴展為主目錄，環境變量也被擴
+展。
+
+"%f" 和 "%m" 轉換需要識別字符串結尾。通常這是通過匹配後面的字符和項目完成的。
+如果後面沒有別的項目，該行的其餘部分都被匹配。如果 "%f" 後面跟著 '%' 或者反斜
+槓，它會尋找 'isfname' 字符的序列。
+
+在 MS-DOS、MS-Windows 和 OS/2 系統上，"C:" 會加到 "%f" 開頭中，即使使用
+"%f:"。這就是說 (字母表中的) 單字符文件名將不被識別。
+
+"%p" 轉換一般後跟 "^"。這是為了配合編譯器產生的這種輸出: >
+	    ^
+或 >
+   ---------^
+以指定錯誤所在列。這被用在一個多行錯誤信息中。|errorformat-javac| 有一個有用
+的例子。
+
+"%s" 轉換指定用於定位錯誤行的搜索文本。該文本用作按本義出現的字符串。文本會加
+入 "^" 和 "%" 使要定位的錯誤行完全匹配搜索文本。文本也加入 "\V" 匹配原作為前
+綴，使得它 "very nomagic"。"%s" 轉換可用於定位錯誤輸出裡沒有行號的行。"grep"
+shell 命令的輸出就是如此。
+如果此模式存在，不使用行號。
+
+改 變 目 錄
+
+下面的大寫轉換指定特殊的格式字符串的類型。至多只能用其中的一個作為以逗號分隔的
+單個格式的前綴。
+一些編譯器產生含有目錄名的信息，這些目錄名需要加在 %f 讀入文件名的前面 (比如
+GNU make)。下面的代碼可用於掃瞄這些目錄名；它們將被保存在內部的目錄棧中。
+								*E379*
+	%D		"進入目錄" 格式字符串；期待後跟 %f 以找到目錄名
+	%X		"退出目錄" 格式字符串；期待跟在 %f 之後
+
+當定義 "進入目錄" 或是 "退出目錄" 格式時，"%D" 或是 "%X" 必須在子字符串的開
+頭。Vim 會跟蹤目錄的變化並把當前目錄添加在帶有相對路徑的錯誤文件名前。有關細
+節，參見 |quickfix-directory-stack|。
+
+
+多 行 信 息					*errorformat-multi-line*
+
+Vim 可以讀入程序輸出的多行信息，也就是超過一行的錯誤字串。有關前綴有:
+	%E		多行錯誤信息開始
+	%W		多行警告信息開始
+	%I		多行一般信息開始
+	%A		多行信息開始 (未指定類型)
+	%>		下行再次從當前模式開始尋找 |efm-%>|
+	%C		多行信息繼續
+	%Z		多行信息結束
+這些可同 '+' 和 '-' 一起使用，參見下面的 |efm-ignore|。
+
+模式裡的 "\n" 不能用於匹配多行消息。
+
+例子: 你的編譯器以下面格式輸出 (開頭的行號並不是實際輸出):
+
+     1	Error 275 ~
+     2	line 42 ~
+     3	column 3 ~
+     4	' ' expected after '--' ~
+
+正確的錯誤格式串應如下: >
+   :set efm=%EError\ %n,%Cline\ %l,%Ccolumn\ %c,%Z%m
+
+這樣，|:clist| 產生的出錯信息為:
+
+ 1:42 col 3 error 275:  ' ' expected after '--'
+
+另一個例子: Python 解釋器產生下面的錯誤信息 (行號不是實際輸出):
+
+     1	==============================================================
+     2	FAIL: testGetTypeIdCachesResult (dbfacadeTest.DjsDBFacadeTest)
+     3	--------------------------------------------------------------
+     4	Traceback (most recent call last):
+     5	  File "unittests/dbfacadeTest.py", line 89, in testFoo
+     6	    self.assertEquals(34, dtid)
+     7	  File "/usr/lib/python2.2/unittest.py", line 286, in
+     8	 failUnlessEqual
+     9	    raise self.failureException, \
+    10	AssertionError: 34 != 33
+    11
+    12	--------------------------------------------------------------
+    13	Ran 27 tests in 0.063s
+
+假使你想讓 |:clist| 輸出這樣的相關信息:
+ 5 unittests/dbfacadeTest.py:89:  AssertionError: 34 != 33
+
+錯誤格式字符串可這樣定義: >
+  :set efm=%C\ %.%#,%A\ \ File\ \"%f\"\\,\ line\ %l%.%#,%Z%[%^\ ]%\\@=%m
+
+注意 %C 字符串在 %A 前指定: 因為 ' %.%#' 表達式 (表示正則表達式 ' .*') 匹配每
+一個以空格開頭後接任何字符的行，這樣就包括了本來會單獨產生錯誤信息的第 7 行。
+錯誤格式字符串總是一個模式接一個模式的分析，直到找到首個匹配。
+
+							*efm-%>*
+%> 項目可用來避免在 'errorformat' 較早的位置出現的模式。尤其是那些會匹配所有內
+容的模式。例如，如果錯誤看起來像:
+
+	Error in line 123 of foo.c: ~
+	unknown variable "i" ~
+
+可以這樣找到它: >
+	:set efm=xxx,%E%>Error in line %l of %f:,%Z%m
+其中 "xxx" 包含也可以匹配第二行的模式。
+
+重要: 沒有關於上次在 errorformat 哪個部分匹配的記憶；錯誤文件的每行都重新開始
+遍歷錯誤格式行。例如，如果: >
+  setlocal efm=aa,bb,cc,dd,ee
+其中 aa、bb 等是錯誤格式字符串。錯誤文件的每行都會依次匹配 aa 模式，然後 bb，
+然後 cc 等等。只因為 cc 匹配了上一個錯誤行並_不_意味著當前行會優先嘗試 dd，即
+使 cc 和 dd 都是多行錯誤格式字符串也不例外。
+
+
+
+單 獨 文 件 名				*errorformat-separate-filename*
+
+如果編譯器輸出只給定一次文件名而其後有多個信息指向這個文件，下面的前綴就很有
+用:
+	%O		單行文件信息: 過讀 (overread，見下) 匹配部分
+	%P		單行文件信息: 將文件 %f 入棧
+	%Q		單行文件信息: 將最後一個文件名出棧
+
+例子: 編譯器產生以下出錯日誌 (不含開頭的行號):
+
+     1	[a1.tt]
+     2	(1,17)  error: ';' missing
+     3	(21,2)  warning: variable 'z' not defined
+     4	(67,3)  error: end of file found before string ended
+     5
+     6	[a2.tt]
+     7
+     8	[a3.tt]
+     9	NEW compiler v1.1
+    10	(2,2)   warning: variable 'x' not defined
+    11	(67,3)  warning: 's' already defined
+
+這個文件對每個在 [...] 中包括的文件列出了多個信息。我們可以這樣設定格式： >
+  :set efm=%+P[%f],(%l\\,%c)%*[\ ]%t%*[^:]:\ %m,%-Q
+
+|:clist| 會正確的顯示它們的文件名:
+
+  2 a1.tt:1 col 17 error: ';' missing
+  3 a1.tt:21 col 2 warning: variable 'z' not defined
+  4 a1.tt:67 col 3 error: end of file found before string ended
+  8 a3.tt:2 col 2 warning: variable 'x' not defined
+  9 a3.tt:67 col 3 warning: 's' already defined
+
+和其它匹配整行的前綴不同，%P、%Q 和 %O 可以匹配同一行中的多個模式。這樣就可以
+對像下面這樣嵌套的文件解析：
+  {"file1" {"file2" error1} error2 {"file3" error3 {"file4" error4 error5}}}
+%O 解析不包含需要出入棧的文件名的信息的字符串。更深入的例子，參見
+|errorformat-LaTeX|。
+(譯者注: overread 有讀過度的意思，這裡的意思是說對讀到的文件名不用太過認真)
+
+
+忽 略 和 使 用 整 個 信 息				*efm-ignore*
+
+'+' 和 '-' 可與上面的大寫代碼結合；這種情況下，它們要在字母的前面，比如 '%+A'
+或 '%-G'。
+	%-		不在任何輸出中包含相匹配的 (多) 行
+	%+		在 %m 錯誤串中包含整個匹配行
+
+%G 只在和 '+' 和 '-' 結合使用時才有用。它解析編譯器版本等可被忽略的字符串。
+	%-G		忽略此信息
+	%+G		通用信息
+
+
+模 式 匹 配
+
+scanf() 風格的 "%*[]" 記法仍被支持，以和老版本兼容。但你可以在格式化字符串中指
+定 Vim 支持的 (幾乎) 任何正則表達式。因為元字符本身可能為匹配字符串或文件名的
+一部分 (因此內部需要被轉義)，要起到元字符的作用，它們的開頭要加上一個 '%'：
+	%\		單個 '\' 字符。注意在 ":set errorformat=" 定義中需要
+			用 "%\\" 來轉義。
+	%.		單個 '.' 字符。
+	%#		單個 '*' (注意！) 字符。
+	%^		單個 '^' 字符。注意這並不有用，模式總是匹配行首
+	%$		單個 '$' 字符。注意這並不有用，模式總是匹配行尾
+	%[		單個 '[' 字符 (指定一個 [] 字符範圍)。
+	%~		單個 '~' 字符。
+當在表達式中使用字符類 (參見 |/\i|) 時，含有 "\+" 數量符的串可以使用 scanf()
+的 "%*" 形式代替。比如: "%\\d%\\+" ("\d\+" 或 "任意數字") 和 "%*\\d" 相同。
+重要備註: 子匹配 \(...\) 不能用於格式規格中，因為它被留作內部變換使用。
+
+
+'errorformat' 中 的 多 個 選 項			*efm-entries*
+
+為能識別從不同編譯器產生的輸出，可在 'errorformat' 中指定多個格式模式，用逗號
+將它們分隔 (備註: 逗號後的空格被忽略)。使用第一個完全匹配的模式。如果沒有匹
+配，則使用最近一次匹配行的匹配部分，然而文件名被刪除並且錯誤信息被設定為整個信
+息。如果有模式可以匹配多個編譯器產生的輸出 (但不是正確的方式)，將它放到一個更
+嚴格的模式的後面。
+
+要在模式中包括逗號，在它前面加一個反斜槓 (如果是在 ":set" 命令中，要加兩個)。
+要包括反斜槓本身，則使用兩個反斜槓 (在 ":set" 命令中使用四個)。":set" 命令中，
+在空格前也要加一個反斜槓。
+
+
+有 效 匹 配						*quickfix-valid*
+
+如果某行不能完全匹配 'errorformat' 中的項目，則此行被放入到錯誤信息中並標記為
+"無效"。這些行會被 ":cn" 和 ":cp" 命令忽略 (除非沒有任何有效行存在)。你可以用
+":cl!" 來顯示所有的出錯信息。
+
+如果出錯格式不含文件名，Vim 不能跳轉到正確的文件。你需要手動跳轉。
+
+
+例子
+
+Amiga 上的 Aztec 編譯器產生的錯誤文件格式是:
+
+	filename>linenumber:columnnumber:errortype:errornumber:errormessage
+
+	filename	錯誤所在文件的文件名
+	linenumber	錯誤所在行號
+	columnnumber	錯誤所在列號
+	errortype	錯誤類型，一般為單個 'E' 或 'W'
+	errornumber	錯誤號 (用於查找手冊)
+	errormessage	錯誤描述
+
+可以用這個 'errorformat' 項目來匹配:
+	%f>%l:%c:%t:%n:%m"
+
+一些產生單行錯誤輸出的 C 編譯器的例子:
+%f:%l:\ %t%*[^0123456789]%n:\ %m	Manx/Aztec C 出錯信息
+					(scanf() 不能理解 [0-9])
+%f\ %l\ %t%*[^0-9]%n:\ %m		SAS C
+\"%f\"\\,%*[^0-9]%l:\ %m		通用 C 編譯器
+%f:%l:\ %m				GCC
+%f:%l:\ %m,%Dgmake[%*\\d]:\ Entering\ directory\ `%f',
+%Dgmake[%*\\d]:\ Leaving\ directory\ `%f'
+					與 gmake 配合使用的 GCC (只有一行！)
+%f(%l)\ :\ %*[^:]:\ %m			老式 SCO C 編譯器 (OS5 之前)
+%f(%l)\ :\ %t%*[^0-9]%n:\ %m		同上，增加錯誤類型和錯誤號
+%f:%l:\ %m,In\ file\ included\ from\ %f:%l:,\^I\^Ifrom\ %f:%l%m
+					GCC，一些附加信息
+
+對多行信息處理更深入的例子，參見 |errorformat-Jikes| 和 |errorformat-LaTeX|。
+
+注意在空格和雙引號前的反斜槓。這對 :set 命令是必需的。在逗號前有兩個反斜槓，一
+個是為 :set 命令需要，一個是為避免將逗號視為出錯格式的分隔符。
+
+
+過 濾 信 息
+
+如果編譯器產生的錯誤信息和格式串不適合，你可以寫一個程序將出錯信息轉化為適合格
+式。通過設定 'makeprg' 選項，你可以用 ":make" 命令運行它。比如: >
+   :set mp=make\ \\\|&\ error_filter
+管道符前的那些反斜槓是為了避免將其視作命令分隔符。每個空格前的反斜槓是 :set 命
+令所必需的。
+
+=============================================================================
+8. 目錄棧					*quickfix-directory-stack*
+
+Quickfix 根據 make 輸出，維護一個保存所有使用過的目錄的棧。對 GNU-make 來講，
+這非常簡單，因為它總是輸出絕對路徑，不管是通過 makefile 中的一個 'cd' 命令還是
+以 "-C dir" (在讀入 makefile 之前進入到指定目錄) 參數運行。'-w' 選項可用來強制
+GNU-make 在處理前後輸出當前目錄。
+
+如果你使用的不是 GNU-make，那目錄棧的維護就會複雜得多。比如 AIX-make 從不輸出
+有關當前目錄的任何信息。這樣你就需要在 makefile 上多花些功夫。Lesstif 的
+makefile 中有一個命令可以顯示 "Making {target} in {dir}"。這裡的問題是它並不在
+離開目錄時輸出信息，而且它不輸出絕對路徑。
+
+為解決相對路徑和缺少 "退出目錄" 信息問題，Vim 使用下面的算法:
+
+1) 檢查給定目錄是否為當前目錄的子目錄。如是，則將其存為當前目錄。
+2) 如果不是，則檢查它是否為上級目錄之一的某個子目錄。
+3) 如果目錄仍沒找到，則假定為它為 Vim 當前目錄的子目錄。
+
+此外，每一個文件都被檢查，看其是否存在於識別出的目錄中。如果不存在，則在目錄棧
+(_不是_子目錄樹！) 的其它目錄中查找。如果仍沒找到，則假定它在 Vim 當前目錄中。
+
+此算法仍有限制。本例假定 make 只在進入到一個目錄時輸出類似 "Making all in dir"
+的信息。
+
+1) 假定你有以下目錄和文件:
+   ./dir1
+   ./dir1/file1.c
+   ./file1.c
+
+   如果 make 在處理當前目錄前處理 "./dir1" 目錄，而在文件 "./file1.c" 中存在
+   一處錯誤，Vim 會載入文件 "./dir1/file.c"。
+
+   這只能靠 "退出目錄" 信息解決。
+
+2) 假定你有以下目錄和文件:
+   ./dir1
+   ./dir1/dir2
+   ./dir2
+
+   你得到如下結果:
+
+   Make 輸出			  Vim 理解的目錄
+   ------------------------	  ----------------------------
+   Making all in dir1		  ./dir1
+   Making all in dir2		  ./dir1/dir2
+   Making all in dir2		  ./dir1/dir2
+
+   這可以通過在 "進入目錄" 信息中輸出絕對路徑或是輸出 "退出目錄" 信息的方法解
+   決。
+
+為避免這些問題，要確保輸出絕對路徑和 "退出目錄" 信息。
+
+Makefiles 例子:
+
+Unix:
+    libs:
+	    for dn in $(LIBDIRS); do				\
+		(cd $$dn; echo "Entering dir '$$(pwd)'"; make); \
+		echo "Leaving dir";				\
+	    done
+
+並將
+    %DEntering\ dir\ '%f',%XLeaving\ dir
+加到 'errorformat' 選項中以處理上面的輸出。
+
+注意 Vim 並不檢查 "退出目錄" 信息中的目錄是否為當前目錄。因此只要使用 "Leaving
+dir" 這樣的信息就可以了。
+
+=============================================================================
+9. 特定錯誤格式					*errorformats*
+
+						*errorformat-Jikes*
+Jikes(TM) 是 IBM Research 發佈的一個源碼到字節碼的 Java 編譯器。它提供簡單的多
+行錯誤信息。
+
+下面是一個與其所產生的信息相匹配的 'errorformat' 格式字符串。這幾行可加到用戶
+的 |vimrc| 以覆蓋 Vim 識別的缺省模式。或者，你可以參考 |:set+=| 將這個模式安裝
+到缺省格式之中。 >
+
+  :set efm=%A%f:%l:%c:%*\\d:%*\\d:,
+	\%C%*\\s%trror:%m,
+	\%+C%*[^:]%trror:%m,
+	\%C%*\\s%tarning:%m,
+	\%C%m
+<
+以 "+E" 選項啟動時，Jikes(TM) 產生一個單行信息。對此，可以這樣匹配： >
+
+  :setl efm=%f:%l:%v:%*\\d:%*\\d:%*\\s%m
+<
+						*errorformat-javac*
+'errorformat' 可以很好的和 javac 工作，javac 的輸出中用 "^" 表示錯誤所在列: >
+  :setl efm=%A%f:%l:\ %m,%-Z%p^,%-C%.%#
+或者: >
+  :setl efm=%A%f:%l:\ %m,%+Z%p^,%+C%.%#,%-G%.%#
+<
+這裡還有一個用於 Unix 的替代方法，由 Michael F. Lamb 提供。首先過濾錯誤: >
+  :setl errorformat=%Z%f:%l:\ %m,%A%p^,%-G%*[^sl]%.%#
+  :setl makeprg=javac\ %\ 2>&1\ \\\|\ vim-javac-filter
+
+然後，你需要在路徑的某處 (如 ~/bin) 加入 "vim-javac-filter" 並使之可執行。它包
+含如下內容: >
+   #!/bin/sed -f
+   /\^$/s/\t/\ /g;/:[0-9]\+:/{h;d};/^[ \t]*\^/G;
+
+用中文來說，該 sed 腳本:
+- 把單個製表符換成單個空格；並
+- 把包含文件名、行號及錯誤信息的行移到指針行下方。這樣，兩者之間無用的錯誤文本
+  就不會打破 vim "多行消息" 的概念，我們也不用硬要把它當作 "多行信息的繼續"。
+
+						*errorformat-ant*
+ant (http://jakarta.apache.org/) 輸出的每個行首都為 [javac]，這樣我們可將上面
+的格式修改如下: >
+  :set efm=%A\ %#[javac]\ %f:%l:\ %m,%-Z\ %#[javac]\ %p^,%-C%.%#
+
+'errorformat' 還可以處理與 javac 或 jikes 之一配合使用的 ant。如使用 jikes，你
+需要告訴 ant 使用 jikes 的 +E 選項以使 jikes 產生單行錯誤信息。這就是下面 (一
+個 build.xml 文件的) 第二行所做的： >
+  <property name = "build.compiler"       value = "jikes"/>
+  <property name = "build.compiler.emacs" value = "true"/>
+
+下面的 'errorformat' 能同時處理與 javac 和 jikes 配合使用的 ant: >
+  :set efm=\ %#[javac]\ %#%f:%l:%c:%*\\d:%*\\d:\ %t%[%^:]%#:%m,
+	   \%A\ %#[javac]\ %f:%l:\ %m,%-Z\ %#[javac]\ %p^,%-C%.%#
+<
+						*errorformat-jade*
+解析 jade (見 http://www.jclark.com/) 錯誤十分簡單: >
+  :set efm=jade:%f:%l:%c:%t:%m
+<
+						*errorformat-LaTeX*
+下面是 'errorformat' 處理 (La)TeX 產生的多行錯誤輸出的例子。":clist" 和 ":cc"
+等命令將多行錯誤信息顯示在一行，開頭的空格被刪除。
+將 LaTeX 的錯誤格式運用於其它產生多行錯誤信息的編譯器就很簡單了。
+
+這些命令可被加到 |vimrc| 或是其它 Vim 腳本 －－ 比如一個僅在編輯 LaTeX 源文件
+時才載入的含有 LaTeX 相關內容的腳本。
+確保將例子中的所有行都拷貝 (按照給定順序)，然後可刪除註釋行。行首的 '\' 可以參
+考 |line-continuation|。
+
+		首先設定 'makeprg' 使 LaTeX 可以報告多個錯誤；不在首個錯誤發生
+		時就停止: >
+ :set makeprg=latex\ \\\\nonstopmode\ \\\\input\\{$*}
+<
+		多行錯誤信息開始: >
+ :set efm=%E!\ LaTeX\ %trror:\ %m,
+	\%E!\ %m,
+<		多行警告信息開始；開始的兩個包含行號。若干正則表達式的含義：
+		  - "%.%#"  (".*")   匹配一個字符串 (可為空)
+		  - "%*\\d" ("\d\+") 匹配一個數字 >
+	\%+WLaTeX\ %.%#Warning:\ %.%#line\ %l%.%#,
+	\%+W%.%#\ at\ lines\ %l--%*\\d,
+	\%WLaTeX\ %.%#Warning:\ %m,
+<		錯誤/警告信息可能的續行；其中的首行也含有行號： >
+	\%Cl.%l\ %m,
+	\%+C\ \ %m.,
+	\%+C%.%#-%.%#,
+	\%+C%.%#[]%.%#,
+	\%+C[]%.%#,
+	\%+C%.%#%[{}\\]%.%#,
+	\%+C<%.%#>%.%#,
+	\%C\ \ %m,
+<		匹配下面模式的行不含有任何重要的信息；將其忽略: >
+	\%-GSee\ the\ LaTeX%m,
+	\%-GType\ \ H\ <return>%m,
+	\%-G\ ...%.%#,
+	\%-G%.%#\ (C)\ %.%#,
+	\%-G(see\ the\ transcript%.%#),
+<		刪除所有空白行: >
+	\%-G\\s%#,
+<		LaTeX 輸出並不在每一行中都指定出錯的文件名；而只在括號中指定
+		一次。
+		下面的模式試圖匹配這些文件名並將它們保存到內部棧中。這些模式
+		可能掃瞄相同行 (一個接一個的)，結尾的 "%r" 表示行中 "餘下" 的
+		部分，這些部分在下輪被重新解析，直到遇到行尾為止。
+
+		過讀 '('...')' 包含的文件名；不將其入棧，因為此文件不含有任何
+		錯誤: >
+	\%+O(%f)%r,
+<		將 '(' 後的文件名入棧: >
+	\%+P(%f%r,
+	\%+P\ %\\=(%f%r,
+	\%+P%*[^()](%f%r,
+	\%+P[%\\d%[^()]%#(%f%r,
+<		當掃瞄到 ')'，將最後一個文件名出棧: >
+	\%+Q)%r,
+	\%+Q%*[^()])%r,
+	\%+Q[%\\d%*[^()])%r
+
+注意某些情況下，LaTeX 輸出中的文件名不能正確解析。解析會被不成對的括號打亂。上
+面的例子只試圖捕獲最普通的情況。你可以根據你的需要而修改有關設定，比如，所有煩
+人的 "Overfull ..." 警告可不被視為出錯。
+除了過濾 LaTeX 的輸出信息外你還可以直接讀入 [La]TeX 編譯器生成的 *.log 文件。
+這包括其它的一些由錯誤引起的有用信息。但要解析這麼複雜的文件，你需要使用外部過
+濾器。參考上面關於 Vim 過濾器的描述。
+
+						*errorformat-Perl*
+在 $VIMRUNTIME/tools 中，你可以找到 efm_perl.pl 腳本。它將 Perl 出錯信息過濾為
+quickfix 模式可以理解的格式。使用方法可以查看該文件的開頭部分。(此腳本已過時，
+見 |compiler-perl|。)
+
+
+
+ vim:tw=78:ts=8:ft=help:norl:

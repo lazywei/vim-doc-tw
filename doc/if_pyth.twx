@@ -1,0 +1,350 @@
+*if_pyth.txt*   For Vim version 7.3.  最近更新：2010年8月
+
+
+		  VIM REFERENCE MANUAL    by Paul Moore
+		  譯者: lang2，Willis http://vimcdoc.sf.net
+
+
+Vim 的 Python 編程接口					*python* *Python*
+
+1. 命令				|python-commands|
+2. vim 模塊			|python-vim|
+3. 緩衝區對像			|python-buffer|
+4. 範圍對像			|python-range|
+5. 窗口對像			|python-window|
+6. 動態調入			|python-dynamic|
+7. Python 3			|python3|
+
+{Vi 無此功能}
+
+Vim 的 Python 2.x 接口僅當 |+python| 特性被編譯進 Vim 時才有效。
+Vim 的 Python 3 接口僅當 |+python3| 特性被編譯進 Vim 時才有效。
+
+==============================================================================
+1. 命令							*python-commands*
+
+					*:python* *:py* *E205* *E263* *E264*
+:[range]py[thon] {stmt}
+			執行 Python 語句 {stmt}。
+
+:[range]py[thon] << {endmarker}
+{script}
+{endmarker}
+			執行 Python 腳本 {script}。
+			備註: 此命令在沒有編譯進 Python 特性時無效。為了避免這
+			樣的錯誤，參閱 |script-here|。
+
+{endmarker} 前面_不能_有任何空白字符。如果在 "<<" 之後省略了 {endmarker}，在
+{script} 之後一定要有一個點 '.'。這和 |:append| 及 |:insert| 命令的道理是一樣
+的。這種形式的 |:python| 命令主要用於在 Vim 腳本中嵌入 Python 代碼。
+
+例子: >
+	function! IcecreamInitialize()
+	python << EOF
+	class StrawberryIcecream:
+		def __call__(self):
+			print 'EAT ME'
+	EOF
+	endfunction
+<
+備註: Python 對於縮進是非常敏感的。要確保 "class" 所在行及 "EOF" 沒有任何縮
+進。
+
+							*:pyfile* *:pyf*
+:[range]pyf[ile] {file}	
+			執行 {file} 文件中包含的 Python 腳本。整個參數被用作一
+			個文件名。 {Vi 無此功能}
+
+這些命令根本上都差不多 － 它們都將當前範圍 |python-range| 設定為指定的行範圍，
+並對其執行 Python 代碼。
+
+:python 的情況所執行的代碼來自命令行。
+:pyfile 的情況所執行的代碼來自一個指定的文件。
+
+Python 命令不能在 |sandbox| 裡使用。
+
+需要傳遞參數的話，你得使用 sys.argv[]。例如： >
+
+	:python import sys
+	:python sys.argv = ["foo", "bar"]
+	:pyfile myscript.py
+
+下面是一些例子						*python-examples*  >
+
+	:python from vim import *
+	:python from string import upper
+	:python current.line = upper(current.line)
+	:python print "Hello"
+	:python str = current.buffer[42]
+
+(注意 如同導入 (import) 模塊一樣，變動對後續命令持續有效。這和 Python 的解釋
+程序是一樣的。)
+
+==============================================================================
+2. vim 模塊						*python-vim*
+
+Python 的代碼所有對 Vim 的操作 (只有一個例外 － 看下面的 |python-output|) 都是
+通過 "vim" 模塊來進行的。該模塊包括兩個方法，三個常量，以及一個異常對象。在使
+用它們之前你得先導入 (import) vim 模塊。
+
+總覽 >
+	:py print "Hello"		# 顯示信息
+	:py vim.command(cmd)		# 執行 Ex 命令
+	:py w = vim.windows[n]		# 獲取窗口 "n"
+	:py cw = vim.current.window	# 獲取當前窗口
+	:py b = vim.buffers[n]		# 獲取緩衝區 "n"
+	:py cb = vim.current.buffer	# 獲取當前緩衝區
+	:py w.height = lines		# 設定窗口高度
+	:py w.cursor = (row, col)	# 設定光標位置
+	:py pos = w.cursor		# 獲取 tuple (行，列)
+	:py name = b.name		# 獲取緩衝區的文件名
+	:py line = b[n]			# 獲取緩衝區內的一行
+	:py lines = b[n:m]		# 獲取數行
+	:py num = len(b)		# 獲取統計的行數
+	:py b[n] = str			# 在緩衝區裡寫入一行文本
+	:py b[n:m] = [str1, str2, str3]	# 一次性寫入多行文本
+	:py del b[n]			# 刪除一行
+	:py del b[n:m]			# 刪除數行
+
+"vim" 模塊中的方法
+
+vim.command(str)					*python-command*
+	執行 vim (ex-模式) 命令 str。無返回值。
+	例如: >
+		:py vim.command("set tw=72")
+		:py vim.command("%s/aaa/bbb/g")
+<	下面的定義可以執行普通模式命令: >
+		def normal(str):
+			vim.command("normal "+str)
+		# 注意使用單引號標識出含有雙引號的字符串
+		normal('"a2dd"aP')
+<								*E659*
+	":python" 在 Python 2.2 及之前版本上不能嵌套使用。下面命令只對 Python
+	2.3 之後版本適用: >
+		:py vim.command("python print 'Hello again Python'")
+
+
+vim.eval(str)						*python-eval*
+	使用 vim 內部的表達式處理器來對表達式 str 求值。(參閱 |expression|)。
+	返回表達式的結果：
+	-如果 Vim 表達式計算結果是字符串或者數值，那麼返回一個字符串。
+	-如果 Vim 表達式計算結果是 Vim 列表，那麼返回一個列表
+	-如果 Vim 表達式計算結果是 Vim 字典，那麼返回一個字典
+	字典和列表被遞歸擴展。
+	例: >
+	    :py text_width = vim.eval("&tw")
+	    :py str = vim.eval("12+12")		# 注意：結果是個字符串！
+						# 使用 string.atoi()
+						# 把它轉換成數字
+
+	    :py tagList = vim.eval('taglist("eval_expr")')
+<	後一個將返回一個 python 類型的字典列表，例如：
+	[{'cmd': '/^eval_expr(arg, nextcmd)$/', 'static': 0, 'name':
+	'eval_expr', 'kind': 'f', 'filename': './src/eval.c'}]
+
+
+
+"vim" 模塊中的異常對像
+
+	vim.error					*python-error*
+	當遇到 Vim 的錯誤時，Python 引起一個 vim.error 類的異常。
+	例: >
+		try:
+			vim.command("put a")
+		except vim.error:
+			# nothing in register a
+
+"vim" 模塊中的常量
+	注意 這些其實並非真正的常量 － 你還是可以對它們賦值。但這毫無意義，因
+	為你會丟失該 vim 對像本來代表的值。
+
+vim.buffers						*python-buffers*
+	一個序列對象，用來提供對 vim 緩衝區的操作。該對像支持以下操作: >
+	    :py b = vim.buffers[i]	# 索引 (只讀)
+	    :py b in vim.buffers	# 成員測試
+	    :py n = len(vim.buffers)	# 成員個數
+	    :py for b in vim.buffers:	# 順序存取
+<
+vim.windows						*python-windows*
+	一個序列對象，用來提供對 vim 窗口的操作。該對像支持以下操作: >
+	    :py w = vim.windows[i]	# 索引 (只讀)
+	    :py w in vim.windows	# 成員測試
+	    :py n = len(vim.windows)	# 成員個數
+	    :py for w in vim.windows:	# 順序存取
+<
+vim.current						*python-current*
+	一個用來提供對各種各樣當前 "current" 對像進行操作的對象。它包括一些特
+	定的屬性:
+		vim.current.line	當前行 (讀寫)			字符串
+		vim.current.buffer	當前緩衝區 (只讀)		緩衝區
+		vim.current.window	當前窗口 (只讀)			窗口
+		vim.current.range	當前行範圍 (只讀)		範圍
+
+	最後一種情況需要一些額外的解釋。當用 :python 或 :pyfile 命令指定一個范
+	圍之後，該範圍將成為 "當前範圍"。一個範圍就如同一個緩衝區，只不過所操
+	作的對象界限於所有行的一個子集。請參閱 |python-range|。
+
+
+Python 的輸出						*python-output*
+	Vim 將所有 Python 代碼的輸出都顯示在信息區。普通的輸出會以一般信息出
+	現，錯誤會以出錯信息出現。
+
+	用具體實現的術語來講，這表示所有 sys.stdout (包括 print 語句的輸出) 以
+	一般信息形式出現，而所有 sys.stderr (包括 error tracebacks) 都會被顯示
+	成出錯信息。
+
+							*python-input*
+	Vim 並不支持用 Python 來輸入 (通過 sys.stdin，包括 input() 和
+	raw_input())。這些調用可能會導致崩潰。這個問題可能以後會修正。
+
+==============================================================================
+3. 緩衝區對像						*python-buffer*
+
+緩衝區對像代表 vim 緩衝區。你可以用以下這幾種辦法來獲取緩衝區的列表:
+	- 通過 vim.current.buffer (|python-current|)
+	- 通過 vim.buffers 的索引訪問 (|python-buffers|)
+	- 通過一個窗口的 "buffer" 屬性 (|python-window|)
+
+緩衝區對像只有一個只讀屬性 - name - 緩衝區的文件全名。該對像還包括三個方法
+(append，mark 及 range；見下)。
+
+你也可以將緩衝區對像視為序列對象。這樣的話，它們就可以被看作字符串的列表進行存
+取 (它們是可變的)。每一個元素是緩衝區中的一行。所有通常的序列存取操作，包括索
+引，索引賦值，切片 (slice) 及切片賦值，等等，都可以被使用。注意 索引 (切片) 操
+作的結果是一個字符串 (字符串列表)。這產生了一個意想不到的結果 - b[:] 和 b 是不
+同的。確切一些，"b[:] = None" 會清空整個緩衝區，而 "b = None" 僅僅更新變量 b 
+的值，完全不會影響到緩衝區。
+
+緩衝區索引從 0 開始算起，這與通常的 Python 語法一致。但這和 Vim 的行號從 1 算
+起有分歧。這一點在處理標記 (見下) 是要特別留意，因為標記是以行號區分的。
+
+緩衝區對象的方法有:
+	b.append(str)	對緩衝區附加一行
+	b.append(str, nr)  同上，在第 "nr" 行之後
+	b.append(list)	對緩衝區附加一系列行
+			備註: append 方法可以帶一個字符串列表作為參數，這和
+			Python 中內建的列表對象的對應方法是不同的。
+	b.append(list, nr)  同上，在第 "nr" 行之後
+	b.mark(name)	返回一個 tuple (行，列) 用來代表該位置上的一個命名標記
+			(也可以用於 []"<> 等標記)
+	b.range(s,e)	返回一個範圍對像 (參見 |python-range|) 用來代表指定緩
+			沖區中行 s 與 行 e (包含 s 和 e |inclusive|) 之間的部
+		 	分。
+
+注意：當增加一行的時候，這一行裡一定不要含有換行符 '\n'。行尾的 '\n' 可以，
+但會被忽略，所以下面的操作是可以的：
+	:py b.append(f.readlines())
+
+例如 (假定 b 是當前緩衝區) >
+	:py print b.name		# 輸出緩衝區的名字
+	:py b[0] = "hello!!!"		# 替換最頂上的一行
+	:py b[:] = None			# 刪除整個緩衝區
+	:py del b[:]			# 刪除整個緩衝區
+	:py b[0:0] = [ "a line" ]	# 在第一行前添加一行
+	:py del b[2]			# 刪除一行 (第三行)
+	:py b.append("bottom")		# 在緩衝區結尾添加一行
+	:py n = len(b)			# 總行數
+	:py (row,col) = b.mark('a') 	# 命名標記
+	:py r = b.range(1,5)		# 緩衝區內的一個範圍
+
+==============================================================================
+4. 範圍對像						*python-range*
+
+範圍對像代表一個 vim 緩衝區內的一個部分。你可以用以下的方法之一來獲取一個緩衝
+區對像:
+	- 通過 vim.current.range (|python-current|)
+	- 通過一個緩衝區的 range() 方法 (|python-buffer|)
+
+一個範圍對像在操作上幾乎和一個緩衝區對像完全一樣。不過，其操作的目標僅顯於範圍
+指定的行 (當然，這個行範圍會隨著切片賦值，行刪除，或者 range.append() 等等操作
+而改變)。
+
+範圍對象的屬性有:
+	r.start		首行在緩衝區內的索引
+	r.end		尾行在緩衝區內的索引
+
+範圍對象的方法有:
+	r.append(str)	給範圍附加一行
+	r.append(str, nr)  同上，在第 "nr" 行之後
+	r.append(list)	給範圍附加一系列行
+			備註: append 方法可以帶一個字符串列表作為參數，這和
+			Python 中內建的列表對象的對應方法是不同的。
+	r.append(list, nr)  同上，在第 "nr" 行之後
+
+例如 (假設 r 是當前範圍):
+	# 發送範圍內的所有行給缺省打印機
+	vim.command("%d,%dhardcopy!" % (r.start+1,r.end+1))
+
+==============================================================================
+5. 窗口對像						*python-window*
+
+窗口對像代表一個 vim 窗口。你可以用以下幾種方法來獲取一個窗口對像:
+	- 通過 vim.current.window (|python-current|)
+	- 通過對 vim.windows 的索引操作 (|python-windows|)
+
+你只能通過窗口對象的屬性來控制它。這些對像沒有方法，也沒有序列等其它接口。
+
+窗口的屬性包括:
+	buffer (只讀)		窗口中顯示的緩衝區
+	cursor (讀寫)		窗口中的當前光標位置
+				這是一個 tuple (行，列)。
+	height (讀寫)		行數表示的窗口高度
+	width (讀寫)		列數表示的窗口寬度
+height 屬性只有當屏幕被水平分割時才可寫。
+width  屬性只有當屏幕被垂直分割時才可寫。
+
+==============================================================================
+6. 動態調入						*python-dynamic*
+
+MS-Windows 上，可以動態調入 Python 庫。|:version| 輸出這時應包括
+|+python/dyn|。
+
+這意味著 Vim 只有在必要時才尋找 Python DLL 文件。如果不使用 Python 接口，你就
+不需要它。這樣，即使沒有該 DLL 文件，你也可使用 Vim。
+
+要使用 Python 接口，Python DLL 必須在搜索路徑上。控制台窗口裡輸入 "path" 可以
+看到 (搜索路徑) 當前使用的目錄。
+
+DLL 的名字必須匹配 Vim 編譯時所使用的 Python 版本。目前，該名字為
+"python24.dll"，也就是 Python 2.4。要確信這一點，編輯 "gvim.exe" 文件並查找
+"python\d*.dll\c"。
+
+==============================================================================
+7. Python 3						*python3*
+
+							*:py3* *:python3*
+|:py3| 和 |:python3| 命令和 |:python| 類似。
+							*:py3file*
+|:py3file| 命令和 |:pyfile| 類似。
+
+Vim 可以用四種方式編譯 (:version 輸出結果):
+1. 無 Python 支持	    (-python、-python3)
+2. 只有 Python 2 支持       (+python 或 +python/dyn、-python3)
+3. 只有 Python 3 支持       (-python、+python3 或 +python3/dyn)
+4. Python 2 和 3 支持       (+python/dyn、+python3/dyn) 
+
+關於第四種特殊情況的更多細節:
+
+要同時支持 Python 2 和 Python 3，兩者必須都是動態載入。
+
+在 Linux/Unix 系統上用這種方式並導入全局符號的時候，使用第二個 Python 版本會導
+致系統崩潰。所以，要麼載入全局符號但只激活一個 Python 版本，要麼考慮不載入全局
+符號。後者使 Python 導入 ("import") 某些期待 Vim 提供某些符號的庫的時候會失敗。
+							*E836* *E837*
+Vim 的配置腳本根據一個特定的 Python 標準庫 (termios) 對所有的庫進行猜測。如果
+對兩個 Python 版本導入該庫均成功，那麼可以在 Vim 中同時使用兩者。否則在一個會
+話中，只允許使用先用到的版本。使用第二個版本會得到 E836 或 E837 的錯誤信息。
+
+這裡 Vim 的行為取決於配置所在的系統。如果兩個 Python 版本都用了
+--enable-shared 進行配置，兩者會同時激活。但沒有鏈接進 libPython 的第三方庫仍
+然會有問題。
+
+要迴避這些問題，有以下幾個方案:
+1. 重新編譯有問題的庫，把它鏈接進相應的 libpython.so 裡。
+2. 重新編譯 Vim，只用一個 Python 版本。
+3. 配置完後，撤銷 auto/config.h 中 PY_NO_RTLD_GLOBAL 的定義。這可能會使 Vim 崩
+   潰。
+
+
+==============================================================================
+ vim:tw=78:ts=8:ft=help:norl:

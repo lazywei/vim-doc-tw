@@ -1,0 +1,619 @@
+*usr_44.txt*	For Vim version 7.3.  最近更新：2009年4月
+
+		     VIM 用戶手冊 - by Bram Moolenaar
+		     譯者: wandys，tocer http://vimcdoc.sf.net
+
+			     自定義語法高亮
+
+
+Vim 對上百種文件都有自動語法高亮。如果你所編輯的文件類型沒有被包括，通過閱讀本
+章，你可以掌握對這種文件類型自定義語法高亮的方法。同時請參考 |:syn-define|。
+
+|44.1|	基本語法命令
+|44.2|	關鍵字
+|44.3|	匹配
+|44.4|	區域
+|44.5|	嵌套項目
+|44.6|	跟隨組
+|44.7|	其它參數
+|44.8|	簇
+|44.9|	包含其它語法文件
+|44.10|	同步
+|44.11|	安裝語法文件
+|44.12|	可移植語法文件格式
+
+     後一章: |usr_45.txt|  選擇你的語言
+     前一章: |usr_43.txt|  使用文件類型
+       目錄: |usr_toc.txt|
+
+==============================================================================
+*44.1*	基本語法命令
+
+利用一個已經存在的語法文件可以節省很多時間。首先看 $VIMRUNTIME/syntax 目錄下是
+否存在一種類似語言的語法文件。這些文件同時可以讓你瞭解語法文件的一般佈局。為了
+進一步理解，你需要閱讀以下的部分。
+
+讓我們先從簡單的命令開始。在定義新的語法之前，我們需要清除舊的定義: >
+
+	:syntax clear
+
+這在最終的語法文件中不是必須的，但在我們試驗時卻很有用。
+
+本章有很多簡化。如果你要編寫一個供別人使用的語法文件，請從頭到尾閱讀本章以通曉
+有關細節。
+
+
+列 出 已 定 義 的 項 目
+
+要查看現在已定義的項目，用這個命令: >
+
+	:syntax
+
+你可以用此命令查看哪些命令確實已被定義。這在調試新的語法文件時很有用。它還會顯
+示每個項目所用的顏色，可以更好的區分彼此。
+   列出某個特定語法組的項目，用: >
+
+	:syntax list {group-name}
+
+這還可以用來列出簇 (在 |44.8| 有解釋)。只需要在名字中包含 '@'。
+
+
+匹 配 大 小 寫
+
+一些語言是大小寫不敏感的，比如 Pascal。另外一些，比如 C，則是大小寫敏感的。你
+需要用以下命令指出你的類型: >
+
+	:syntax case match
+	:syntax case ignore
+
+參數 "match" 意味著 Vim 區分語法元素的大小寫，這樣 "int" 和 "Int" 與 "INT" 不
+同。如果指定 "ignore" 參數，"Procedure"、"PROCEDURE" 和 "procedure" 均視為相
+同。
+   ":syntax case" 命令可以出現在語法文件的任何地方，並對其後的語法定義產生效
+用。在大多數情況下，你只需要一個 ":syntax case" 命令；但如果你使用一種不常見的
+語言，這種語言既包括大小寫敏感的元素又包括大小寫不敏感的元素，你需要在文件中使
+用多個 ":syntax case" 命令。
+
+==============================================================================
+*44.2*	關鍵字
+
+最基本的語法元素是關鍵字。要定義一個關鍵字，用以下命令: >
+
+	:syntax keyword {group} {keyword} ...
+
+{group} 是語法組的名字。用 ":highlight" 命令，你可以對 {group} 設定顏色。
+{keyword} 參數是關鍵字。這裡有一些例子: >
+
+	:syntax keyword xType int long char
+	:syntax keyword xStatement if then else endif
+
+這個例子中用到了兩個名為 "xType" 和 "xStatement" 的語法組。按慣例，每個組名都
+用所定義語言的文件類型作為前綴。本例中是為 x 語言 (樣例語言 (eXample)，無特殊
+含義) 定義語法。在為 "csh" 腳本建立的語法文件中，將用到類似 "cshType" 的名字。
+這樣，前綴和 'filetype' 的值相同。
+   這些命令使 "int"，"long"，"char" 以一種方式被高亮顯示，而 "if"、"then"、
+"else" 和 "endif" 則以另一種方式被高亮顯示。現在你需要將 x 組名和標準的 Vim 名
+字聯繫起來: >
+
+	:highlight link xType Type
+	:highlight link xStatement Statement
+
+這告訴 Vim 以 "Type" 的方式高亮顯示 "xType"，以 "Statement" 的方式高亮顯示
+"xStatement"。關於標準名，參考 |group-name|。
+
+非 常 見 關 鍵 字
+
+在關鍵字裡用到的字符必須在 'iskeyword' 選項內。如果你使用其它的字符，關鍵字將
+不被匹配。Vim 對此並不給出警告信息。
+   x 語言在關鍵字中用到了 '-' 字符。使用的方法如下: >
+>
+	:setlocal iskeyword+=-
+	:syntax keyword xStatement when-not
+
+"setlocal" 命令用來指定只對當前緩衝區改變 'iskeyword'。但仍會對 "w" 和 "*" 等
+命令造成影響。如果這不是所期望的，不要定義關鍵字而使用匹配 (在下一節內解釋)。
+
+x 語言允許縮寫。比如，"next" 可以縮寫成 "n"、"ne" 或者 "nex"。你可以用這個命令
+來定義: >
+>
+	:syntax keyword xStatement n[ext]
+
+這並不會匹配 "nextone"，關鍵字只匹配完整的單詞。
+
+==============================================================================
+*44.3*	匹配
+
+試想一下定義更複雜的東西。你想要匹配普通的標識符。對此，你定義一個匹配語法項
+目。它會匹配任意一個只由小寫字母組成的單詞: >
+
+	:syntax match xIdentifier /\<\l\+\>/
+<
+	備註:
+	關鍵字超越其它的語法項目。這樣上面的 ":syntax keyword" 命令定義的
+	"if"，"then" 等關鍵字將被視為關鍵字，即使它們匹配 xIdentifier 的模式。
+
+最後一部分是一個模式 (類似查找中的模式)。"//" 用來包含模式 (像 ":substitute" 
+命令中的一樣)。你也可以用其它的字符，比如加號或者引號。
+
+現在定義一個註釋的匹配。在 x 語言中註釋是以 '#' 開頭的行: >
+
+	:syntax match xComment /#.*/
+
+你可以用任意的查找模式。因此通過一個匹配項目，你可以高亮顯示非常複雜的項目。關
+於查找模式，參考 |pattern|。
+
+==============================================================================
+*44.4*	區域
+
+在 x 樣例語言中，字符串用雙引號 (") 來包含。要高亮一個字符串，你需要定義一個區
+域。你需要一個區域的開頭 (雙引號) 和一個區域的結尾 (雙引號)。定義如下所示:
+>
+	:syntax region xString start=/"/ end=/"/
+
+"start" 和 "end" 指示定義用於尋找區域開頭和結尾的模式。但如果一個有這樣的字符
+串該怎麼辦呢？
+
+	"A string with a double quote (\") in it" ~
+
+這會帶來一個問題：字符串中間的雙引號會結束區域。你需要告訴 Vim 忽略任何轉義之
+後的雙引號: >
+
+	:syntax region xString start=/"/ skip=/\\"/ end=/"/
+
+用兩個反斜槓匹配單個反斜槓，因為反斜槓在字符串中是一個特殊字符。
+
+什麼時候用區域而不用匹配？兩者主要的區別是匹配是單個的模式，它必須作為整體來匹
+配；而區域是只要區域的 "開始" 匹配便開始匹配，"結尾" 匹配是否找到並不重要。這
+樣當一個項目倚賴於 "結尾" 匹配時，你不能用區域。區域定義起來更簡單些，當使用嵌
+套項目時也更加方便，這將在下一節中解釋。
+
+==============================================================================
+*44.5*	嵌套項目
+
+看一下這個註釋:
+
+	%Get input  TODO: Skip white space ~
+
+你想將 "TODO" 高亮顯示成黃色字符，即使它在一個藍色高亮顯示的註釋中。要使 Vim 
+瞭解到這些，你需要定義以下的語法組: >
+
+	:syntax keyword xTodo TODO contained
+	:syntax match xComment /%.*/ contains=xTodo
+
+在第一行中，"contained" 參數告訴 Vim 這個關鍵字只能存在於另一個語法項目中。下
+一行指定 "contains=xTodo"，這說明 "xTodo" 語法元素存在其中。結果就是註釋行作為
+整體匹配 "xComment" 並被顯示成藍色。而其中的 "TODO" 單詞匹配 "xTodo" 將被顯示
+成黃色。
+
+
+遞 歸 嵌 套
+
+x 語言用大括號定義代碼塊。而且一個代碼塊中可以包含其它的代碼塊。這可以用以下方
+式定義: >
+
+	:syntax region xBlock start=/{/ end=/}/ contains=xBlock
+
+假設你有這樣的代碼: 
+
+	while i < b { ~
+		if a { ~
+			b = c; ~
+		} ~
+	} ~
+
+首先一個 "xBlock" 開始於第一行的 '{'。第二行中有另一個 '{'。因為我們已經在一個
+"xBlock" 之內，因此一個嵌套的 "xBlock" 在此處開始。這樣 "b = c" 那一行在第二級
+的 "xBlock" 區域之內。下一行有一個 '}'，這將和區域的結尾相匹配。它會結束嵌套的
+"xBlock"。因為這個 '}' 存在於嵌套的區域，它在第一個 'xBlock' 區域的視野裡被隱
+藏。因此最後一行的 '}' 結束第一個 'xBlock' 區域。
+
+
+保 留 結 尾
+
+考慮下面的兩個語法項目: >
+
+	:syntax region xComment start=/%/ end=/$/ contained
+	:syntax region xPreProc start=/#/ end=/$/ contains=xComment
+
+你定義註釋是以 '%' 開始的任意行，而預處理命令是以 '#' 開始的任意行。因為預處理
+行可以有註釋，預處理的定義包含一個 "contains=xComment" 參數。現在看一下下面的
+代碼會發生什麼情況:
+
+	#define X = Y  % Comment text ~
+	int foo = 1; ~
+
+你看到的是第二行也被當作預處理高亮顯示。預處理命令應該在行結尾處結束。這也是你
+要使用 "end=/$/" 的原因。但到底是哪裡錯了呢？
+   問題在於被包含的註釋。註釋以 '%' 開始，在行尾結束。註釋結束後，預處理語法繼
+續，這是在行尾已被處理之後進行的，因此下一行也被認為是預處理命令。
+   為避免這個問題，避免一個包含在內的語法項目吃掉一個必需的行尾，使用
+"keepend" 參數。這樣就會解決兩個行結尾的匹配問題: >
+
+	:syntax region xComment start=/%/ end=/$/ contained
+	:syntax region xPreProc start=/#/ end=/$/ contains=xComment keepend
+
+
+包 含 多 個 項 目
+
+你可以用 'contains' 參數來指定任何項目都能被包含。比如: >
+
+	:syntax region xList start=/\[/ end=/\]/ contains=ALL
+
+所有的項目都包含在此項中。它也包含它自身，但不能在同一位置 (這是為了避免無限循
+環)。
+   你可以指定不被包括的組，這樣就包含除了指定組之外的所有組:
+>
+	:syntax region xList start=/\[/ end=/\]/ contains=ALLBUT,xString
+
+使用 "TOP" 項目，你可以包含所有那些沒有 "contained" 參數的項目。"CONTAINED" 用
+來只包含那些使用了 "contained" 參數的項目。更多信息，參考 |:syn-contains|。
+
+==============================================================================
+*44.6*	跟隨組
+
+x 語言有這種形式的語句:
+
+	if (condition) then ~
+
+你想對這三種項目使用不同的高亮。儘管 "(condition)" 和 "then" 可能在其它地方有
+其它的高亮顯示方式。這時你需要這樣做: >
+
+	:syntax match xIf /if/ nextgroup=xIfCondition skipwhite
+	:syntax match xIfCondition /([^)]*)/ contained nextgroup=xThen skipwhite
+	:syntax match xThen /then/ contained
+
+"nextgroup" 參數指定跟隨的項目。這並不是必須的。如果指定的項目都沒找到，什麼事
+情都不會發生。比如，在下面的代碼中:
+
+	if not (condition) then ~
+
+"if" 匹配 "xIf"。"not" 並不匹配指定的跟隨組 "xIfCondition"，這樣只有 "if" 被高
+亮顯示。
+
+"skipwhite" 參數告訴 Vim 空白字符 (空格和製表符) 可以出現在項目之間。相似地，
+"skipnl" 參數允許項目之間存在換行符；"skipempty" 允許存在空行。注意 "skipnl" 
+並不忽略一個空行，換行符之後必須有能夠匹配的內容。
+
+==============================================================================
+*44.7*	其它參數
+
+MATCHGROUP
+
+當你定義一個區域時，整個區域將根據指定的組名被高亮顯示。比如，要高亮顯示
+"xInside" 組被小括號 "()" 包含的部分，用下面的命令: >
+
+	:syntax region xInside start=/(/ end=/)/
+
+假設，你要以不同方式顯示括號。你可以用很多複雜的區域語句來完成，或者你可以使用
+"matchgroup" 參數。它將告訴 Vim 用另外一個組的方式來顯示區域的開頭和結尾 (在本
+例中是 xParen 組): >
+
+	:syntax region xInside matchgroup=xParen start=/(/ end=/)/
+<
+"matchgroup" 參數適用於它之後的區域開頭或結尾。在前一例中，開頭和結尾都以
+"xParen" 方式高亮顯示。如果要用 "xParenEnd" 顯示結尾: >
+
+	:syntax region xInside matchgroup=xParen start=/(/
+		\ matchgroup=xParenEnd end=/)/
+
+用 "matchgroup" 的一個副作用是被包含的項目不會在區域的開頭或結尾匹配。
+"transparent" 的例子中用到此作用。
+
+
+TRANSPARENT
+
+在 C 語言文件中你想要以不同方式高亮顯示 "while" 和 "for" 後面的小括號。這兩者
+中均會出現嵌套的小括號，它們會以相同的方式顯示。你必須保證括號的高亮顯示在匹配
+的 ')' 處結束。下面是一種可用的方法:
+>
+	:syntax region cWhile matchgroup=cWhile start=/while\s*(/ end=/)/
+		\ contains=cCondNest
+	:syntax region cFor matchgroup=cFor start=/for\s*(/ end=/)/
+		\ contains=cCondNest
+	:syntax region cCondNest start=/(/ end=/)/ contained transparent
+
+你現在可以用不同方式高亮顯示 "cWhile" 和 "cFor"。"cCondNest" 項目可以出現在它
+們中的任何一個，並且使用所處那個項目的高亮顯示。這是 "transparent" 參數產生的
+效果。
+   注意 "matchgroup" 參數和項目本身是同一組。為什麼要定義它呢？使用
+"matchgroup" 的副作用是被包含的項目並不會在開始項目之中尋找匹配。這樣就避免了
+cCondNest 組匹配 "for" 或 "while" 後面立即跟隨的 '('。否則，它會掃瞄整個文本直
+到匹配的 ')'，而區域從其後繼續。現在 cConNest 只在開始模式匹配後才開始匹配，就
+是在第一個 '(' 之後。
+
+
+位 移
+
+假設你要定義一個在 "if" 之後並在 '(' 和 ')' 之間的區域。但是你不想包括 "if" 或
+者 '(' 和 ')'。你可以為模式定義一個位移。比如: >
+
+	:syntax region xCond start=/if\s*(/ms=e+1 end=/)/me=s-1
+
+開始模式的位移是 "ms=e+1"。"ms" 代表匹配開始 (Match Start)。它定義模式開始的偏
+移量。"e+1" 的意思是匹配在模式結束處 (End) 後再忽略一個字符後開始匹配。
+   結尾模式的位移是 "me=s-1"。"me" 表示匹配結尾 (Match End)。"s-1" 的意思是在
+模式開始 (Start) 的前面一個字母處。下面這個代碼的結果是:
+
+	if (foo == bar) ~
+
+只有 "foo == bar" 部分以 "xCond" 方式高亮顯示。
+
+關於偏移量的更多信息，參考: |:syn-pattern-offset|。
+
+
+ONELINE
+
+"oneline" 參數說明區域不超過一行的範圍。比如: >
+
+	:syntax region xIfThen start=/if/ end=/then/ oneline
+
+這定義了一個開始於 "if" 並在 "then" 結束的區域。但如果在 "if" 後沒有 "then"，
+這個區域就不會被匹配。
+
+	備註:
+	當使用 "oneline" 時，如果結尾模式沒有在同一行被匹配，那麼整個區域就不
+	會匹配。如果不指定 "oneline"，Vim _不會_ 檢查結尾模式是否匹配；即使結
+	尾模式在文件後面的部分沒有匹配，區域也將開始匹配。
+
+
+續 行 及 避 免
+
+現在事情變得有點複雜。讓我們來定義一個預處理行。它以 "#" 開始到行尾結束。一個
+以 '\' 結束的行使得下一行成為它的續行。這樣你可以允許語法項目包括一個續行模
+式: >
+
+	:syntax region xPreProc start=/^#/ end=/$/ contains=xLineContinue
+	:syntax match xLineContinue "\\$" contained
+
+在本例中，雖然 'xPreProc' 一般只匹配單個行，它包含的組 (xLineContinue) 允許它
+使用多行。比如，它會匹配下面的兩行:
+
+	#define SPAM  spam spam spam \ ~
+			bacon and spam ~
+
+在本例中，這就是你所需要的。如果它並不是你想要的，你可以通過給被包含的模式添加
+"excludenl" 參數來使區域在一個單行上。比如，你想高亮顯示 "xPreProc" 中只在行結
+尾處的 "end"。為了避免 "xPreProc" 像 "xLineContinue" 那樣擴展到下一行，使用
+"excludenl": >
+
+	:syntax region xPreProc start=/^#/ end=/$/
+		\ contains=xLineContinue,xPreProcEnd
+	:syntax match xPreProcEnd excludenl /end$/ contained
+	:syntax match xLineContinue "\\$" contained
+
+"excludenl" 必須寫在模式之前。因為 "xLineContinue" 並沒有 "excludenl"，它的匹
+配會像前面那樣擴展 "xPreProc" 到下一行。
+
+==============================================================================
+*44.8*	簇
+
+開始編寫語法文件時，你會注意到你要產生很多的語法組。Vim 能讓你定義一個語法的集
+合 -- 簇 (cluster)。
+   假設你有一個語言，它含有 "for" 循環，"if" 語句，"while" 循環和函數。它們都
+含有相同的語法元素: 數字，標識符。你可以這樣定義它們: >
+
+	:syntax match xFor /^for.*/ contains=xNumber,xIdent
+	:syntax match xIf /^if.*/ contains=xNumber,xIdent
+	:syntax match xWhile /^while.*/ contains=xNumber,xIdent
+
+你需要重複使用 "contains" 參數。如果你想添加另一個包含項目，你需要把它加三次。
+語法簇簡化了這些定義，你可以使用一個簇來代表這些語法組。
+   要為這三個組包含的兩個項目定義一個簇，用下面的命令: >
+
+	:syntax cluster xState contains=xNumber,xIdent
+
+簇可以像語法組那樣用在其它的項目內。它們的名字以 '@' 開頭。因此你可以這樣定
+義這三個組: >
+
+	:syntax match xFor /^for.*/ contains=@xState
+	:syntax match xIf /^if.*/ contains=@xState
+	:syntax match xWhile /^while.*/ contains=@xState
+
+你可以用 "add" 參數給簇添加新組: >
+
+	:syntax cluster xState add=xString
+
+你也可以用 "remove" 參數從簇裡刪除某個組:
+
+	:syntax cluster xState remove=xNumber
+
+==============================================================================
+*44.9*	包含其它語法文件
+
+C++ 語言的語法是 C 語言的超集。因為你不想編寫兩個獨立的語法文件，你可以在 C++ 
+語法文件中首先讀入 C 語言的語法文件: >
+
+	:runtime! syntax/c.vim
+
+":runtime!" 命令會在 'runtimepath' 裡搜索所有的 "syntax/c.vim" 文件。這使得
+C++ 語法中的 C 部分定義的方式就像 C 文件裡使用的那樣。如果你替換了 c.vim 語法
+文件，或是在另一個文件中增加了項目，這些都會被載入。
+   載入 C 語法項目之後，可以定義特定的 C++ 項目。比如，添加一些沒在 C 中用到的
+關鍵字: >
+
+	:syntax keyword cppStatement	new delete this friend using
+
+這會像任何其它的語法文件一樣起作用。
+
+現在考慮一下 Perl 語言。Perl 腳本包括兩個不同的部分: POD 格式的文檔和用 Perl 
+本身編寫的程序。POD 部分以 "=head" 開頭並以 "=cut" 結尾。
+   你想要在一個文件中定義 POD 語法，並在 Perl 語法文件中使用它。
+":syntax include" 命令讀入一個語法文件並將定義的元素儲存到一個語法簇中。對
+Perl 來說，格式如下所示: >
+
+	:syntax include @Pod <sfile>:p:h/pod.vim
+	:syntax region perlPOD start=/^=head/ end=/^=cut/ contains=@Pod
+
+perlPOD 開始於 Perl 文件中的 "=head"。這個區域包含 @Pod 簇。所有在 pod.vim 語
+法文件定義的頂層項目均在這裡匹配。當找到 "=cut"，區域結束，我們回到在 Perl 文
+件中定義的項目。
+   ":syntax include" 命令很聰明，它會忽略包含文件中的 ":syntax clear"。並且類
+似於 "contains=All" 的參數只會包括存在於被包含文件的項目，而不會包括包含文件內
+的項目。
+   "<sfine>:p:h/" 部分使用當前文件的名字 (<sfile>)，把它展開成全路徑 (:p)，然
+後取頭部分 (:h)。結果就是文件的目錄名。這將包含相同目錄下的 pod.vim 文件。
+
+==============================================================================
+*44.10*	同步
+
+編譯器處理起這些來很簡單。它們在文件頭開始解析以至文件尾。Vim 並沒有這麼簡單。
+它必須從編輯進行的中間開始。那麼怎麼確定它的位置？
+   秘密在於 ":syntax sync" 命令。它告訴 Vim 怎樣找出當前位置。比如，下面的命令
+告訴 Vim 向後掃瞄 C 風格註釋的開頭和結尾，並對註釋高亮顯示: >
+
+	:syntax sync ccomment
+
+你可以使用其它的參數。"minlines" 參數告訴 Vim 向後掃瞄的最小行數；"maxline" 則
+指定最大行數。
+   比如，下面的命令告訴 Vim 從屏幕的頂端開始反向掃瞄至少 10 行: >
+
+	:syntax sync ccomment minlines=10 maxlines=500
+
+如果它不能在這個範圍內確定位置，它會繼續反向查看直至它知道要怎樣做。但它最多就
+查看 500 行。(大的 "maxline" 值會降低速度；而小的值會使同步失敗。)
+   為使同步更快，告訴 Vim 哪些語法項目可以被忽略。對那些只有當確實要顯示時才用
+到的匹配和區域，可以指定 "display" 參數。
+   缺省情況下，找到的註釋會以 Comment 語法組指定的方式顯示顏色。如果你想用其它
+的顏色顯示，你可以指定一個不同的語法組: >
+
+	:syntax sync ccomment xAltComment
+
+如果你的語言沒有 C 風格的註釋，你可以用其它的同步方式。最簡單的方法是告訴 Vim 
+跳過若干行並從那裡開始定位。下面的命令指定 Vim 反向跳過 150 行，並從那裡開始分
+析: >
+
+	:syntax sync minlines=150
+
+一個大的 "minlines" 會使 Vim 變得很慢，尤其是向後卷屏的時候。
+   最後，你可以用這個命令來指定要查找的語法組: >
+>
+	:syntax sync match {sync-group-name}
+		\ grouphere {group-name} {pattern}
+
+這會告訴 Vim 當它看到 {pattern}，名為 {group-name} 的語法組會在其後開始。
+{sync-group-name} 用於給這個同步規格說明一個名字。比如，shell 腳本的 if 語句以
+"if" 開頭，以 "fi" 結尾。
+
+	if [ --f file.txt ] ; then ~
+		echo "File exists" ~
+	fi ~
+
+你可以用下面的命令為這個語法定義一個 "grouphere" 指示: >
+
+	:syntax sync match shIfSync grouphere shIf "\<if\>"
+
+"groupthere" 參數告訴 Vim 某個模式結束一個組。比如，if/fi 組的結束如下所示: >
+
+	:syntax sync match shIfSync groupthere NONE "\<fi\>"
+
+在這個例子中，NONE 告訴 Vim 你不在任何一個特殊的區域內。特別地，你不在一個 if 
+代碼塊內。
+
+你還可以定義沒有 "grouphere" 或 "groupthere" 參數的匹配和區域。這些組在同步時
+會被忽略。比如，下面的命令忽略 {} 內的所有部分，即使它們通常能在其它的同步方法
+中匹配: >
+
+	:syntax sync match xSpecial /{.*}/
+
+有關同步的更多信息，請見參考手冊: |:syn-sync|。
+
+==============================================================================
+*44.11*	安裝語法文件
+
+當你新的語法文件要投入使用時，把它放到在 'runtiimepath' 下的一個 "syntax" 目
+錄。對 Unix 來講，它可以是 "~/.vim/syntax"。
+  語法文件的名字必須要和文件類型相同並以 ".vim" 做後綴。這樣，對 x 語言來講，
+這個文件的完整路徑是:
+
+	~/.vim/syntax/x.vim ~
+
+你要確保該文件類型可被識別。參考 |43.2|。
+
+如果你的語言文件工作的很好，你也許想要其他的 Vim 用戶來使用。首先閱讀下一節以
+確保你的文件能很好的適用於別人。然後將它 email 給 Vim 維護者:
+<maintainer@vim.org>。並要解釋文件類型是怎樣識別的。如果幸運的話，你的文件會包
+括在 Vim 的下一版本中！
+
+
+向 已 有 文 件 添 加 項 目
+
+我們前邊是假定你要寫一個全新的語法文件。如果一個已有的語法文件可以工作但是缺少
+某些項目，你可以將這些項目添加到另一個獨立的文件。這樣不用改變發佈的語言文件，
+因為安裝 Vim 的新版本時會丟失這些改變。
+   在你的文件中寫入語法命令 (也許要用到已有語法的組名)。比如，給 C 語法文件添
+加新的變量類型:
+>
+	:syntax keyword cType off_t uint
+
+文件應使用和原始語法文件一樣的名字。在本例中，是 "c.vim"。把它放到
+'runtimepath' 裡的靠後的目錄裡。對 Unix 而言，該目錄可以是:
+
+	~/.vim/after/syntax/c.vim ~
+
+==============================================================================
+*44.12*	可移植語法文件格式
+
+如果所有的 Vim 用戶都能交換語法文件豈不更好？為此，語法文件必須符合一些規則。
+
+首先要有一個說明語法文件目的，維護人，以及更新時間的文件頭。但不要包含太多的歷
+史更改信息。比如: >
+
+	" Vim syntax file
+	" Language:	C
+	" Maintainer:	Bram Moolenaar <Bram@vim.org>
+	" Last Change:	2001 Jun 18
+	" Remark:	Included by the C++ syntax.
+
+用和其它語法文件相同的格式。使用一個已有的語法文件作為樣例會節約很多時間。
+
+為你的語法文件選擇一個好的，描述性強的名字。使用小寫字符和數字。不要使用太長的
+名字，因為它將在很多地方用到: 語法文件名 "name.vim"，'filetype'，
+b:current_syntax 以及組名的開頭 (例如: nameType、nameStatement、nameStrings
+等)。
+
+以一個 "b:current_syntax" 檢查開頭。如果它被定義，表明其它語法文件 (在
+'runtimepath' 前部的) 已被載入: >
+
+	if exists("b:current_syntax")
+	  finish
+	endif
+
+為和 Vim 5.8 兼容: >
+
+	if version < 600
+	  syntax clear
+	elseif exists("b:current_syntax")
+	  finish
+	endif
+
+在最後將 "b:current_syntax" 設定為語法的名字。不要忘了被包含的文件也會這樣做，
+當你包含兩個文件時，也許要復位 "b:current_syntax"。
+
+如果你想讓你的語法文件適用於 Vim 5.x，添加一個對 v:version 檢查。參考
+yacc.vim。
+
+不要包括任何的用戶首選項。不要設定 'tabstop'，'expandtab' 等。這些屬於文件類型
+腳本。
+
+不要包括映射或者縮寫。如果確實需要識別關鍵字，只設定 'iskeyword'。
+
+為使用戶能夠選擇自己喜歡的顏色，請為每一種類型的高亮項目製作不同的高亮組。然後
+把它們鏈接到標準高亮組。這使每個色彩方案能正常工作。如果你選擇特定的顏色，那樣
+會使一些色彩方案看起來很難看。不要忘了一些人使用不同的背景，或者只能使用八種顏
+色。
+
+鏈接可用 "hi def link"，這樣用戶就可以在語法文件載入前選擇不同的高亮。例如: >
+
+	  hi def link nameString	String
+	  hi def link nameNumber	Number
+	  hi def link nameCommand	Statement
+	  ... 等等 ...
+
+給那些在同步時用不到的項目添加 "display" 參數可以提高向後滾屏和 CTRL-L 的速
+度。
+
+==============================================================================
+
+下一章: |usr_45.txt| 選擇你的語言
+
+版權: 參見 |manual-copyright|  vim:tw=78:ts=8:ft=help:norl:

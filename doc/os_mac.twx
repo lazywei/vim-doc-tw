@@ -1,0 +1,110 @@
+*os_mac.txt*	For Vim version 7.3.  最近更新: 2006年7月
+
+
+		     Vim 參考手冊    作者：Bram Moolenaar
+	    譯者: iCrazy<icrazy@ustc.edu>, Willis，tocer
+	    http://vimcdoc.sf.net
+
+
+					*mac* *Mac* *macintosh* *Macintosh*
+
+本文件闡述 Vim 的 Macintonsh 版本的特性。
+
+注意: 本文檔已經略有過時。在這裡你可以找到更多有用的信息:
+	http://macvim.org
+
+1. 文件名約定			|mac-filename|
+2. .vimrc 和 .vim 文件		|mac-vimfile|
+3. FAQ				|mac-faq|
+4. 已知的不足之處		|mac-lack|
+5. Mac 錯誤報告			|mac-bug|
+6. 編譯 Vim			|mac-compile|
+
+Vim 的 3.0 版有一個移植到 Mac 的版本。這是當時文檔中開始的幾句話：
+
+VIM Release Notes
+Initial Macintosh release, VIM version 3.0
+19 October 1994
+
+Eric Fischer
+<enf1@midway.uchicago.edu>, <eric@jcp.uchicago.edu>, <etaoin@uchicago.edu>
+5759 N. Guilford Ave
+Indianapolis IN 46220 USA
+
+==============================================================================
+1. 文件名約定						*mac-filename*
+
+從 Vim 版本 7 開始，你只能用 unix 的路徑分隔符。為了確定指定的文件名是與當前目
+錄相關 (相對路徑)，還是絕對路徑 (即：和 "桌面" 相關)，我們使用了如下的算法：
+
+	如果路徑以 "/" 開始，則為絕對路徑
+	如果路徑以 ":" 開始，則為相對路徑
+	如果路徑不以 "/" 和 ":" 開始，但是 ":" 在 "/" 之前出現，則為絕對路徑
+>
+		:e /HD/text
+		:e HD:text
+<	編輯磁盤 "HD" 中的文件 "text" >
+		:e :src:main.c
+		:e src/main.c
+<	編輯當前目錄下子目錄 "src" 中的文件 "main.c" >
+		:e os_mac.c
+<	編輯當前目錄下的文件 "os_mac.c"。
+
+您可以使用變量 |$VIM| 和 |$VIMRUNTIME| >
+
+		:so $VIMRUNTIME:syntax:syntax.vim
+
+==============================================================================
+2. .vimrc 和 .vim 文件					*mac-vimfile*
+
+對於 Vim 腳本，建議使用 Unix 風格的換行符，也就是單個 NL 字符。
+
+當 Vim 啟動時，它會載入 $VIMRUNTIME/macmap.vim 腳本以定義默認的命令鍵
+(command-key) 映射。
+
+在舊版系統上，一般應避免使用以 "." 開頭的文件，所以那些 rc 文件被命名為
+"vimrc" 或 "_vimrc"，以及 "gvimrc" 或 "_gvimrc"。這些文件可以是任何格式 (mac、
+dos 或 unix)。如果 |'nocompatible'| 選項打開，Vim 可以處理任何文件格式，否則它
+只能處理 mac 格式的文件。
+
+==============================================================================
+3. Mac FAQ						*mac-faq*
+
+在互聯網上:  http://macvim.org/OSX/index.php#FAQ
+
+問題: 我不能在 Apple 終端輸入非 ASCII 的字符。
+回答: 在 Windows Setting，Emulation，確信沒有選上 "Escape non-ASCII
+      characters"。
+
+問題: 怎麼從命令行啟動 GUI？
+回答: 假設 Vim.app 存放在 /Applications 中:
+	open /Applications/Vim.app
+   或:
+	/Applications/Vim.app/Contents/MacOS/Vim -g  {arguments}
+
+問題: 如果我用 GUI 或 open 啟動 Vim.app，如何合理設置 $PATH？
+回答: 下面這個竅門能用於多數 shell。把它放到 vimrc 文件中。macvim.org 發佈的二
+      進制發行包中帶有的系統 vimrc 文件已經包含。 >
+	let s:path = system("echo echo VIMPATH'${PATH}' | $SHELL -l")
+	let $PATH = matchstr(s:path, 'VIMPATH\zs.\{-}\ze\n')
+
+==============================================================================
+4. 已知的不足之處					*mac-lack*
+
+在終端中，CTRL-^ 需要用 Shift-Control-6 來輸入。而 CTRL-@ 則用 Shift-Control-2
+輸入。
+
+==============================================================================
+5. Mac 錯誤報告						*mac-bug*
+
+當報告任何與 Mac 平台相關的 bug 或特性時，請使用 vim-mac 郵件列表 |vim-mac|。
+然而，您必須先訂閱它。另一個辦法就是發郵件給當前的 MacVim 維護者：
+
+	mac@vim.org
+
+==============================================================================
+6. 編譯 Vim						*mac-compile*
+
+見伴隨源程序的文件 "src/INSTALLmac.txt"。
+
+ vim:tw=78:ts=8:ft=help:norl:

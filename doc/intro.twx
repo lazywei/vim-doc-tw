@@ -1,0 +1,774 @@
+*intro.txt*     for Vim version 7.3.  最後更新：2010年6月
+
+
+		  VIM 參 考 手 冊	作者：Bram Moolenaar
+		  			譯者：Dasn, tocer 
+					http://vimcdoc.sf.net
+
+
+介紹 Vim						*ref* *reference*
+
+1. 簡介				|intro|
+2. 互聯網上的 Vim		|internet|
+3. 製作群			|credits|
+4. 記法				|notation|
+5. 瞭解一下模式			|vim-modes-intro|
+6. 從一種模式切換到另一種模式	|mode-switching|
+7. 窗口裡的東東			|window-contents|
+8. 術語				|definitions|
+
+==============================================================================
+1. 簡介							*intro*
+
+Vim 的意思是 Vi IMproved (Vi 改進版)。以前它是 Vi IMitation (Vi 模仿版) 的縮
+寫，但是由於做了許多改進，改一下名字還是合適的。Vim 文本編輯器包含了 unix "Vi"
+編輯器的幾乎所有的命令並且還加入了許多新的命令。這對於編寫程序和編輯普通的文本
+文件是非常有用的。
+   所有的命令都可以通過鍵盤來輸入。這樣的優點在於：你可以通過把手放在鍵盤上，
+把眼睛放在屏幕上，集中精力在編輯的任務上。如果你需要，Vim 提供對鼠標的支持，並
+且還有帶有滾動條和菜單的圖形界面版本 (參見：|gui.txt|)。
+
+本手冊的概述可以參見 "help.txt" 文件，|help.txt|。在 Vim 裡，按 <help> 或 <f1>
+鍵就可以訪問該文件，使用 |:help| 命令也可以 (只鍵入 ":help" 即可，沒有豎線或引
+號)。
+   如果幫助文件不在默認的位置，可以使用選項 'helpfile' 來指定。你可以通過標籤
+跳轉到相應的主題：用 CTRL-] 跳轉至當前光標下的主題，用 CTRL-T 跳回來。
+
+這本手冊會在花括號裡提及 Vi 與 Vim 的不同之處，就像這樣：{Vi 沒有在線幫助}。欲
+知 Vim 與 Vi 有何不同，請參考 |vi_diff.txt|。
+
+本手冊說明各種系統上的 Vim。不同的計算機和不同的終端之間可能有一點兒不同。除了
+本文給出的一些建議，每個支持的系統還有單獨的文檔，見 |sys-file-list|。
+
+							*pronounce*
+Vim 的念法是一個詞，像 Jim，而不是 vi-ai-em。拼法由大寫字母打頭，因為它是一個
+名字，還是像 Jim。
+
+這是一本包含 Vim 所有命令和選項的參考手冊。它不是一本介紹如何使用 Vi 或 Vim 的
+書，從某種意義上講，它有些複雜了。對於初學者，有一個可供實地演練的 |tutor| 可
+以試試。想要學習怎樣使用 Vim，請閱讀用戶手冊 |usr_toc.txt|。
+
+							*book*
+許多介紹 Vi 的書都會有一個專門為初學者準備的章節。我推薦兩本這樣的書：
+
+	"Vim - Vi Improved" 作者是 Steve Oualline
+
+這是最早的一本完全介紹 Vim 的書。非常適合初學者。一些最常用的命令用圖片和實例
+來講解。不太常用的命令也有介紹，一些高級功能有重點地羅列出來。還有一個非常詳盡
+的索引和一個快速查找。書的部分內容已經包含在用戶手冊裡了 |frombook|。
+
+本書由新騎士出版社 (new riders publishing) 出版。ISBN: 0735710015
+更多信息請訪問如下鏈接之一：
+	http://iccf-holland.org/click5.html
+	http://www.vim.org/iccf/click5.html
+
+	"Learning the Vi editor"  作者是 Linda Lamb 和 Arnold Robbins
+
+這是一本關於 Vi 的書 (第六版)，裡面有一章是講 Vim 的。Vi 的入門部分講解地很精
+彩。一些 Vim 的特有命令只寥寥數筆代過。這本書有德譯版 (也有中文版 -- 譯者注)。
+由 O'Reilly 出版。ISBN: 1-56592-426-6。
+
+==============================================================================
+2. 互聯網上的 Vim 						*internet*
+
+			*www* *WWW* *faq* *FAQ* *distribution* *download*
+Vim 的最新消息可以通過訪問其網站頁面得到。網站上同樣包含指向最新版本的 Vim 的
+鏈接。FAQ 是一系列常見問題的解答。如果有問題請先讀一下 FAQ。
+
+	VIM 主頁：	  http://www.vim.org/
+	VIM FAQ：	  http://vimdoc.sf.net/
+	下載：	 	  ftp://ftp.vim.org/pub/vim/MIRRORS
+
+
+討論 Vim 的新聞組：					*news* *usenet*
+	comp.editors
+這個新聞組也討論其它編輯器。如果你寫的是有關 Vim 的話題，要記得講清楚。
+
+
+						*mail-list* *maillist*
+Vim 有許多郵件列表：
+
+<vim@vim.org>
+	討論現存版本的 Vim：有用的映射，提問、回答，以及到哪裡得到特定的版本，
+	等等。有相當多的人在關注著這個列表，而且回答問題，包括初學者的問題。這
+	裡你可以放心大膽地提問題。
+<vim-dev@vim.org>				*vim-dev* *vimdev*
+	討論改進 Vim：新功能，移植，補丁，測試版本等等。
+<vim-announce@vim.org>				*vim-announce*
+	通告 Vim 的新版本；也包括測試版和不同系統的移植版。本郵件列表只讀。
+<vim-multibyte@vim.org>				*vim-multibyte*
+	討論如何使用和改進 Vim 的處理多字節文本的功能。
+<vim-mac@vim.org>				*vim-mac*
+	討論如何使用和改進 Macintosh 系統裡的 Vim。
+
+						*maillist-archive*
+訪問 http://www.vim.org/maillist.php 以獲取最新的信息。
+
+NOTE:
+- 你只有在訂閱了這些郵件列表之後，才能在上面發佈信息。
+- 為了避免垃圾郵件，你需要用與你訂閱該郵件列表相同的郵件地址發送信息。
+- 信件的大小最多是 40000 個英文字符。
+
+						*subscribe-maillist*
+如果你想加入郵件列表，發 e-mail 至：
+	<vim-subscribe@vim.org>
+確保你的發件人的地址 "From:" 是正確的。郵件列表服務器會回信告訴你如何訂閱。
+
+要得到更多信息和以前的歸檔，請查看 Vim 郵件列表頁面:
+http://www.vim.org/maillist.php
+
+
+報告漏洞 (bug):				*bugs* *bug-reports* *bugreport.vim*
+
+發送漏洞報告至：Vim Bugs <bugs@vim.org>
+這不是一個郵件列表，但是發送到這個地址的郵件會被轉發到 Vim 維護者那裡。請盡量
+使用精練的語言描述；回答郵件裡的問題勢必會佔用維護者開發 Vim 的時間！要給出導
+致漏洞的可重複的例子，並且盡可能找出哪個選項影響該漏洞。如果可能的話，換一台機
+器試試；如果你能解決這個問題，把補丁發給我。
+
+下面這個命令能夠幫你提供你正在使用的 Vim 版本和配置信息: >
+   :so $vimruntime/bugreport.vim
+這條命令會在當前目錄下創建一個名為 "bugreport.txt" 的新文件，裡面包含了許多與
+你當前環境有關的信息。在發送之前檢查一下，不要洩漏你的機密！
+
+如果 Vim 崩潰了，試著找出哪裡出了問題。這裡可以提供幫助: |debug.txt|。
+
+如果有問題，或者想知道是不是某個問題已經被修正但不知道哪裡能找到補丁，加入
+vim-dev 郵件列表並在那裡發文詢問。|maillist|
+
+							*year-2000* *Y2K*
+因為 Vim 在編輯時沒有用到日期，所以不必擔心 2000 年問題。Vim 使用的時間格式是
+從 1970 年 1 月 1 日至今的秒數。它被用做被編輯文件和交換文件的時間戳，不是太重
+要，只多只能引起一些警告。
+
+當一個 32 位的整型數容不下這些秒數的時候，可能會有 2038 年的問題。這取決於你的
+編譯器、連接庫以及操作系統。特別是用到 time_t 和 ctime() 函數的時候。time_t 以
+4 字節大小存儲在交換文件中。但是它只是用來在恢復時顯示文件的日期/時間，不會影
+響到正常的編輯。
+
+Vim 中的 strftime() 函數直接調用系統函數 strftime()。localtime() 調用系統函數
+time()。getftime() 使用系統函數 stat() 返回的時間。如果你的系統庫函數兼容 2000
+年問題，Vim 也就沒問題。
+
+用戶可能在創建 Vim 腳本時用到了外部命令。它們可能會引入 2000 年問題，但這不是
+Vim 本身的問題。
+
+==============================================================================
+3. 製作群				*credits* *author* *Bram* *Moolenaar*
+
+Vim 的大部分是由 Bram Moolenaar <Bram@vim.org> 編寫的。
+
+部分文檔來自於由：
+	W.N. Joy
+	Alan P.W. Hewett
+	Mark Horton
+編寫的多種 Vi 手冊。
+
+Vim 編輯器是在 Stevie 的基礎上並汲取了其它軟件的思想開發出來的。這裡提一下為這
+些軟件工作的人。還有許多朋友通過發補丁以及對 Vim 的建議和反饋的方式，給予我很
+大的幫助，在這裡就不一一提及了。
+
+如果沒有這些人的幫助，Vim 永遠不可能成為現在這個樣子。
+
+	Ron Aaron		修改 Win32 GUI 版本
+	Mohsin Ahmed		加密
+	Zoltan Arpadffy		VMS 版本的移植工作
+	Tony Andrews		Stevie 的作者
+	Gert van Antwerpen	對 DJGPP 的 MS-DOS 版本修改
+	Berkeley DB(3)		交換文件實現的想法
+	Keith Bostic		Nvi 作者
+	Walter Briscoe		Makefile 的更新和各種補丁
+	Ralf Brown		MS-DOS 上的 SPAWNO 庫
+	Robert Colon		提供了許多有用的建議
+	Marcin Dalecki		GTK+ 圖形界面的移植，工具欄的圖標，gettext()
+	Kayhan Demirel		給我發送烏干達的信息
+	Chris & John Downey	xvi (多窗口的思想)
+	Henk Elbers		最先移植到 VMS 
+	Daniel Elstner		GTK+ 2 移植
+	Eric Fischer		Mac 系統移植、'cindent'、其它的改進
+	Benji Fisher		解答用戶問題
+	Bill Foster		Athena 圖形界面移植
+	Google			讓我每星期可以在 Vim 上工作一天
+	Loic Grenie		xvim (多窗口思想)
+	Sven Guckes		Vim 促進者和前網站維護者
+	Darren Hiebert		Exuberant ctags
+	Jason Hildebrand	GTK+ 2 移植
+	Bruce Hunsaker		改進了 VMS 移植版本
+	Andy Kahn		加入了 Cscope 支持，GTK+ 的圖形界面移植
+	Oezguer Kesim		Vim 郵件列表的維護者
+	Axel Kielhorn		Macintosh 移植
+	Steve Kirkendall	Elvis 作者
+	Roger Knobbe		Windows NT 移植
+	Sergey Laskavy		來自莫斯科的幫助
+	Felix von Leitner	前任 Vim 郵件列表的維護者
+	David Leonard		將 Python 擴展移植到 Unix
+	Avner Lottem		在窗口裡從左向右編輯
+	Flemming Madsen		X11 客戶端－服務器，許多功能和補丁
+	Tony Mechelynck		回答了許多用戶的問題
+	Paul Moore		Python 接口的擴展，許多補丁
+	Katsuhito Nagano	多字節版本 
+	Sung-Hyun Nam		多字節版本
+	Vince Negri		加強了 Win32 圖形界面和控制台版本
+	Steve Oualline		第一本介紹 Vim 的書的作者 |frombook|
+	Dominique Pelle		valgrind 報告及許多修正
+	A.Politz		很多漏洞報告及一些修正
+	George V. Reilly	最先從事 Win32 及其 GUI 版本的移植工作
+	Stephen Riehm		bug 收集者
+	Stefan Roemer		各種補丁以及為用戶提供幫助
+	Ralf Schandl		IBM OS/390 移植
+	Olaf Seibert		DICE 和 BeBox 版本，強化了正則表達式
+	Mortaza Shiran		Farsi 補丁
+	Peter da Silva		termlib
+	Paul Slootman		OS/2 移植
+	Henry Spencer		正則表達式
+	Dany St-Amant		Macintosh 移植
+	Tim Thompson		Stevie
+	G. R. (Fred) Walter	Stevie
+	Sven Verdoolaege	Perl 接口
+	Robert Webb		命令行補全，GUI 和許多補丁
+	Ingo Wilken		Tcl 接口
+	Mike Williams		PostScript 打印
+	Juergen Weigert		Lattice 版本，AUX 改進，UNIX 和 MS-DOS 移植，
+        			及 autoconf
+        Stefan 'Sec' Zehl       vim.org 的維護者
+
+我希望感謝所有向我報告 bug 和給我建議的人，但是人太多在這裡不能一一提及。如果
+沒有他們的幫助，Vim 不可能成為現在這個樣子：他們是 Vim 的生命之源。
+
+
+在這篇文檔裡，有些地方還會提到其它版本的 Vi ：
+							*Vi* *vi*
+Vi 	"原始版本"。如果不提及，這裡指 Sun OS 4.x 裡出現的 Vi。 ":version" 返
+	回結果 "version 3.7, 6/7/85"。有時也指別的版本的 Vi。只在 Unix 裡運
+	行。只有在遵循許可證的條件下才能得到源代碼。Vi 的更多信息：
+		http://vi-editor.org	[現在不好用了……]
+							*Posix*
+Posix	來自 IEEE 1003.2 PART 2: Shell and utilities。通常叫做 "Posix"。這篇文
+	本描述了 Vi 應該怎樣工作。
+	參見 |posix-compliance|。
+							*Nvi*
+Nvi	"新" vi 的縮寫。4.4 BSD 和 FreeBSD 帶的 Vi 版本。很好地兼容了原始版本
+	的 Vi，並且增加了一些功能。這裡所指的版本是 1.79。 "version" 返回信息
+	是 "version 1.79 (10/23/96)"。雖然有一個 1.81 版正在開發，但是最近幾年
+	一直沒有新版本放出。
+	源代碼自由發放。
+							*Elvis*
+Elvis	另一個 Vi 的克隆，作者是 Steve Kirkendall。非常簡潔但是不及 Vim 靈活。
+	這裡的版本是 2.1，仍在開發中。源代碼自由發放。
+
+==============================================================================
+4. 記法							*notation*
+
+如果你在閱讀本文時使用了語法高亮功能，那些不是用來直接輸入的文字通常會用特殊的
+顏色顯示。例如在 ()，{} 和 <> 裡的內容，以及 CTRL-X。
+
+注意 Vim 的命令包括所有可能的字符。有時候 []，{} 和 <> 也需要輸入，這些都應該
+在上下文中有清楚地說明。
+
+
+[]		方括號裡的字符是可選的。
+
+						    *count* *[count]* *E489*
+[count]		可選的數值，可用在命令前以重複該命令。在沒有特殊說明的情況下，
+		如果省略該數值，會認為該數值是 1。注意，在本手冊裡 [count] 沒
+		有出現在命令的描述中，只在解釋中有提及。這樣做可以使查找命令更
+		簡單。如果打開了 'showcmd' 選項，(部分) 輸入的計數 (count) 會
+		顯示在窗口底部。可以用 <Del> 鍵刪除最後輸入的數位 (|N<Del>|)。
+
+							*[quotex]*
+["x]		可選的用於存儲文本的寄存器。參見 |registers|。x 代表從 'a' 到
+		'z' 或從 'A' 到 'Z' (大小寫英文字母) 以及 '"' 中的一個字符，在
+		某些情況下 (比如在 put 命令中) 還可以是 '0' 到 '9'、'%'、'#'
+		或其它字符。大寫和小寫字母指的是同一個寄存器，但是使用小寫字母
+		會覆蓋原先寄存器中的內容，而使用大寫字母會將新的內容追加在原內
+		容之後。若省略 ""x" 或使用 """"，則把文本存儲到無名寄存器中。
+
+							*{}*
+{}		命令中花括號裡的內容是必須出現的，但是可以取不同的值。Vim 與
+		Vi 的不同之處也同樣在花括號裡給出 (這可以通過上下文清楚地分辨
+		出來)。
+
+							*{char1-char2}*
+{char1-char2}	在 char1 到 char2 區間內的一個字符，例如：{a-z} 是一個小寫字
+		母。多個區間可以串接，例如：{a-zA-Z0-9} 代表任一數字或字母。
+
+						*{motion}* *movement*
+{motion}	移動光標的命令，或動作。它們在 |motion.txt| 裡有解釋。例如：
+			w		移動至下一個單詞的首部
+			b		移動至當前單詞的首部
+			4j		下移四行
+			/the<cR>	移動至下一個 "The"
+		這些命令可以跟在一個操作符 |operator| 後面，以指定操作符所作用
+		的範圍。
+		- 如果動作包含計數，並且操作符中也包含計數，那麼最後的效
+		  果是兩個數值的乘積。例如："2d3w" 刪除六個單詞。
+		- 動作可以是反向的，例如："db" 刪除至當前單詞首部。
+		- 動作也可以是鼠標點擊。但不是所有的終端都支持鼠標。
+		- 命令 ":omap" 可以在操作符等待狀態時對字符進行映射。
+		- 可以使用 ex 命令來移動光標。這可以用來調用函數做一些複雜移
+		  動。無論你使用什麼 ":" 命令，這裡的動作總是面向字符且非包含
+		  (exclusive) 的。意思是你不可能包括不算換行符的一行的最後一個
+		  字符 (除非設置了 'virtualedit' 屬性)。
+		  如果 ex 命令改變了操作符開始位置之前的文本或者跳轉到別的緩衝
+		  區，那麼結果不可預測。往後改變文本是可以的。如果當前的緩衝區
+		  沒有卸載，跳轉到別的緩衝區也是可以的。
+
+							*{Visual}*
+{visual}	選中的文本區域。用 "v"、"V" 或者 CTRL-V 激活該模式，接著使用移
+		動光標的命令改變選中文本的另一端。該操作在操作符 |operator| 之
+		前使用，被高亮的文本是操作符的作用範圍。
+		參見 |visual-mode|。
+
+							*<character>*
+<character>	下面表格中的特殊字符，可以帶修飾符，也可以是帶有修飾符的單個鍵
+		ASCII 字符。
+
+							*'character'*
+'c'		單個 ASCII 字符。
+
+							*CTRL-{char}*
+CTRL-{char}	作為控制字符輸入的 {char}；也就是說，按住 CTRL 鍵再按 {char}。
+		{char} 是大寫字母還是小寫字母都沒關係；就是說 CTRL-A 和 CTRL-a
+		是一樣的。但是在有些終端裡，用 SHIFT 鍵會生成別的編碼，如果是
+		這樣，就別這麼用。
+
+							*'option'*
+'option'	用單引號括起來的是選項，或參數。可以被賦值。參見 |options|。
+
+							*quotecommandquote*
+"command"	用雙引號括起來的是可以輸入的命令。
+
+					*key-notation* *key-codes* *keycodes*
+下面這些按鍵的名稱文檔裡會用到。它們也可以用在 ":map" 命令裡 (按下 CTRL-K 再按
+下你想輸入的鍵就可以輸入該鍵的鍵名)。
+
+標識符		含義		    	等價於	十進制數值	~
+-----------------------------------------------------------------------
+<Nul>		零			CTRL-@	  0 (存儲為 10) *<Nul>*
+<BS>		退格鍵			CTRL-H	  8	*backspace*
+<Tab>		製表符			CTRL-I	  9	*tab* *Tab*
+							*linefeed*
+<NL>		換行符			CTRL-J	 10 (用作 <Nul>)
+<FF>		換頁符			CTRL-L	 12	*formfeed*
+<CR>		回車符			CTRL-M	 13	*carriage-return*
+<Return>	同 <CR>					*<Return>*
+<Enter>		同 <CR>					*<Enter>*
+<Esc>		轉義			CTRL-[	 27	*escape* *<Esc>*
+<Space>		空格				 32	*space*
+<lt>		小於號			<	 60	*<lt>*
+<Bslash>	反斜槓			\	 92	*backslash* *<Bslash>*
+<Bar>		豎槓			|	124	*<Bar>*
+<Del>		刪除				127
+<CSI>		命令序列引入		ALT-Esc	155	*<CSI>*
+<xCSI>		圖形界面的 CSI 				*<xCSI>*
+
+<EOL>		行尾 (可以是 <CR>、<LF> 或 <CR><LF>，
+		根據不同的系統和 'fileformat' 而定)	*<EOL>*
+
+<Up>		光標上移鍵			*cursor-up* *cursor_up*
+<Down>		光標下移鍵			*cursor-down* *cursor_down*
+<Left>		光標左移鍵			*cursor-left* *cursor_left*
+<Right>		光標右移鍵			*cursor-right* *cursor_right*
+<S-Up>		Shift＋光標上移鍵	
+<S-Down>	Shift＋光標下移鍵
+<S-Left>	Shift＋光標左移鍵
+<S-Right>	Shift＋光標右移鍵
+<C-Left>	Control＋光標左移鍵
+<C-Right>	Control＋光標右移鍵
+<F1> - <F12>	功能鍵 1 到 12			*function_key* *function-key*
+<S-F1> - <S-F12> Shift＋功能鍵 1 到 12		*<S-F1>*
+<Help>		幫助鍵
+<Undo>		撤銷鍵
+<Insert>	Insert 鍵
+<Home>		Home				*home*
+<End>		End				*end*
+<PageUp>	Page-up				*page_up* *page-up*
+<PageDown>	Page-down			*page_down* *page-down*
+<kHome>		小鍵盤 Home (左上)		*keypad-home*
+<kEnd>		小鍵盤 End (左下)		*keypad-end*
+<kPageUp>	小鍵盤 Page-up (右上)		*keypad-page-up*
+<kPageDown>	小鍵盤 Page-down (右下)		*keypad-page-down*
+<kPlus>		小鍵盤 +			*keypad-plus*
+<kMinus>	小鍵盤 -			*keypad-minus*
+<kMultiply>	小鍵盤 *			*keypad-multiply*
+<kDivide>	小鍵盤 /			*keypad-divide*
+<kEnter>	小鍵盤 enter			*keypad-enter*
+<kPoint>	小鍵盤 小數點			*keypad-point*
+<k0> - <k9>	小鍵盤 0 到 9			*keypad-0* *keypad-9*
+<S-...>		Shift＋鍵			*shift* *<S-*
+<C-...>		Control＋鍵			*control* *ctrl* *<C-*
+<M-...>		Alt＋鍵 或 meta＋鍵		*meta* *alt* *<M-*
+<A-...>		同 <m-...>			*<A-*
+<D-...>		Command＋鍵 (只用於蘋果機)	*<D-*
+<t_xx>		termcap 裡的 "xx" 入口鍵
+-----------------------------------------------------------------------
+
+備註: Shift＋方向鍵，幫助鍵和撤銷鍵只在少數終端裡有效。在 Amiga 機器上，Shift
+＋功能鍵 10 生成命令序列引入碼 (CSI)，也用於鍵序列。只有再按一個鍵，該代碼才能
+被識別出來。
+
+備註: Delete 鍵有兩個鍵碼。一般是十進制的 ASCII 碼 127，這個總能認出來。但有些
+delete 鍵會發送 termcap 入口項 "kD" 的值。這兩個值有同樣的效果。
+參見 |:fixdel|。
+
+備註: 小鍵盤上的按鍵與其對應的 "正常" 按鍵一樣。例如，<kHome> 與 <Home> 有同樣
+的效果。如果小鍵盤上的鍵發送的原始鍵碼與 "正常" 鍵相同，那麼將被認為是按下了
+"正常" 鍵。例如，如果 <kHome> 發送的鍵碼與 <Home> 相同，當按下 <khome> 的時
+候，Vim 會認為你按下了 <Home>。<kHome> 的映射此時不會有效。
+
+								*<>*
+例子中經常使用 <> 記法。有時這只是用來說明你需要輸入什麼，但經常它需要照本義鍵
+入，例如在 ":map" 命令裡。規則是：
+ 1.  任何可顯示的字符都可以直接鍵入，反斜槓和 '<' 除外。
+ 2.  反斜槓用兩個反斜槓表示 "\\"，或者用 "<Bslash>"。
+ 3.  真正的 '<' 用 "\<" 或 "<lt>" 表示。只有在沒有歧義的時候才可以直接用 '<'
+     表示。
+ 4.  "<key>" 的意思是特殊鍵。其含義上面的表格都有介紹，下面是一些例子：
+	   <Esc>		Escape 鍵
+	   <C-G>		CTRL-G
+	   <Up>			光標上移鍵
+	   <C-LeftMouse>	Control＋鼠標左鍵點擊
+	   <S-F11>		Shift＋功能鍵 11
+	   <M-a>		Meta- a (第 8 位置位的 'a')
+	   <M-A>		Meta- A (第 8 位置位的 'A')
+	   <t_kd>		termcap 的 "kd" 入口 (光標下移鍵)
+
+如果你想在 Vim 裡使用 <> 的完整記法，必須確定 'cpoptions' 裡不包括 '<' 標誌位
+(如果沒有置位 'compatible'，默認值就是這樣)。 >
+	:set cpo-=<
+這裡，<> 記法使用 <lt> 來抵消鍵名的特殊含義。使用反斜槓也可以，但是需要去掉
+'cpoptions' 裡的 'b' 標誌位。
+
+下面的例子是把 CTRL-H 映射成六個字符 "<Home>"：
+	:imap <C-H> \<Home>
+	:imap <C-H> <lt>Home>
+第一種方法只有在 'cpoptions' 裡沒有 'B' 標誌位才好用。第二種總成立。
+要在映射中得到按本義出現的 "<lt>" 這幾個字符： >
+	:map <c-l> <lt>lt>
+
+對於映射，縮寫和菜單命令你可以用複製-粘貼直接使用手冊裡的例子。你也可以手動鍵
+入它們，包括 '<' 和 '>'。但是在其它命令裡，比如 ":set" 和 "autocmd"，這是_不_
+行的！
+
+==============================================================================
+5. 瞭解一下模式					*vim-modes-intro* *vim-modes*
+
+Vim 有六種基本模式：
+
+					*Normal* *Normal-mode* *command-mode*
+普通模式		在普通 (normal) 模式裡，你可以輸入所有的普通編輯命令。
+			啟動編輯器之後就處於該模式 (除非你置位了 'insertmode' 
+			選項，下面會有說明)。亦稱為命令 (command) 模式。
+
+
+可視模式		該 (visual) 模式與普通模式相似，但是移動光標的命令會擴
+			展高亮的區域。非移動命令作用於高亮的區域。見
+			|Visual-mode|。
+			如果置位了 'showmode' 選項，窗口底部會出現
+			"--VISUAL--" 字樣。
+
+選擇模式		該 (select) 模式看起來與 MS-Windows 的選擇模式很像。鍵
+			入一個可顯示字符會刪掉所有被選擇的字符並且進入插入模
+			式。見 |select-mode|。
+			如果置位了 'showmode' 選項，窗口底部會出現
+			"--SELECT--" 字樣。
+
+插入模式		在插入 (insert) 模式下你鍵入的內容會插入到緩衝區。見
+			|insert-mode|。
+			如果置位了 'showmode' 選項，窗口底部會出現
+			"--INSERT--" 字樣。
+
+命令行模式		在命令行 (command-line 或 Cmdline) 模式裡你可以在窗口
+			底部輸入一行命令。執行 Ex 命令使用 ":"，查找使用 "?"
+			和 "/"，調用過濾命令使用 "!"。|cmdline-mode|
+
+Ex 模式			與命令行模式類似，但是執行完一條命令後，你會繼續停留在
+			Ex 模式。提供非常有限的命令行編輯。|Ex-mode|
+
+還有六種_附加_模式。這些都是在基本模式的基礎上變化而來的：
+
+				*Operator-pending* *Operator-pending-mode*
+操作符等待模式		該 (operator-pending) 模式與普通模式類似，但是在操作符
+			之後，Vim 等待一個動作 {motion} 以確定操作符的作用范
+			圍。
+
+
+替換模式		替換 (replace) 模式是插入模式的特殊情況。你可以做和插
+			入模式裡相同的事情，但是你輸入的字符會覆蓋原先的字符。
+			見 |Replace-mode|。
+			如果置位了 'showmode' 選項，窗口底部會出現
+			"-- REPLACE --" 字樣。
+
+虛擬替換模式		虛擬替換 (virtual replace) 模式類似於替換模式，但你替
+			換的不是文件的字符，而是屏幕上佔據的位置。見
+			|Virtual-Replace-mode|。
+			如果置位了 'showmode' 選項，窗口底部會出現
+			"-- VREPLACE --" 字樣。
+
+插入普通模式		在插入模式裡輸入 CTRL-O 可進入該 (insert normal) 模
+			式。與普通模式類似，但是只能執行一條命令然後返回到插入
+			模式。
+			如果置位了 'showmode' 選項，窗口底部會出現
+			"-- (insert) --" 字樣。
+
+插入可視模式		在插入模式裡進行可視模式的選擇，例如，在插入模式裡鍵入
+			CTRL-O 然後鍵入 "v" 或 "V" 或 CTRL-V，可進入該 (insert
+			visual) 模式。可視選擇結束時，返回到插入模式。
+			如果置位了 'showmode' 選項，窗口底部會出現
+			"-- (insert) VISUAL --" 字樣。
+
+插入選擇模式		在插入模式裡啟動選擇模式可進入該 (insert select) 模
+			式。例如，用鼠標拖拽或 <S-Right>。如果選擇模式結束，
+			Vim 返回插入模式。
+			如果置位了 'showmode' 選項，窗口底部會出現
+			"-- (insert) SELECT --" 字樣。
+
+==============================================================================
+6. 從一種模式切換到另一種模式				*mode-switching*
+
+如果因為某種原因你不知道處於哪種模式，你總是可以通過按兩下 <Esc> 返回普通
+模式。不過不能在 Ex 模式裡這麼做，那裡，用 ":visual" 返回普通模式。
+如果在你按下 <Esc> 後發現屏幕閃爍或者聽到響聲，這證明你已經回到普通模式。
+然而，在插入模式裡按下 CTRL-O 後再按下 <Esc> 也會聽到喇叭的響聲，但是你仍然處
+於插入模式，再按一下 <Esc> 即可。
+
+
+							*i_esc*
+切換 		到 模式						    ~
+		普通	 可視	 選擇	 插入	   替換     命令行    Ex ~
+從  模式								 ~
+普通			v V ^V	  *4	 *1	   R gR	    : / ? !   Q
+可視		 *2		  ^G	 c C	    --	      :       --
+選擇		 *5	^O ^G		 *6	    --	      --      --
+插入		 <Esc>	  --	  --		  <Insert>    --      --
+替換		 <Esc>	  --	  --	<Insert>	      --      --
+命令行		 *3	  --	  --	 :start	    --		      --
+Ex		 :vi	  --	  --	 --	    --	      --
+
+-  不可用
+-- 不可能
+
+*1 從普通模式切換到插入模式可以用這些命令："i"、"I"、"a"、"A"、"o"、 "O"
+   "c"、"C"、"s" 或 S"。
+*2 從可視模式切換到普通模式可以使用一個不移動光標的命令，這樣命令執行後就會返
+   回普通模式。也可以使用 <Esc> "v"、"V" 或 "CTRL-V" (見 |v_v|)，這幾個命令可
+   以沒有副作用地終止可視模式。
+*3 從命令行模式切換至普通模式：
+   - 敲 <CR> 或 <NL>，使得鍵入的命令得以執行。
+   - 刪除整行 (例如，用 CTRL-U) 最後再按一下 <BS>。
+   - 敲 CTRL-C 或 <Esc> 可以退出命令行模式而不執行已經鍵入的命令。
+   在最後一種情況裡，<Esc> 可能被 'wildchar' 定義，這樣 <Esc> 就會作為命令行模
+   式裡的命令補全鍵。你可以再按一下 <Esc> 忽略補全的命令。{Vi: 當敲 <Esc> 的時
+   候命令行會被執行。大多數人對此感覺不爽；因此 Vim 進行了改動。但是如果 <Esc>
+   是映射的一部分，命令行仍然會執行。如果你想使用 Vi 的特性包括輸入的 <Esc> 的
+   這種反應，那麼可以使用 ":cmap ^V<Esc> ^V^M" }
+*4 從普通模式切換到選擇模式：
+   - 如果 'selectmode' 裡包含 "mouse"，當使用鼠標選擇文本時即可切換。
+   - 如果 'selectmode' 裡包含 "key"，那麼按住 Shift 鍵然後用不可顯示的命令來移
+     動光標。
+   - 如果 'selectmode' 包含 "cmd"，那麼用 "v"、"V" 或 "CTRL-V"
+   - 使用 "gh"、"gH" 或 "g CTRL-H" 
+*5 使用不可顯示的命令移動光標 (不要按 Shift) 可以從選擇模式轉到普通模式。
+*6 輸入一個可顯示字符可以從選擇模式切換到插入模式。插入該字符的同時刪除被選擇
+   的部分。
+   
+如果打開了 'insertmode' 選項，編輯文件時將直接進入插入模式。
+
+	*CTRL-\_CTRL-N* *i_CTRL-\_CTRL-N* *c_CTRL-\_CTRL-N* *v_CTRL-\_CTRL-N*
+另外，CTRL-\ CTRL-N 或 <C-\><C-N> 可以用來從其它模式切換到普通模式。這樣可以確
+保 Vim 處於普通模式而不會像 <Esc> 那樣產生響聲。然而，它不能用在 Ex 模式。當用
+在一個需要參數的命令，諸如 |f| 、|m| 等之後，等待時間由 'ttimeoutlen' 決定。
+
+	*CTRL-\_CTRL-G* *i_CTRL-\_CTRL-G* *c_CTRL-\_CTRL-G* *v_CTRL-\_CTRL-G*
+如果置位了 'insertmode'，則 CTRL-\ CTRL-G 或 <C-\><C-G> 切換到插入模式，否則切
+換至普通模式。這可以讓 Vim 處於 'insertmode' 所指定的模式，而不必關心當前的模
+式。
+
+				    *Q* *mode-Ex* *Ex-mode* *Ex* *EX* *E501*
+Q			切換至 "Ex" 模式。有點像一個接一個的 ":" 命令，除了：
+			- 你不需要輸入 ":"。
+			- 屏幕不會在每個命令執行完後更新。
+			- 沒有正常的命令行編輯。
+			- 映射和縮寫無效。
+			實際上，你正在使用一個 "標準的" 行編輯器。(<Del> 或
+			<BS> 刪除一個字符，CTRL-U 刪除整行)。
+			如果使用 "ex" 調用 Vim，Vim 缺省進入該模式。
+			用 ":vi" 命令 |:visual| 退出 "Ex" 模式。
+			注意: 老版本的 Vim 裡，"Q" 用來排版文本，現在那個功能
+			使用 |gq| 。但是如果你使用 |vimrc_example.vim|，那麼
+			"Q" 會和 "gq" 一樣。
+
+					*gQ*
+gQ			同 "Q"，切換到 "Ex" 模式，但與一條接一條的 ":" 命令相
+			當。所有的行編輯、補全等功能都可用。
+			用 ":vi" 命令 |:visual| 退出 "Ex" 模式。
+			{Vi 沒有該功能}
+
+==============================================================================
+7. 窗口裡的東東					*window-contents*
+
+在普通模式和插入/替換模式裡屏幕窗口顯示當前緩衝區裡的內容：所見即所得。但有兩
+個例外：
+- 如果 'cpoptions' 選項裡包含 '$'，並且改動在一行之內，被改動的文本沒有直接刪
+  除，而是在被刪除的最後一個字符放上 '$'。
+
+- 當在一個窗口輸入文本的時候，監視相同文本的其它窗口不會立即更新，直到插入結束
+  為止。
+{Vi: 在慢速終端上屏幕有時不會更新}
+
+除非關閉了 'wrap' 選項，否則長度大於窗口寬度的文本會被迴繞 (見下面)。置位
+'linebreak' 選項可以使文本只在空白字符處被迴繞。
+
+如果已經到達了緩衝區的最後一行，但是當前窗口還有顯示空間，Vim 會在末行之後的第
+一列顯示一個 '~'，像這樣： >
+
+	+-----------------------+
+	|some line		|
+	|last line		|
+	|~			|
+	|~			|
+	+-----------------------+
+
+也就是說，'~' 意味著到達了緩衝區的末尾。
+
+如果當前窗口不能完整的顯示最後一行，Vim 會在窗口的最後幾行的第一列用 '@' 字符
+表示這一點，就像這樣： >
+
+	+-----------------------+
+	|first line		|
+	|second line		|
+	|@			|
+	|@			|
+	+-----------------------+
+
+也就是說，'@' 表示這一行窗口裡放不下。
+
+如果標誌位 "lastline" 出現在 'display' 選項裡，你就不會看到窗口最左邊的 '@' 字
+符。如果最後一行不能完全放到窗口裡，就只顯示能放下的部分，並且該行的最後三個字
+符用 "@@@" 代替，像這樣： >
+
+	+-----------------------+
+	|first line		|
+	|second line		|
+	|a very long line that d|
+	|oesn't fit in the wi@@@|
+	+-----------------------+
+
+如果文本中只包含一行，窗口裡放不下，這是很特殊的情況。Vim 只會顯示光標所在位置
+周圍的部分字符。不會顯示特殊字符，這樣你可以編輯該行的任何部分。
+{Vi: 行的長度不能適應窗口的寬度時，給出 "內部錯誤"}
+
+在 'highlight' 選項裡出現的 '@' 可以用來為 '@' 和 '~' 設置特殊的高亮方式。這使
+它們能夠和緩衝區裡的真實字符得以區分。
+
+選項 'showbreak' 定義迴繞行的前端包含的字符串。
+							*wrap-off*
+如果關閉了 'wrap' 選項，長行不會被迴繞。只顯示能放到窗口裡的那一部分。如果光標
+移動到沒有顯示的部分，屏幕會水平方向滾動。這樣做的好處是可以正常顯示文本列而窗
+口裡放不下的行也可編輯。缺點是你不能一次看見一行的所有字符。選項 'sidescroll' 
+可以設定滾動列數的最小值。{Vi: 沒有 'wrap' 選項}
+
+所有正常的 ASCII 字符直接顯示在屏幕上。<Tab> 用相應數量的空白代替。其餘不可顯
+示的字符用 "^{char}" 代替。其中的 {char} 為不可顯示字符的值加 64。比如，響鈴字
+符 (7) 顯示為 "^G"。ASCII 值在 127 至 160 的字符用 "~{char}" 代替，{char} 是該
+字符的數值減去 64。這些字符在屏幕上要多佔一個位置，而光標只能放在其中的第一個
+位置上。
+
+如果你置位了 'number' 選項，所有的行前面會加行號。提示：如果你不喜歡迴繞的行混
+淆了行號，可以把 'showbreak' 選項設置成八個空格： >
+	:set showbreak=\ \ \ \ \ \ \ \ 
+<
+如果你置位了 'list' 選項，<Tab> 字符不會顯示成多個空格，而是 "^I"。'$' 字符會
+出現在每一行的末尾，這樣你可以發現尾部的空白字符。
+
+在命令行模式裡，只有命令行自己被正確地顯示。緩衝區內容的顯示從你返回命令模式
+(即普通模式) 的那一刻進行更新。
+
+窗口的最後一行是用來顯示狀態和其它信息的。狀態信息只有在選項打開的時候才可用：
+
+狀態信息			選項           缺省       Unix 缺省	~
+當前模式			'showmode'	開	     開
+命令字符			'showcmd'	開	     關
+光標位置			'ruler'		關	     關
+
+當前模式是 "-- INSERT --" 或 "-- REPLACE --"，見 |'showmode'|。命令字符是你輸
+入的但還沒執行的命令。{Vi: 不顯示按下的字符，也不顯示光標的位置}
+
+如果你用一個慢速終端，你可以關閉狀態信息以加速編輯： >
+	:set nosc noru nosm
+<
+如果出錯，錯誤信息會保持至少一秒鐘 (使用反轉顯示)。{Vi: 在你閱讀之前，錯誤信息
+可能已經被其它信息覆蓋掉了}
+
+有些命令會顯示有多少行受影響。只有行數超過 'report' 控制 (默認是 2) 的閾值，這
+才會發生。
+
+在 Amiga 系統上，Vim 在一個 CLI 窗口裡運行。Vim 的名字和當前文件的全名在標題欄
+裡顯示。窗口大小改變的時候，Vim 自動重畫窗口。你可以把窗口搞的很小，但是如果太
+小了就連一行文本也裝不下了。盡量讓窗口保持至少 40 個字符的寬度，這樣可以閱讀最
+後一行 (狀態行) 的大多數信息。
+
+在大多數 Unix 系統上，窗口大小的調整可以正確地被 Vim 識別和處理。{Vi: 處理得不
+好}
+
+==============================================================================
+8. 術語							*definitions*
+
+  屏幕			Vim 所用的整個工作區域。可以是一個終端模擬窗口。也被叫
+			做 "Vim 窗口"。
+
+  窗口			緩衝區視圖。
+
+
+一個屏幕包含一個或多個窗口，被狀態行和屏幕底部的命令行分割。
+
+	+-------------------------------+
+屏幕	| 窗口 1	| 窗口 2	|
+	|		|		|
+	|		|		|
+	|=== 狀態行  ===|==== 狀態行 ===|
+	| 窗口 3			|
+	|				|
+	|				|
+	|========== 狀態行 =============|
+	|命令行 			|
+	+-------------------------------+
+
+命令行也用來輸出信息。如果命令行沒有足夠的空間來顯示信息，屏幕會上滾。
+
+四種不同類型的 "行"：
+
+  緩衝 行		緩衝區裡的行。與讀出/寫入文件的行的內容相同。每一行可
+  			以包含成千上萬個字符。
+
+  邏輯 行		應用過折疊的緩衝行。關閉折疊裡的緩衝行被折疊成一個邏輯
+  			行："+-- 99 行 折疊"。邏輯行也可以包含成千上萬個字符。
+
+  窗口 行		窗口裡顯示的行：被迴繞的邏輯行，換行符，等等，都在這裡
+			應用。窗口行的長度不能超過窗口允許的寬度，多出的部分會
+			被迴繞或截斷。
+
+  屏幕 行		Vim 使用的屏幕中的行。包括所有窗口的窗口行、狀態行以及
+			命令行。它們的長度受屏幕的寬度的限制。如果命令行裡命令
+			的長度大於屏幕的寬度，則自動迴繞並滾屏以騰出空間。
+
+
+緩衝 行		邏輯 行		窗口 行		屏幕 行 ~
+
+1. 一		1. 一		1. +-- 折疊	1.  +-- 折疊
+2. 二		2. +-- 折疊	2. 五		2.  五
+3. 三		3. 五		3. 六		3.  六
+4. 四		4. 六		4. 七		4.  七
+5. 五		5. 七				5.  === 狀態行 ===
+6. 六						6.  aaa
+7. 七						7.  bbb
+						8.  ccc ccc c
+1. aaa		1. aaa		1. aaa		9.  cc
+2. bbb		2. bbb		2. bbb		10. ddd
+3. ccc ccc ccc	3. ccc ccc ccc	3. ccc ccc c	11. ~ 
+4. ddd		4. ddd		4. cc		12. === 狀態行 ===
+				5. ddd		13. (命令行)
+				6. ~ 
+
+==============================================================================
+ vim:tw=78:ts=8:ft=help:norl:

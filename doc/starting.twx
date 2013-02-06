@@ -1,0 +1,1274 @@
+*starting.txt*  For Vim version 7.3.  最近更新: 2010年8月
+
+
+		  VIM 參考手冊    by Bram Moolenaar
+				譯者: Willis
+				http://vimcdoc.sf.net
+
+
+啟動 Vim						*starting*
+
+1. Vim 參數			|vim-arguments|
+2. Amiga 上的 Vim		|starting-amiga|
+3. 運行 eVim			|evim-keys|
+4. 初始化			|initialization|
+5. $VIM 和 $VIMRUNTIME		|$VIM|
+6. 暫停				|suspend|
+7. 保存設置			|save-settings|
+8. 視圖和會話			|views-sessions|
+9. viminfo 文件			|viminfo-file|
+
+==============================================================================
+1. Vim 參數						*vim-arguments*
+
+最常見的是啟動 Vim 編輯單個文件。使用的命令是
+
+	vim filename					*-vim*
+
+更一般的，Vim 是這麼啟動的:
+
+	vim [option | filename] ..
+
+選項參數和文件名參數可以混合使用，使用的數目也沒有限制。不過，小心帶參數的選
+項。
+
+關於各個 Vi 版本的兼容性，見 |cmdline-arguments|。
+
+開始編輯時，以下五項可以且只能選一個。
+
+							*-file* *---*
+文件名		一個或多個文件名。其中的第一個將成為當前文件並讀入緩衝區。光標
+		會定位在緩衝區的第一行。
+		要避免以 '-' 開始的文件名被解釋成選項，在文件名列表前加上
+		"--"。例如: >
+			vim -- -filename
+<		在 "--" 之後的所有參數被解釋為文件名。也就是說，後面不能再跟選
+		項或者 "+command" 參數。
+
+							*--*
+-		該參數有兩個含義，取決於是否使用 Ex 模式。
+
+		以普通模式啟動: >
+			vim -
+			ex -v -
+<		開始編輯新緩衝區，並以標準輸入讀取的文本填充之。通常從標準輸入
+		讀入的命令現在從標準錯誤 (stderr) 讀入。例如: >
+			find . -name "*.c" -print | vim -
+<		緩衝區會被標為已修改，因為它包含需要保存的文本。除非以只讀模式
+		進入，這時緩衝區不會標為已修改。例如: >
+			ls | view -
+<
+		以 Ex 模式啟動: >
+			ex -
+			vim -e -
+			exim -
+			vim -E
+<		開始編輯時處於安靜模式。見 |-s-ex|。
+
+							*-t* *-tag*
+-t {tag}	一個標籤。從標籤文件裡查找 "tag"。相關的文件成為當前文件，並執
+		行相關的命令。通常用於 C 程序，此時 "tag" 通常是函數名。其效果
+		是，包含該函數的文件稱為當前文件，而光標定位在函數的開始處 (見
+		|tags|)。
+
+							*-q* *-qf*
+-q [errorfile]	QuickFix 模式。名字為 {errorfile} 的文件被讀入並顯示第一個錯
+		誤。 見 |quickfix|。
+		如果不給出 [errorfile]，使用 'errorfile' 選項給定的文件名。其
+		缺省值見 'errorfile'。
+		{Vi 無此功能}
+
+(無)		不帶上面四種參數的任何一種，Vim 開始編輯一個新的緩衝區。它是空
+		白的，也不帶文件名。
+
+
+啟動模式也可以通過使用程序的名字 (替代 "vim") 來指定。具體來說，不同的名字等價
+於給出不同的選項。見下:
+ex	vim -e	    以 Ex 模式啟動 (見 |Ex-mode|)。		    *ex*
+exim	vim -E	    以增強的 Ex 模式啟動 (見 |Ex-mode|)。	    *exim*
+			(通常並沒有安裝)
+view	vim -R	    以只讀模式啟動 (見 |-R|)。			    *view*
+gvim	vim -g	    以 GUI 啟動 (見 |gui|)。			    *gvim*
+gex	vim -eg	    以 Ex 模式啟動 GUI。			    *gex*
+gview	vim -Rg	    以只讀模式啟動 GUI.				    *gview*
+rvim	vim -Z	    和 "vim" 類似，但以受限模式啟動 (見 |-Z|)	    *rvim*
+rview	vim -RZ	    和 "view" 類似，但以受限模式啟動。	   	    *rview*
+rgvim	vim -gZ	    和 "gvim" 類似，但以受限模式啟動。	  	    *rgvim*
+rgview	vim -RgZ    和 "gview" 類似，但以受限模式啟動。	  	    *rgview*
+evim    vim -y      簡易 Vim: 置位 'insertmode' (見 |-y|)	    *evim*
+eview   vim -yR     和 "evim" 類似，啟用只讀模式		    *eview*
+vimdiff vim -d	    以 diff 模式啟動 |diff-mode|
+gvimdiff vim -gd    以 diff 模式啟動 GUI |diff-mode|
+
+程序名字後面還可以有附加的字符，它們都被忽略。例如，你可以用 "gvim-5" 來啟動
+GUI。當然，你必須有這個名字的可執行文件。
+
+Unix 上，你通常有一個可執行文件叫 Vim，並鏈接該可執行文件到不同的啟動名字。如
+果你的系統不支持鏈接，但是你不想保留該可執行文件的多個備份，可以使用別名。例
+如: >
+	alias view   vim -R
+	alias gvim   vim -g
+<
+							*startup-options*
+選項參數可以任何順序給出。單個字母的選項可以在一個連字號後一起給出。在 "--" 參
+數之後，就不能再有任何選項參數了。
+
+VMS 上，所有的選項參數假定都是小寫的，除非前面有一個正斜槓。這樣，"-R" 應該意
+味著恢復而 "-/R" 表示只讀。
+
+--help							*-h* *--help*
+-h		給出使用說明 (幫助) 並退出。{Vi 無此功能}
+		關於捕獲文本，見 |info-message|。
+
+							*--version*
+--version	顯示版本信息並退出。和 |:version| 命令的輸出結果相同。{Vi 無此
+		功能}
+		關於捕獲文本，見 |info-message|。
+
+							*--noplugin*
+--noplugin	跳過插件的載入。復位 'loadplugins' 選項。
+		{Vi 無此功能}
+		注意 |-u| 參數可能會屏蔽載入的插件:
+			參數		載入 vimrc 文件		載入插件 ~
+			(無)			是		    是
+			-u NONE			否		    否
+			-u NORC			否		    是
+			--noplugin		是		    否
+
+--startuptime {fname}					*--startuptime*
+		啟動時把計時信息寫入文件 {fname}。可用於分析載入 .vimrc、插件
+		和打開首個文件的過程中時哪一步最耗時，
+		如果 {fname} 已存在，在後面附加新消息。
+		(僅當編譯時帶有 |+startuptime| 特性才有效)。
+
+							*--literal*
+--literal	按本義取文件名，不擴展通配符。在 Unix 上不需要，因為那裡 Vim
+		總是按本義取文件名的 (外殼程序擴展通配符)。
+		適用於所有名字，包括本參數之前的那些名字。
+
+							*-+*
++[num]		光標在編輯第一個文件時會定位在第 "num" 行。如果不給出 "num"，
+		光標會定位在最後一行。
+
+							*-+/*
++/{pat}		光標在編輯第一個文件時會定位在第一個包含 "pat" 模式的行 (可用
+		的搜索模式可見 |pattern| )。
+
++{command}						*-+c* *-c*
+-c {command}	在讀入第一個文件後執行命令 {command} (在自動命令和文件的模式行
+		處理之後)。"command" 按 Ex 命令來解釋。如果 "command" 包含空
+		格，應該用雙引號括起該命令 (取決於使用的外殼)。
+		示例: >
+			vim  "+set si"  main.c
+			vim  "+find stdio.h"
+			vim  -c "set ff=dos"  -c wq  mine.mak
+<
+		注意: 在一個 Vim 命令裡，你可以使用不超過 10 個 "+" 或者 "-c"
+		參數。它們的執行按給定的順序進行。"-S" 參數也被當作 "-c" 參數
+		那樣對待。
+		{Vi 只允許一個命令}
+
+--cmd {command}						*--cmd*
+		在處理任何 vimrc 文件之前執行命令 {command}。除此以外，和 -c
+		{command} 類似。你可以使用不超過 10 個本命令，不佔用 "-c" 命令
+		的數目限制。
+		{Vi 無此功能}
+
+							*-S*
+-S {file}	在第一個文件讀入之後，執行腳本 {file}。這是下面這條等價的命令
+		的一個簡便方式: >
+			-c "source {file}"
+<		它可以和 "-c" 參數混合使用，也和 "-c" 那樣可以使用多次。"-c"
+		參數的 10 個的限制也應用於此。
+		{file} 不能以 "-" 開始。
+		{Vi 無此功能}
+
+-S		和 "-S Session.vim" 類似。只有在用作最後一個參數或者其後有另外
+		一個 "-" 選項時才會被這麼理解。
+
+							*-r*
+-r		恢復模式。如果沒有文件名參數，使用已有的所有交換文件。如果給出
+		文件名，讀入相應的交換文件以恢復以前崩潰的編輯會話。見
+		|crash-recovery|。
+
+							*-L*
+-L		和 -r 相同。 {僅在 Vi 的有些版本裡存在: "列出可恢復的編輯會
+		話"}
+
+							*-R*
+-R		只讀模式。為所有編輯的文件置位 'readonly' 選項。你仍然可以編輯
+		緩衝區，但你不能實際覆蓋文件。如果你忘記了你處於只讀 (View) 模
+		式而試圖進行改動，仍然可以在 Ex 命令後面附加感歎號來覆蓋文件，
+		比如 ":w!"。'readonly' 選項可以用 ":set noro" 復位 (見選項一
+		章，|options|)。
+		後來開始的編輯並不自動進入只讀模式。調用可執行的 "view" 和給出
+		-R 參數有相同的效果。
+		'updatecount' 選項設為 10000，意味著交換文件不會很經常的自動更
+		新。
+
+							*-m*
+-m		不允許寫入修改的部分。復位 'write' 選項，從而屏蔽了文件的寫
+		入。不過，之後可以重新置位 'write' 選項來打開寫文件的功能。
+		{Vi 無此功能}
+
+							*-M*
+-M		不允許修改。復位 'modifiable' 選項，從而禁止任何改動。也復位
+		'write' 選項，從而寫入文件也被屏蔽。不過，'modifiable' 和
+		'write' 選項都可以被重新設置來允許修改和寫入文件。
+		{Vi 無此功能}
+
+						*-Z* *restricted-mode* *E145*
+-Z		受限模式。使用外部外殼的任何命令都被禁止。這包括使用 CTRL-Z 暫
+		停、":sh"、過濾程序，system() 函數，反引號擴展，等等。
+		{Vi 無此功能}
+
+							*-g*
+-g		啟動 Vim 並進入 GUI 模式。見 |gui|。{Vi 無此功能}
+
+							*-v*
+-v		啟動 Ex 進入 Vi 模式。只有在可執行文件名字叫 "ex" 或者 "gvim"
+		的時候才有意義。對於 gvim 而言，即使能夠，也不啟動 GUI。
+
+							*-e*
+-e		啟動 Vim 進入 Ex 模式 |Q|，只有在可執行文件不叫 "ex" 的時候才
+		有意義。
+
+							*-E*
+-E		啟動 Vim 進入增強的 Ex 模式 |gQ|。只有在可執行文件不叫 "exim"
+		的時候才有意義。
+		{Vi 無此功能}
+
+							*-s-ex*
+-s		安靜或批處理模式。只有在 Vim 使用 "ex" 名字或者前面以 "-e" 參
+		數啟動的時候才有意義。否則的話，見 |-s|，後者接受參數，但是本
+		參數不需要。Vim 用來從文件而不是終端讀取 Ex 命令並執行之。關閉
+		大多數提示和信息消息，也包括警告和錯誤消息。
+		這些命令的輸出仍然顯示 (到標準輸出 (stdout)):
+			:print
+			:list
+			:number
+			:set      顯示選項值。
+		如果 'verbose' 非零，則消息也會顯示 (用於調試，到標準錯誤
+		(stderr))。
+		不使用 'term' 和 $TERM。
+		如果 Vim 看起來沒有動靜，試試輸入 "qa!<Enter>"。你不會得到提
+		示，所以你沒法看到 Vim 在等待你輸入。
+		跳過初始化 (除了通過 "-u" 參數給出的那些)。
+		示例: >
+			vim -e -s  < thefilter  thefile
+<
+							*-b*
+-b		二進制模式。文件 I/O 只會用 <NL> 來分隔行。'expandtab' 選項被
+		復位。'textwidth' 選項設為 0。'modeline' 被復位。'binary' 選項
+		被置位。這發生在 vimrc/exrc 文件被讀入以後，但在讀入文件參數列
+		表之前。另見 |edit-binary|。{Vi 無此功能}
+
+							*-l*
+-l		Lisp 模式。置位 'lisp' 和 'showmatch' 選項。
+
+							*-A*
+-A		阿拉伯模式。置位 'arabic' 選項。(只有在編譯時加入 |+arabic| 特
+		性才有效 (這也包含 |+rightleft|)。否則 Vim 給出錯誤信息並退
+		出。)
+		{Vi 無此功能}
+
+							*-F*
+-F		波斯模式。設置 'fkmap' 和 'rightleft' 選項。(只有在編譯時加入
+		|+rightleft| 和 |+farsi| 特性才有效。否則 Vim 給出錯誤信息並退
+		出。){Vi 無此功能}
+
+							*-H*
+-H		希伯來模式。置位 'hkmap' 和 'rightleft' 選項。(只有在編譯時加
+		入 |+rightleft| 特性才有效。否則 Vim 給出錯誤信息並退出。)
+		{Vi 無此功能}
+
+							*-V* *verbose*
+-V[N]		詳細。設置 'verbose' 選項為 [N] (缺省: 10)。對每個被執行的腳本
+		和讀入或寫入的 viminfo 文件都會給出消息。可以用來瞭解啟動和退
+		出時發生了什麼事情。{Vi 無此功能}
+		示例: >
+			vim -V8 foobar
+
+-V[N]{filename}
+		類似於 -V 並同時設置 'verbosefile' 為 {filename}。結果是，消息
+		不顯示，而是寫到文件 {filename}。{filename} 不能以數字開始。
+		示例: >
+			vim -V20vimlog foobar
+<
+							*-D*
+-D		調試。在執行腳本的第一個命令的時候進入調試模式。|debug-mode|
+		{僅當編譯時加入 |+eval| 特性才有效}
+		{Vi 無此功能}
+
+							*-C*
+-C		兼容模式。置位 'compatible' 選項。你可以用此參數進入
+		'compatible' 模式，即使存在 .vimrc 文件也是如此。
+		要注意有些插件或啟動腳本裡的命令 ":set nocompatible" 總可以超
+		越之，所以你最後還是用了 "nocompatible"。要找出原因: >
+			:verbose set compatible?
+<		有些插件在置位 'compatible' 時不能工作，你需要在啟動後這樣置位
+		之: >
+			vim "+set cp" filename
+<		另見 |compatible-default|。{Vi 無此功能}
+
+							*-N*
+-N		不兼容模式。復位 'compatible' 選項。你可以用此參數設置
+		'nocompatible'，即使不存在 .vimrc 文件或使用 "-u NONE" 時也是
+		如此。
+		另見 |compatible-default|。{Vi 無此功能}
+
+							*-y* *easy*
+-y		簡易模式。|evim| 和 |eview| 隱含本參數。開始時置位
+		'insertmode'，並表現的像點擊-輸入的編輯器那樣。設置該參數會執
+		行腳本 $VIMRUNTIME/evim.vim。設置相應的映射，使之和多數點擊-輸
+		入的編輯器行為類似。見 |evim-keys|。如果可能，啟動 GUI。
+		{Vi 無此功能}
+
+							*-n*
+-n		不使用交換文件。在崩潰後因而無法恢復。如果你只想瀏覽或者在很慢
+		的媒介上 (例如，軟盤上) 編輯文件，這也許有用。
+		也可以通過 ":set updatecount=0" 完成。你可以通過給
+		'updatecount' 選項一些值來重新打開，例如 ":set uc=100"。
+		注意: 不用混用 -n 和 -b，使之成為 -nb，這是另一個意思: |-nb|。
+		執行 vimrc 文件的命令_後_，'updatecount' 才置為 0，但這發生在
+		GUI 初始化之前。因此，該選項會覆蓋 vimrc 文件裡對
+		'updatecount' 的設置，但不會覆蓋 gvimrc 的。見 |startup|。
+		如果你想減少對磁盤的訪問 (例如在筆記本上)，不要使用 "-n"，而是
+		設置 'updatetime' 和 'updatecount' 為很大的值，然後在需要保存
+		你的工作的時候輸入 ":preserve"。這使得你可以從崩潰中恢復。
+		{Vi 無此功能}
+
+							*-o*
+-o[N]		打開 N 個窗口，水平分割。如果沒有給出 [N]，為每個文件參數打開
+		一個窗口。如果沒有足夠的空間，只打開前面數項。如果給出的窗口數
+		超過參數的數目，後面的窗口會編輯空文件。
+		{Vi 無此功能}
+
+							*-O*
+-O[N]		打開 N 個窗口，垂直分割。此外和 -o 類似。如果命令行上同時給出
+		-o 和 -O 選項，較後的那個決定窗口如何分割。
+		{Vi 無此功能}
+
+							*-p*
+-p[N]		打開 N 個標籤頁。如果沒有給出 [N]，為每個文件參數打開一個標籤
+		頁。最大標籤頁數由 'tabpagemax' 決定 (缺省為 10)。如果有比參數
+		更多的標籤頁，後面的標籤頁會編輯空文件。另見 |tabpage|。
+		{Vi 無此功能}
+
+							*-T*
+-T {terminal}	設置終端名為 "terminal"。這影響 Vim 發送給你終端的代碼。通常不
+		需要，因為 Vim 能夠找到你使用的終端類型 (見 |terminal-info|)。
+		{Vi 無此功能}
+
+							*-d*
+-d		以 diff 模式啟動，和 |vimdiff| 類似。
+		{Vi 無此功能} {僅當編譯時加入 |+diff| 特性才有效}
+
+-d {device}	只出現在 Amiga 上，並且編譯時沒有加入 |+diff| 特性才適用。
+		和 "-dev" 類同。
+							*-dev*
+-dev {device}	只出現在 Amiga 上，打開 {device} 設備，並用來編輯。
+		通常你會使用該參數來設置窗口位置和大小: "-d
+		con:x/y/width/height"，比如 "-d con:30/10/600/150"。但是你可以
+		用之在別的設備上啟動編輯，比如，AUX:。{Vi 無此功能}
+							*-f*
+-f		Amiga: 不要在新窗口上啟動 Vim。該選項應該用於 Vim 被別的程序啟
+		動，並且需等待編輯會話完成的場合 (例如，mail 或者 readnews)。
+		見 |amiga-window|。
+
+		GUI: 不要從啟動 Vim 的程序那裡斷開。'f' 代表 "foreground" (前
+		台)。如果不提供，GUI 分叉 (fork) 出一個新進程，並結束當前的進
+		程。 "-f" 應該用於 gvim 被別的程序啟動，並且需等待編輯會話完成
+		的場合 (例如，mail 或者 readnews)。如果你希望 gvim 永遠不要分
+		叉，在你的 |gvimrc| 裡給 'guioptions' 加上 'f'。
+		小心: 你可以使用 "-gf" 在前台啟動 GUI，但是 "-fg" 是用來指定前
+		台顏色的。|gui-fork|
+		{Vi 無此功能}
+
+							*--nofork*
+--nofork	GUI: 不分叉。和 |-f| 相同。
+							*-u* *E282*
+-u {vimrc}	讀入文件 {vimrc} 執行初始化。跳過多數其他的初始化步驟；見
+		|initialization|。這可以用來啟動 Vim 進入特殊模式，使用特殊的
+		映射和設置。可以用外殼映射來方便使用之。例如: >
+			alias vimc vim -u ~/.c_vimrc !*
+<		也可以考慮自動命令；見 |autocommand|。
+		如果 {vimrc} 等於 "NONE" (全是大寫)，所有文件和環境變量的初始
+		化都被跳過，這包括 GUI 開始時候 |gvimrc| 文件的讀入。插件的載
+		入也被跳過。
+		如果 {vimrc} 等於 "NORC" (全是大寫)，那麼和 "NONE" 基本相同，
+		除了不跳過插件的載入之外。
+		使用 "-u" 參數的副作用是 'compatible' 選項缺省是打開的。這可能
+		有意想不到的效果。見 |'compatible'|。
+		{Vi 無此功能}
+
+							*-U* *E230*
+-U {gvimrc}	在 GUI 啟動的時候讀入 {gvimrc} 文件並執行初始化。跳過其它的
+		GUI 初始化。如果 {gvimrc} 等於 "NONE"，GUI 初始化過程不讀入任
+		何文件。 |gui-init|
+		特例: 系統菜單文件總會讀入。
+		{Vi 無此功能}
+
+							*-i*
+-i {viminfo}	使用 "viminfo" 文件而不是缺省的 viminfo 文件。如果使用名字
+		"NONE" (全是大寫)，則即使設置了 'viminfo' 或者使用 ":rv" 或
+		":wv" 的時候，也不讀寫 viminfo 文件。另見 |viminfo-file|。
+		{Vi 無此功能}
+
+							*-x*
+-x		讀寫文件都使用加密。會提示密鑰，該密鑰存在 'key' 選項裡。所有
+		的寫操作使用該密鑰加密文本。 '-x' 參數在讀文件的時候是不需要
+		的，因為待讀取的文件是否經過加密總是會檢查的。Vim 會自動詢問密
+		鑰。|encryption|
+
+							*-X*
+-X		不試圖連接到 X 服務器以取得當前窗口的標題，也不使用 X 剪貼板進
+		行複製/粘貼。這避免了在終端模擬器裡運行 Vim 的時候因為慢速的 X
+		服務器連接而導致的漫長的啟動時間。
+		|--startuptime| 可以幫助你發現導致緩慢的原因。
+		只有在 Unix 或 VMS 上並編譯時使用 |+X11| 特性才有意義。不然該
+		參數被忽略。
+		如果要為特定的終端禁止連接，見 'clipboard' 選項。
+		如果內建了 X11 會話管理協議 (XSMP) 的處理程序，-X 選項也關閉到
+		它的連接，以減少意想不到的延遲。
+		如果後來又希望恢復連接 (比如，客戶-服務器間的消息)，調用
+		|serverlist()| 函數。不過，這並不會重新打開 XSMP 的處理。
+		{Vi 無此功能}
+
+							*-s*
+-s {scriptin}	讀入腳本文件 "scriptin"。文件裡的字符就如同你輸入那樣被解釋。
+		這和命令 ":source! {scriptin}" 相同。如果在編輯器結束之前就遇
+		到文件尾，後續的字符從鍵盤讀入。只有在不是 Ex 模式啟動的時候才
+		工作。見 |-s-ex|。另見 |complex-repeat|。
+		{Vi 無此功能}
+
+							*-w_nr*
+-w {number}
+-w{number}	設置 'window' 選項為 {number}。
+
+							*-w*
+-w {scriptout}	所有你輸入的字符記錄在 "scriptout" 文件裡，直到 Vim 結束為止。
+		這可用於創建一個腳本文件，以後可以用 "vim -s" 或 ":source!" 重
+		新執行之。如果 "scriptout" 文件已經存在，新的字符會附加在其
+		後。另見 |complex-repeat|。
+		{scriptout} 不能以數字開始。
+		{Vi 無此功能}
+
+							*-W*
+-W {scriptout}	和 -w 類似，但不是附加，而是覆蓋已經存在的文件。
+		{Vi 無此功能}
+
+--remote [+{cmd}] {file} ...
+		在另外一個作為服務器的 Vim 裡打開 {file}。任何非文件的參數必須
+		在此之前出現。
+		見 |--remote|。{Vi 無此功能}
+
+--remote-silent [+{cmd}] {file} ...
+		和 --remote 類似，但如果找不到服務器，不會抱怨。
+		見 |--remote-silent|。{Vi 無此功能}
+
+--remote-wait [+{cmd}] {file} ...
+		和 --remote 類似，但等待服務器結束文件的編輯。
+		見 |--remote-wait|。{Vi 無此功能}
+
+--remote-wait-silent [+{cmd}] {file} ...
+		和 --remote-wait 類似，但如果找不到服務器，不會抱怨。
+		見 |--remote-wait-silent|。{Vi 無此功能}
+
+--servername {name}
+		指定 Vim 服務器的名字，用以向它發送，會用於自己建立之。
+		見 |--servername|。{Vi 無此功能}
+
+--remote-send {keys}
+		向 Vim 服務器發送鍵碼序列 {keys} 並退出。
+		見 |--remote-send|。{Vi 無此功能}
+
+--remote-expr {expr}
+		在另外一個作為服務器的 Vim 裡執行表達式 {expr}。結果在標準輸出
+		裡顯示。
+		見 |--remote-expr|。{Vi 無此功能}
+
+--serverlist	輸出 Vim 服務器名字的列表並退出。
+		見 |--serverlist|。{Vi 無此功能}
+
+--socketid {id}						*--socketid*
+		只限於 GTK+ GUI Vim。gvim 會試圖使用 GtkPlug 機制，這樣它就可
+		別的窗口裡面運行。 詳情見 |gui-gtk-socketid|。
+		{Vi 無此功能}
+
+--windowid {id}						*--windowid*
+		只限於 Win32 GUI Vim。gvim 會嘗試使用窗口 {id} 作為父窗口，這
+		樣它就在該窗口內運行。詳見 |gui-w32-windowid|。{Vi 無此功能}
+
+--echo-wid						*--echo-wid*
+		只限於 GTK+ GUI Vim。gvim 會在標準輸出顯示窗口 ID。可以用之使
+		得 gvim 在 kpart 窗口組件裡運行。輸出格式是: >
+			WID: 12345\n
+		{Vi 無此功能}
+
+--role {role}						*--role*
+		只限於 GTK+ 2 GUI。設置主窗口的角色為 {role}。窗口管理器使用窗
+		口角色來唯一表示窗口，從而可以恢復窗口佈置等。登錄時恢復對話時
+		會自動傳遞 --role 參數。見 |gui-gnome-session|。
+		{Vi 無此功能}
+
+-P {parent-title}				*-P* *MDI* *E671* *E672*
+		只限於 Win32: 指定父應用程序的標題。如果可能，Vim 會找到該程
+		序，並在該應用程序裡以 MDI 窗口運行。
+		{parent-title} 必須出現在父應用程序的窗口標題裡。確信它足夠特
+		殊。
+		注意 現在的實現還很原始。不能適用於所有的應用程序，而且也不能
+		使用菜單。
+
+-nb							*-nb*
+-nb={fname}
+-nb:{hostname}:{addr}:{password}
+		試圖連接到 Netbeans 並成為它的一個編輯器服務器。第二種形式指定
+		一個文件，從該文件裡可以讀取連接的信息。第三種形式指定
+		Netbeans 需要的機器名、地址和密碼信息。|netbeans-run|
+		{僅當編譯時加入 |+netbeans_intg| 特性才有效；如果沒有 -nb 會使
+		 Vim 退出}
+
+如果可執行文件叫 "view"，Vim 會以可讀模式啟動。如果你可以創建從 "vim" 到
+"view" 的硬鏈接或者符號鏈接，就可以這麼用。
+也可以用 "vim -R" 啟動只讀的 Vim。
+
+如果可執行文件叫 "ex"，Vim 會以 "Ex" 模式啟動。這意味著它只接受 ":" 命令。不過
+如果給出 "-v" 參數，Vim 仍然會以普通模式啟動。
+
+在 unix 系統上如果編譯時加入 X11 GUI 支持，還可以使用其它參數。見
+|gui-resources|。
+
+==============================================================================
+2. Amiga 上的 Vim					*starting-amiga*
+
+從 Workbench 啟動 Vim 					*workbench*
+-------------------------------
+
+Vim 可以從 Workbench 通過雙擊其圖標啟動。這時，啟動時使用空白緩衝區。
+
+Vim 可以通過 "Project" 圖標開始編輯一到多個文件。圖標的 "Default Tool" 應該是
+Vim 可執行文件的完整路徑。".info" 文件名應該和文本文件的名字相同。通過雙擊圖
+標，Vim 啟動時編輯該文件名，並作為當前文件名，讀入緩衝區 (如果該文件存在的
+話)。你可以通過點擊圖標時按住 Shift 鍵，並在最後一個文件上雙擊來編輯多個文件。
+所有這些圖標的 "Default Tool" 都應該一致。
+
+除了文件名以外，通過 workbench 不可能給 Vim 傳遞別的參數。
+
+Vim 窗口						*amiga-window*
+----------
+
+Vim 在啟動的 CLI 窗口裡運行。如果 Vim 以 "run" 或 "runback" 命令啟動，或者 Vim
+通過 workbench 啟動的話，它會給自己打開一個窗口。
+
+技術細節:
+	要打開一個新窗口，要用一點小技巧。一旦 Vim 認識到它不可能在正常的 CLI
+	窗口裡運行，它會在 "t:" 建立一個腳本文件。該腳本文件包含 Vim 啟動時的
+	相同命令，還有 "endcli" 命令。然後，該腳本通過 "newcli" 命令執行 (這需
+	要 "c:run" 和 "c:newcli" 命令)。腳本文件會保留，直到重啟或者你刪除它的
+	時候為止。該方法需要 ":sh" 和 ":!" 命令能夠正確工作。但如果 Vim 以 -f
+	選項 (前台模式) 啟動，就不使用這個方法。原因是，一個程序以 -f 選項啟動
+	Vim 時，它等待 Vim 返回。使用這個腳本的技巧，調用程序沒法知道 Vim 什麼
+	時候真的退出。比如，mail 程序可以使用 -f 選項來啟動 Vim，然後等待編輯
+	會話的結束。受其影響，":sh" 和 ":!" 命令在應用 -f 選項的時候不能使用。
+
+Vim 會自動識別窗口大小，並對窗口的大小調整做出反應。在 Amiga DOS 1.3 裡面，建
+議使用 fastfonts 程序 "FF"，來加快顯示的重畫速度。
+
+==============================================================================
+3. 運行 eVim							*evim-keys*
+
+EVim 運行的 Vim 使用了點擊-輸入的編輯器風格。這和原來的 Vi 的設計大有分別。但
+是對不常用 Vim 的人學習 Vim 命令有幫助。希望他們能發現使用普通模式下的命令會使
+得編輯更為有效。
+
+Evim 裡，以下選項被改變，不同於缺省值:
+
+	:set nocompatible	使用 Vim 的改進
+	:set insertmode		大部分時間裡保持在插入模式裡
+	:set hidden		使得不可見的緩衝區保持載入
+	:set backup		保持備份文件 (VMS 沒有)
+	:set backspace=2	退格可以刪除任何東西
+	:set autoindent		自動縮進新行
+	:set history=50		保持 50 行的 Ex 命令歷史
+	:set ruler		顯示光標位置
+	:set incsearch		輸入模式過程中動態顯示部分模式對應的匹配
+	:set mouse=a		在所有模式下使用鼠標
+	:set hlsearch		高亮搜索模式的所有匹配
+	:set whichwrap+=<,>,[,]  <Left> 和 <Right> 在換行符上迴繞
+	:set guioptions-=a	只限於非 Unix: 不要自動選擇
+
+鍵盤映射:
+	<Down>		在屏幕行而不是文件行間移動
+	<Up>		同上
+	Q		等同於 "gq"，排版，而不是 Ex 模式
+	<BS>		可視模式: 刪除選擇
+	CTRL-X		可視模式: 剪切到剪貼板
+	<S-Del>		同上
+	CTRL-C		可視模式: 複製到剪貼板
+	<C-Insert>	同上
+	CTRL-V		粘貼到剪貼板 (在任何模式下都可以)
+	<S-Insert>	同上
+	CTRL-Q		做以前 CTRL-V 做的事
+	CTRL-Z		撤銷
+	CTRL-Y		重做
+	<M-Space>	系統菜單
+	CTRL-A		選擇所有
+	<C-Tab>		下一個窗口，CTRL-W w
+	<C-F4>		關閉窗口，CTRL-W c
+
+另外:
+- 使用 ":behave mswin" |:behave|
+- 打開語法高亮
+- 使用文件類型檢測。也使用文件類型插件和縮進
+- 在文本文件裡，'textwidth' 設為 78
+
+一個提示: 如果你想進入普通模式並可以輸入一串命令，使用 CTRL-L。|i_CTRL-L|
+
+==============================================================================
+4. 初始化					*initialization* *startup*
+
+本節是關於 Vim 的非 GUI 版本的。關於啟動 GUI 的額外初始化步驟，見 |gui-fork|。
+
+啟動時，Vim 檢查環境變量和文件，並相應設置值。Vim 按以下順序處理:
+
+1. 設置 'shell' 和 'term' 選項			*SHELL* *COMSPEC* *TERM*
+	環境變量 SHELL，如果存在的話，用來設置 'shell' 選項。MS-DOS 和 Win32
+	上，如果沒有設置 SHELL 的話，使用 COMSPEC 變量。
+	環境變量 TERM，如果存在的話，用來設置 'term' 選項。不過，後來在啟動
+	GUI 時會改變 'term' (下面的第 8 步)。
+
+2. 處理參數
+	Vim 啟動時命令行上給出的選項和文件名被檢查。為所有的文件創建緩衝區 (但
+	這時還沒有載入)。
+	|-V| 參數可以用來顯示或記錄下一步發生了什麼，用於對初始化進行調試。
+
+3. 根據環境變量和/或文件執行 Ex 命令
+	讀入某個環境變量，作為 Ex 命令執行之，多個命令可以用 '|' 或 "<NL>" 分
+	隔。
+								*vimrc* *exrc*
+	包含初始化命令的文件叫做 "vimrc" 文件。vimrc 文件的每一行都作為 Ex 命
+	令執行。有時，它也被叫做 "exrc" 文件。它們是同一種類型文件。但是 Vi 一
+	直用 "exrc"。而 "vimrc" 是 Vim 專用的名字。另見 |vimrc-intro|。
+
+	建議保存你個人初始化的地方是:
+		Unix		    $HOME/.vimrc
+		OS/2		    $HOME/.vimrc 或 $VIM/.vimrc (或 _vimrc)
+		MS-DOS 和 Win32     $HOME/_vimrc 或 $VIM/_vimrc
+		Amiga		    s:.vimrc 或 $VIM/.vimrc
+
+	如果 Vim 啟動時使用了 "-u filename" 參數，則使用文件 "filename"。直到
+	第四步以前的所有初始化都被跳過。"vim -u NORC" 可以用來跳過這些初始化，
+	而且不讀入任何文件。"vim -u NONE" 同時也跳過插件的載入。|-u|
+
+	如果 Vim 啟動時使用了 "-s" 參數，所有直到第四步以前的所有初始化都被跳
+	過。只有 "-u" 選項會被解釋。
+							*evim.vim*
+     a. 如果 vim 以 |evim| 或 |eview| 之名啟動，或帶上 |-y| 參數，載入
+	$VIMRUNTIME/evim.vim 腳本。
+							*system-vimrc*
+     b. 對 Unix、MS-DOS、MS-Windows、OS/2、VMS、Macintosh、RISC-OS 和 Amiga，
+	讀入系統 vimrc 文件執行初始化。該文件的路徑可見於 ":version" 命令。多
+	數情況下，它是 "$VIM/vimrc"。
+	注意  該文件_總_是以 'compatible' 模式讀入的，因為自動復位
+	'compatible' 只有可能在以後發生。如果你喜歡，加上 ":set	nocp" 命令。
+	對 Macintosh，讀入 $VIMRUNTIME/macmap.vim。
+
+	  *VIMINIT* *.vimrc* *_vimrc* *EXINIT* *.exrc* *_exrc* *$MYVIMRC*
+     c. 在四個地方依次搜索初始化命令。第一個找到的地方被使用，餘者被忽略。
+	$MYVIMRC 環境變量被設為最先找到的文件，除非 $MYVIMRC 已經被設置和
+	(譯者注: 或？) 使用 VIMINIT。
+
+	-  環境變量 VIMINIT (另見 |compatible-default|) (*)
+	   $VIMINIT 的值作為 Ex 命令行來使用。
+	-  用戶 vimrc 文件:
+		    "$HOME/.vimrc"	(用於 Unix 和 OS/2) (*)
+		    "s:.vimrc		(用於 Amiga) (*)
+		    "home:.vimrc"	(用於 Amiga) (*)
+		    "$VIM/.vimrc"	(用於 OS/2 和 Amiga) (*)
+		    "$HOME/_vimrc"	(用於 MS-DOS 和 Win32) (*)
+		    "$VIM/_vimrc"	(用於 MS-DOS 和 Win32) (*)
+		注意: 對 Unix、OS/2 和 Amiga 而言，如果 ".vimrc" 不存在，則嘗
+		試 "_vimrc"。因為有可能使用了 MS-DOS 兼容的文件系統。
+		對 MS-DOS 和 Win32 而言，".vimrc" 在 "_vimrc" 之後檢查，因為可
+		能可以使用長文件名。
+		注意: 對 MS-DOS 和 Win32 而言，先檢查 "$HOME"。如果那裡沒有
+		"_vimrc" 或 ".vimrc"，再找 "$VIM"。
+		如果 $VIM 沒有設置，見 |$VIM|。
+	-  環境變量 EXINIT。
+	   $EXINIT 的值作為 Ex 命令行來使用。
+	-  用戶 exrc 文件。和用戶 vimrc 文件一樣，只不過 "vimrc" 被 "exrc" 代
+	   替而已。但只會使用 ".exrc" 或 "_exec" 兩者之一，取決於不同系統。而
+	   且不適用 (*)！
+
+     d. 如果打開 'exrc' 選項 (並非缺省)，在當前目錄搜索三個文件。最先找到的
+	被使用，其餘的忽略。
+	-  文件 ".vimrc" (用於 Unix、Amiga 和 OS/2) (*)
+		"_vimrc" (用於 MS-DOS 和 Win32) (*)
+	-  文件 "_vimrc" (用於 Unix、Amiga 和 OS/2) (*)
+		".vimrc" (用於 MS-DOS 和 Win32) (*)
+	-  文件 ".exrc"  (用於 Unix、Amiga 和 OS/2)
+		"_exrc"  (用於 MS-DOS 和 Win32)
+
+     (*) 如果使用該文件或環境變量，'compatible' 缺省被關閉。見
+	 |compatible-default|。
+
+4. 載入插件腳本。						*load-plugins*
+	相當於執行如下命令: >
+		:runtime! plugin/**/*.vim
+<	結果是，'runtimepath' 選項下的所有目錄會搜索 "plugin" 子目錄，而其中所
+	有 ".vim" 結尾的文件會被執行 (每個目錄下，按字母順序依次執行)，包括所
+	有子目錄的子目錄 (依此類推)。
+	以下情況下，不載入插件:
+	- vimrc 文件裡復位 'loadplugins' 選項。
+	- 使用 |--noplugin| 命令化參數。
+	- 使用 "-u NONE" 命令化參數 |-u|。
+	- 編譯 Vim 時不帶 |+eval| 特性。
+	注意 使用 "-c set noloadplugins" 沒有用，因為命令行的命令這時還沒有執
+	行。可以用 "--cmd 'set noloadplugins'" |--cmd|。
+
+5. 設置 'shellpipe' 和 'shellredir'
+	除非已經設置過，'shellpipe' 和 'shellredir' 選項根據 'shell' 選項的值
+	取值。這意味著除非你自己已經選好了，Vim 會為你找到 'shellpipe' 和
+	'shellredir' 的值。
+
+6. 如果使用 "-n" 命令行參數，設置 'updatecount' 為零
+
+7. 置位 binary 選項
+	如果給 Vim "-b" 標誌，現在會置位二進制編輯的選項。見 |-b|。
+
+8. 進行 GUI 初始化
+	只有啟動 "gvim" 的時候，才會進行 GUI 的初始化。見 |gui-init|。
+
+9. 讀入 viminfo 文件
+	如果 'viminfo' 選項不為空，讀入 viminfo 文件。見 |viminfo-file|。
+
+10. 讀入 quickfix 文件
+	如果給 Vim "-q" 標誌，讀入 quickfix 文件。如果失敗，Vim 會退出。
+
+11. 打開所有窗口
+	如果給出 |-o| 標誌，打開所有窗口 (此時還沒顯示)。
+	如果給出 |-p| 標誌，創建所有標籤頁 (此時還沒顯示)。
+	屏幕的切換現在開始。啟動重畫。
+	如果給出 "-q" 標誌，跳到第一個錯誤處。
+	所有窗口的緩衝區會被載入。
+
+12. 執行啟動命令
+	如果給 Vim "-t" 標誌，跳轉到標籤處。
+	|-c| 和 |+cmd| 參數給出的命令現在執行。
+	如果置位了 'insertmode' 選項，進入插入模式。
+	執行 |VimEnter| 自動命令。
+
+初始化過程的一些提示:
+
+標準安裝:
+創建 vimrc 文件，為你所有的編輯會話建立缺省的設置和映射。把它放到 3b 指出的地
+方:
+	~/.vimrc	(Unix 和 OS/2)
+	s:.vimrc	(Amiga)
+	$VIM\_vimrc	(MS-DOS 和 Win32)
+注意 創建 vimrc 文件會使得 'compatible' 選項缺省被關閉。見
+|compatible-default|。
+
+本地安裝:
+把所有在某個目錄編輯所需要的命令放到 vimrc 文件裡，並把它放在那個目錄下並命名
+".vimrc" (MS-DOS 和 Win32 使用 "_vimrc")。注意: 要使得 Vim 查找這些特殊文件，
+你需要打開 'exrc' 選項。另見 |trojan-horse|。
+
+系統安裝:
+這只適用於你管理整個多個用戶的 Unix 系統，而希望為所有用戶設置缺省值的場合。建
+立建立缺省設置和映射的命令的 vimrc 文件，並把它放在 ":version" 命令指定的目錄
+下。
+
+保存當前 Vim 的狀態到文件:
+無論你何時改變選項的值或者建立新映射，你都可能想保存它們到 vimrc 文件裡以備後
+用。關於如何保存當前設置的狀態到文件，見 |save-settings|。
+
+Vi 用戶如何避免安裝問題:
+Vi 使用 EXINIT 變量和 "~/.exrc" 文件。所以，如果你不想影響 Vi，使用 VIMINIT 變
+量和 "vimrc" 文件。
+
+Amiga 環境變量:
+Amiga 上，有兩種環境變量。使用 DOS 1.3 (或以後版本) setenv 命令設置的那些可以
+識別。見 AmigaDos 1.3 手冊。使用舊的 Manx Set 命令設置的環境變量 (5.0 版本以
+前) 不能識別。
+
+MS-DOS 行分隔符:
+在 MS-DOS 類型的系統上 (MS-DOS 自己、Win32 和 OS/2)，Vim 假設所有的 vimrc 文件
+使用 <CR> <NL> 分隔行。如果你使用只用 <NL> 的文件，而且有類似於 ":map xx yy^M"
+的行，會有問題。因為結尾的 ^M 被忽略。
+
+						     *compatible-default*
+Vim 啟動時，'compatible' 選項是打開的。Vim 開始初始化的時候使用該設置。不過一
+旦找到用戶 vimrc 文件，或者找到當前目錄下的 vimrc 文件，或者 "VIMINIT" 環境變
+量被設置，就會設置 'nocompatible'。這麼做的副作用是會置位或復位其它選項 (見
+'compatible')，但只限於那些還沒有設置或復位過的選項。這和啟動 Vim 時採用
+'compatible' 的新設置效果相同。注意 這裡的討論不適用於系統範圍的 vimrc 文件，
+也不適用於 Vim 啟動時用 |-u| 命令行參數的情形，但適用於 gvimrc 文件。$MYVIMRC
+或 $MYGVIMRC 文件會被設置為第一個找到的 vimrc 和/或 gvimrc 文件。
+
+在找到 .vimrc 文件的這一刻置位或復位 'compatible' 有副作用: 映射在遭遇的時候就
+被解釋。因此，使用像 "<CR>" 這樣的值就會受到此影響。如果映射依賴於使用
+'compatible' 某個特定值，在給出映射前先置位或復位它。
+
+上述行為可以用如下方式改變之:
+- 如果給出 "-N" 命令行參數，使用 'nocompatible'，即使 vimrc 文件不存在亦然。
+- 如果給出 "-C" 命令行參數，使用 'compatible'，即使 vimrc 文件存在也不例外。
+- 如果使用 "-u {vimrc}" 參數，使用 'compatible'。
+- 如果可執行文件的名字以 "ex" 結尾，則和給出 "-C" 參數類似: 使用
+  'compatible'，即使 vimrc 文件存在也不例外。這使得 Vim 以 "ex" 的名字啟動的時
+  候，其行為和 "ex" 類同。
+
+避免特洛伊木馬:						*trojan-horse*
+讀入當前目錄下的 "vimrc" 或 "exrc" 文件時，為了安全原因，通過置位 'secure' 選
+項可以屏蔽某些命令。執行標籤文件裡的命令的時候，則總是如此。否則，你可能會不小
+心使用別人創建的 vimrc 或者標籤文件，從而執行了可怕的命令。屏蔽的包括那些需要
+啟動外殼的命令、寫入文件的命令還有自動命令。此外會回顯 ":map" 命令，從而看到那
+些鍵被映射了。
+	如果你想 Vim 執行本地 vimrc 文件的所有命令，可以使用 EXINIT 或者
+VIMINIT 環境變量或者在全局 "exec" 或 "vimrc" 文件裡屏蔽 'secure' 選項。顯然，
+不可以在當前目錄下的 "vimrc" 或 "exrc" 裡這麼做。
+	在 Unix 系統上，只有你不是 vimrc 文件的擁有者的時候這才發生。警告: 如
+果你解壓歸檔文件而且其中含有 vimrc 或者 exrc 文件的時候，它們也會屬於你，從而
+你不再有安全保護。啟動 Vim 的時候檢查當前目錄 vimrc 文件，或者乾脆復位 'exec'
+選項。有的 Unix 系統允許用戶給文件 "chown" (更換擁有者)。這使得別的用戶可以創
+建有問題的 vimrc，並使你成為擁有者。要小心！
+	使用標籤搜索命令的時候，搜索命令的執行 (標籤文件行裡最後一部分) 總是在
+安全模式下執行的。這和在當前目錄執行 vimrc/exrc 的命令的情況完全類似。
+
+							*slow-start*
+如果 Vim 啟動時間過長，用 |--startuptime| 參數可以知道為什麼。可能有幾個原因:
+- 如果 Unix 版本編譯時加入 GUI 和/或 X11 (檢查 ":version" 的輸出是否含有
+  "+GUI" 和 "+X11")，它可能需要載入共享庫並連接到 X11 服務器上。嘗試編譯一個不
+  帶有 GUI 和 X11 的版本。這也使得可執行文件小一些。
+  使用 |-X| 命令行參數可以避免在終端運行時連接到 X 服務器上。
+- 如果你打開 "viminfo"，viminfo 文件的載入可能需要一點時間。通過暫時屏蔽
+  viminfo，你可以判斷這是否是個問題 (使用 Vim 參數 "-i NONE"，|-i|)。嘗試減少
+  寄存器可存貯的行數: ":set viminfo='20,<50,s10"。|viminfo-file|。
+
+							*:intro*
+如果 Vim 啟動的時候沒有給出文件名，它會顯示一段介紹文字 (為了幫助那些不知道
+Vim 是什麼的人)。一旦因為任何原因顯示重畫，它就被刪除了。要再次看到這段文字，
+使用 ":intro" 命令 (如果空間不夠，你只會看到部分內容)。
+   要避免啟動時的介紹文字，在 'shortmess' 裡加上 'I' 標誌位。
+
+							*info-message*
+|--help| 和 |--version| 參數使得 Vim 顯示消息，並退出。通常，該消息發送到標準
+輸出上。因此，它可以這樣被重定向到文件裡: >
+
+	vim --help >file
+
+在 Vim 裡面: >
+
+	:read !vim --help
+
+使用 gvim 的時候，會檢測到因為從桌面啟動，無法使用終端來顯示消息。這是通過檢測
+到標準輸出 (stdout) 和標準錯誤 (stderr) 不全是 tty 完成的。這也使得上述例子裡
+的 ":read" 命令不能工作。要使其能夠工作，把 'shellredir' 設為 ">" 而不是缺省的
+">&": >
+
+	:set shellredir=>
+	:read !gvim --help
+
+不過，在 gvim 完全無法使用標準輸出的系統中，這仍然無法工作。
+
+==============================================================================
+5. $VIM 和 $VIMRUNTIME
+								*$VIM*
+環境變量 "$VIM" 用於定位許多 Vim 使用的用戶文件，例如用戶啟動腳本 ".vimrc"。不
+同的系統有所不同，見 |startup|。
+
+為了省得每個用戶都設置 $VIM 環境變量，Vim 試圖根據以下順序取得 $VIM 的值:
+1. $VIM 環境變量定義的值。你可以這樣使得 Vim 在特定目錄下找到它的支持文件。例
+   如: >
+	setenv VIM /home/paul/vim
+2. 使用 'helpfile' 的路徑，除非它本身也包含其它的環境變量 (因為其缺省值是
+   "$VIMRUNTIME/doc/help.txt": 雞生蛋的問題)。文件名 ("help.txt" 或者別的) 被
+   去掉。結尾的幾項目錄名也被分別去掉。其順序是: "doc"、"runtime" 和
+   "vim{version}" (例如，"vim54")。
+3. 對 MSDOS、Win32 和 OS/2 而言，Vim 試圖使用可執行文件的目錄名。如果以 "/src"
+   結尾，則去掉該部分。這用於以下場合: 你把 .zip 文件解壓到某個目錄，然後調整
+   搜索路徑以找到其中的 vim 可執行文件。結尾的目錄名被去掉。其順序是:
+   "runtime" 和 "vim{version}" (例如，"vim54")。
+4. Unix 上，使用編譯時定義的安裝目錄 (見 ":version" 的輸出結果)。
+
+一旦 Vim 完成以上操作，它據此設置 $VIM 環境變量。要在其後修改，可以這樣使用
+":let" 命令: >
+	:let $VIM = "/home/paul/vim/"
+<
+								*$VIMRUNTIME*
+環境變量 "$VIMRUNTIME" 用於定位若干支持文件，比如在線的幫助文檔和語法高亮文
+件。例如，主幫助文件正常情況下應該是 "$VIMRUNTIME/doc/help.txt"。
+你通常不需要自己設置 $VIMRUNTIME，而應該讓 Vim 自己去找。以下是查找
+$VIMRUNTIME 的值所用的順序:
+1. 如果設置了環境變量 $VIMRUNTIME，則使用之。如果運行時文件在不常見的位置，可
+   以在這裡定義。
+2. 如果 "$VIM/vim{version}" 存在，則使用之。{version} 是 Vim 的版本號，不包括
+   任何的 '-' 或 '.'。例如: "$VIM/vim54"。這是正常情況下 $VIMRUNTIME 的值。
+3. 如果 "$VIM/runtime" 存在，使用之。
+4. 使用 $VIM 的值。這和較老的版本後向兼容。
+5. 如果設置了 'helpfile' 選項，並且它不包括 '$'，則使用它的值，去掉後面的
+   "doc/help.txt" 部分。
+
+在 Unix 上，有一個 $VIMRUNTIME 編譯時的缺省值 (檢查 ":version" 的輸出)，跳過步
+驟 2、3 和 4，而在第五步之後使用編譯時的缺省值。這意味著編譯時的缺省值否決了
+$VIM 的值。這可以用於 $VIM 為 "/etc" 而運行時文件在 "/usr/share/vim/vim54" 的
+情況。
+
+一旦 Vim 完成以下操作，它據此設置 $VIMRUNTIME 環境變量。要在其後修改之，這樣使
+用 ":let" 命令: >
+	:let $VIMRUNTIME = "/home/piet/vim/vim54"
+
+如果你需要在外殼裡得到 $VIMRUNTIME 的值 (例如，在幫助文件裡 grep 腳本)，你可以
+這麼用: >
+
+	VIMRUNTIME=`vim -e -T dumb --cmd 'exe "set t_cm=\<C-M>"|echo $VIMRUNTIME|quit' | tr -d '\015' `
+
+==============================================================================
+6. 暫停							*suspend*
+
+					*iconize* *iconise* *CTRL-Z* *v_CTRL-Z*
+CTRL-Z			暫停 Vim，和 ":stop" 類似。
+			適用於普通和可視模式。在插入和命令行模式裡，CTRL-Z 作
+			為普通的字符插入。在可視模式下，Vim 回到普通模式。
+			注意: 如果 CTRL-Z 撤銷改變，見 |mswin.vim|。
+
+
+:sus[pend][!]	或			*:sus* *:suspend* *:st* *:stop*
+:st[op][!]		暫停 Vim。
+			如果沒有給出 '!' 並且置位 'autowrite'，那麼每個修改過
+			且有文件名的緩衝區都被寫回。如果給出 '!' 或
+			'autowrite' 沒有置位，修改過的緩衝區不會寫回。
+			遲些時候，不要忘記把 Vim 帶回前台！
+
+在 GUI 上，暫停是通過使 Vim 圖標化完成的。在 Windows 95/NT 上，gvim 被最小化。
+
+在許多 Unix 系統中，可以使用 CTRL-Z 暫停 Vim。這只適用於普通和可視模式 (見下一
+章，|vim-modes|)。如果你把 Vim 放回前台，它會繼續工作。在其它系統中，CTRL-Z 會
+啟動新的外殼。這和 ":sh" 命令相同。在退出外殼後，Vim 會繼續。
+
+在 X-windows 裡，Vim 暫停時不再擁有選擇區。這意味著你不能在其它應用粘貼之 (因
+為 Vim 進入睡眠，試圖得到選擇區會使得程序掛起)。
+
+==============================================================================
+7. 保存設置						*save-settings*
+
+多數情況下，你會手動編輯你的 vimrc 文件。這給你最大程度的靈活性。有一些命令可
+以自動產生 vimrc 文件。你可以直接使用生成的文件，也可以複製/粘貼其中的一些行到
+其它的 vimrc 文件裡。
+
+							*:mk* *:mkexrc*
+:mk[exrc] [file]	寫入當前的鍵盤映射和修改過的選項到 [file] 裡 (缺省是當
+			前目錄下的 ".exrc" )，除非它已經存在。{Vi 無此功能}
+
+:mk[exrc]! [file]	總是寫入當前的鍵盤映射和修改過的選項到 [file] 裡 (缺省
+			是當前目錄下的 ".exrc" )。{Vi 無此功能}
+
+							*:mkv* *:mkvimrc*
+:mkv[imrc][!] [file]	和 ":mkexrc" 類似，但是缺省值是當前目錄下的 ".vimrc"。
+			同時，也把 ":version" 寫入文件裡。{Vi 無此功能}
+
+這些命令會把 ":map" 和 ":set" 命令寫入到文件裡，使得這些命令執行時，當前的鍵盤
+映射和選項會設成和現在相同的值。選項 'columns'、'endofline'、'fileformat'、
+'key'、'lines'、'modified'、'scroll'、'term'、'textmode'、'ttyfast' 和
+'ttymouse' 不含在內，因為它們和終端和文件有關。注意 選項 'binary'、'paste' 和
+'readonly' 是包含在內的，有時這並不是你所希望的。
+
+如果映射使用了特殊鍵，'cpoptions' 選項會暫時設為 Vim 的缺省值，以免映射被錯誤
+的解釋。這使得該文件和 Vi 不兼容，但可以確保它能在不同的終端環境上使用。
+
+只有全局映射被保存，局部於緩衝區的不會。
+
+常見的方法是使用缺省的 ".vimrc" 文件，修改一些 ":map" 和 ":set" 命令，然後寫回
+修改過的文件。先用命令讀入缺省的 ".vimrc" 文件，像這樣
+":source ~piet/.vimrc.Cprogs"，修改設置，然後保存到當前目錄: ":mkvimrc!"。若果
+你想使之成為缺省的 .vimrc，把該文件移動到主目錄 (Unix 上)，s: (Amiga) 或者
+$VIM 目錄 (MS-DOS)。你也可以使用自動命令 |autocommand| 和/或模式行
+|modeline|。
+
+						*vimrc-option-example*
+如果你只想增加一個選項設置到 vimrc 裡，可以使用這些步驟:
+1. 用 Vim 編輯你的 vimrc 文件。
+2. 測試選項值直到正確為止。比如，試試 'guifont' 不同的值。
+3. 附加一行設置選項的值。使用表達式寄存器 '=' 來輸入值。比如，對 'guifont' 選
+   項: >
+   o:set guifont=<C-R>=&guifont<CR><Esc>
+<  [<C-R> 是 CTRL-R，<CR> 是回車，<Esc> 是 escape 鍵]
+   你需要轉義特殊字符，特別是空格。
+
+注意 你建立 .vimrc 文件本身會影響 'compatible' 選項，這有若干副作用。見
+|'compatible'|。":mkvimrc"、":mkexrc" 和 ":mksession" 首先寫入置位或者復位
+'compatible' 選項的命令到輸出文件裡，就是因為有這些副作用的存在。
+
+==============================================================================
+8. 視圖和會話					*views-sessions*
+
+在用戶手冊的 |21.4| 和 |21.5| 兩節已有相關介紹。
+
+						*View* *view-file*
+視圖是應用於一個窗口的設置的集合。你可以保存視圖，並在以後恢復之，從而使文本以
+同樣的方式顯示。本窗口的選項和映射也會同時恢復，這樣你可以從上次保存的視圖開始
+繼續編輯。
+
+						*Session* *session-file*
+會話保存所有窗口的視圖，外加全局設置。你可以保存會話，並在以後恢復之，使得窗口
+的佈局看起來一樣。你可以創建會話在不同的項目之間快速切換，切換時自動調入你上次
+在那個項目上工作的文件。
+
+視圖和會話是 viminfo 文件的一個很好的補充，後者用來記住所有視圖和會話都使用的
+信息 |viminfo-file|。
+
+通過 |-S| 參數，你可以使用以前保存的視圖或者會話快速啟動編輯: >
+	vim -S Session.vim
+<
+{Vi 無此功能} 還有 {僅當編譯時加入 |+mksession| 特性才有效}。
+
+							*:mks* *:mksession*
+:mks[ession][!] [file]	寫入一個 Vim 腳本，該腳本能夠恢復當前的編輯會話。
+			如果包含 [!]，已有的文件會被覆蓋。如果不提供 [file]，
+			使用 "Session.vim"。
+
+":mksession" 的輸出結果類似於 ":mkvimrc"，但文件裡附加更多的命令。這取決於
+'sessionoptions' 選項的值。產生的文件在用 ":source" 命令執行時:
+1. 如果 'sessionoptions' 包含 "options" 的話，恢復全局映射和選項。局部於腳本的
+   映射不會被寫入。
+2. 如果 'sessionoptions' 包含 "globals" 的話，恢復大寫字母開始並至少包含一個小
+   寫字母的全局變量。
+3. 卸載當前所有載入的緩衝區。
+4. 如果 'sessionoptions' 包含 "curdir" 的話，恢復當前目錄。或者如果
+   'sessionoptions' 包含 "sesdir" 的話，設置當前目錄為會話文件所在的位置。
+5. 如果 'sessionoptions' 包含 "winpos" 的話，恢復 GUI Vim 的窗口位置。
+6. 如果 'sessionoptions' 包含 "resize" 的話，恢復屏幕大小。
+7. 恢復緩衝區列表，還有它們最後的光標位置。如果 'sessionoptions' 包含
+   "buffers" 的話，恢復所有的緩衝區，包括隱藏和未載入的。不然，只有窗口裡打開
+   的緩衝區才被恢復。
+8. 恢復所有窗口並使用和過去相同的佈局。如果 'sessionoptions' 包含 "help" 的
+   話，幫助窗口也被恢復。如果 'sessionoptions' 包含 "blank" 的話，編輯無名緩衝
+   區的窗口也被恢復。如果 'sessionoptions' 包含 "winsize" 並且沒有任何 (幫助/
+   空白) 窗口被放棄的話，則恢復窗口大小 (相對於屏幕大小)。否則，只為窗口給定合
+   適的大小。
+9. 如同 |:mkview| 那樣，恢復各個窗口的所有視圖。但使用 'sessionoptions' 而不是
+   'viewoptions'。
+10.如果存在和會話文件同名，但以 "x.vim" (x 代表 "附加" eXtra) 結尾的文件，也同
+   時執行之。你可以用 *x.vim 文件來指定和給出會話相關的附加設置和動作，比如在
+   GUI 版本裡創立菜單項目。
+
+在恢復會話後，當前會話的完整文件名可以通過內部變量 "v:this_session" 得到
+|this_session-variable|。映射示例: >
+  :nmap <F2> :wa<Bar>exe "mksession! " . v:this_session<CR>:so ~/sessions/
+這會保存當前會話，並啟動載入另外一個會話的命令。
+
+會話包含所有標籤頁，除非從 'sessionoptions' 裡刪除了 'tabpages'。|tab-page|
+
+|SessionLoadPost| 自動命令事件在會話文件載入/執行後被激活。
+						*SessionLoad-variable*
+會話文件載入期間，SessionLoad 全局變量被設為 1。用此變量，插件可以推遲部分工
+作，直到激活 SessionLoadPost 事件時才執行。
+
+							*:mkvie* *:mkview*
+:mkvie[w][!] [file]	寫入一個 Vim 腳本，該腳本能夠恢復當前的窗口內容。
+			如果包含 [!]，已有的文件會被覆蓋。如果不提供 [file] 或
+                        者它是從 1 到 9 的數字，則生成一個名字並在前面加上
+			'viewdir' 的值。如果 'viewdir' 的最後一個目錄名不存
+			在，則順便也建立該目錄。
+			如果該文件已存在，這時它總會被覆蓋。使用 |:loadview|
+			來重新載入該視圖。
+			如果 [file] 是文件名 (不考慮 'viewdir')，則編輯該文件
+			的命令加入到生成的文件裡。
+
+":mkview" 的輸出包含如下項目:
+1. 該窗口使用的參數列表。如果使用全局參數列表，它被重設為全局列表的值。參數列
+   表的索引位置也被保存。
+2. 窗口編輯的文件。如果沒有文件，該窗口被清空。
+3. 如果 'viewoptions' 包含 "options" 或者 "localoptions" 的話，恢復映射、縮寫
+   和局部於窗口的選項。一般，只有局部於當前緩衝區和窗口的選項值被恢復。如果視
+   圖作為會話的一部分被保存，並且 'sessionoptions' 包含 "options" 的話，局部選
+   項的全局值也被保存。
+4. 如果使用手動折疊並且 'viewoptions' 包含 "folds" 的話，恢復折疊。也恢復手動
+   打開和關閉的折疊。
+5. 滾動條的位置和文件中的光標位置。如果有關閉的折疊，這不能很好的工作。
+6. 本地的當前目錄，如果和全局當前目錄不同的話。
+
+注意 視圖和會話並不完善:
+- 它們並不會恢復所有的信息。比如，定義的函數、自動命令和 ":syntax on" 並不包括
+  在內。包括寄存器內容、命令行歷史包含在 viminfo 裡，而不是會話或者視圖裡。
+- 全局選項值只有在和缺省值不同時才會被設置。如果當前值不同於缺省值，載入會話不
+  會把它設為缺省值。不過，局部選項會設為它們的缺省值。
+- 已有的映射沒有預警的被覆蓋。其它已有的映射可能會因為這些二義性引起錯誤。
+- 保存手動折疊和手動打開/關閉的折疊時，保存和載入時的文件內容差異會引起折疊恢
+  復的混亂。
+- Vim 腳本效率不高。不過比你自己輸入這些命令總會快點。
+
+							*:lo* *:loadview*
+:lo[adview] [nr]	為當前文件載入視圖。如果沒有給出 [nr]，":mkview" 保存
+			的視圖被恢復。如果指定 [nr]，":mkview [nr]" 保存的視圖
+			被恢復。
+
+":mkview" 和 ":loadview" 的組合可以用來保存同一文件不超過十個的不同視圖。它們
+被保存於 'viewdir' 選項指定的目錄下。使用該文件名保存視圖。如果文件被換名或者
+通過 (符號) 鏈接訪問，就找不回你的視圖了。
+
+時不時，你也許要想要清除 'viewdir' 目錄的內容。
+
+要自動保存和恢復 *.c 文件的視圖: >
+	au BufWinLeave *.c mkview
+	au BufWinEnter *.c silent loadview
+
+==============================================================================
+9. viminfo 文件					*viminfo* *viminfo-file* *E136*
+						*E575* *E576* *E577*
+如果你退出 Vim 以後又再次啟動，通常你會丟失許多信息。viminfo 文件可以用來記住
+這些信息，從而允許你繼續上次退出的編輯。
+
+用戶手冊 |21.3| 一節有所介紹。
+
+viminfo 文件用來保存:
+- 命令行歷史。
+- 搜索字符串歷史。
+- 輸入行歷史。
+- 非空的寄存器內容。
+- 多個文件的位置標記。
+- 文件標記，指向文件的位置。
+- 最近搜索/替換的模式 (適用於 'n' 和 '&')。
+- 緩衝區列表。
+- 全局變量。
+
+如果 |+viminfo| 特性在編譯時關閉，不支持 viminfo 文件。
+
+與此同時，你可以使用會話文件。差別是，viminfo 文件並不依賴於你工作的內容。通
+常，只有一個 viminfo 文件。而會話文件用來保存某個編輯會話的狀態。你可以保存多
+個會話文件，每個針對一個你工作的項目。viminfo 和會話文件一起可以用來有效的進入
+Vim 並直接從你希望的設置開始工作。|session-file|
+
+							*viminfo-read*
+如果 Vim 啟動時 'viminfo' 選項非空，viminfo 文件的內容被讀入，而其中的信息在適
+當的地方被應用。填入 |v:oldfile| 變量。啟動時並不讀入位置標記 (但是文件標記被
+讀入)。關於如何在啟動時設置 'viminfo' 選項，見 |initialization|。
+
+							*viminfo-write*
+如果 Vim 退出時 'viminfo' 非空，相關信息被保存在 viminfo 文件裡 (實際上，如果
+該文件存在的話，和已有的內容合併)。'viminfo' 選項是一個定義需要保存什麼信息的
+字符串，也包含這些信息需要保存多少的數量限制 (見 'viminfo')。
+
+Unix 上的 注意 事項:
+- viminfo 的文件保護會被設置，使得其它用戶不能夠讀取。因為它可能包含任何文本或
+  者工作所需的命令。
+- 如果你需要和其它用戶共享 viminfo 文件 (例如，當你 "su" 到另外一個用戶的時
+  候)，你可以使該文件對同組甚至所有人可寫。Vim 在寫入新的 viminfo 文件的時候會
+  保留該文件的權限。要小心，不要不加考慮的允許任何人讀寫你的 viminfo 文件！
+- Vim 不會覆蓋當前 "實際" 用戶不能寫入的 viminfo 文件。這對使用 "su" 成為 root
+  但是 $HOME 仍然指向一個普通用戶的主目錄的用戶有用。不然 Vim 會建立一個 root
+  擁有的 viminfo 文件，使得別人都無法讀取。
+- viminfo 文件不能是符號鏈接。為了避免安全問題。
+
+可以為每個文件分別存貯位置標記。文件讀入時，如果 'viminfo' 非空，該文件的位置
+標記會從 viminfo 文件裡讀取。注意: 位置標記只有在退出 Vim 的時候才會保存。因為
+對所有你在當前編輯會話打開的文件都保存位置標記，這應該沒有問題。除非使用過
+":bdel"。如果你想保存準備用 ":bdel" 放棄的文件的位置標記，使用 ":wv"。
+'[' 和 ']' 位置標記不會保存，但 '"' 位置標記會。'"' 位置標記用於跳轉到文件最近
+退出時的光標位置。用 'viminfo' 的 "r" 標誌位指定的字符串開始的任何文件不會保存
+其位置標記。這可以用來防止為可移動媒介上的文件保存位置標記 (MS-DOS 上你可以用
+"ra:,rb:"，Amiga 上 "rdf0:,rdf1:,rdf2:")。
+|v:oldfiles| 變量填入 viminfo 文件中有位置標記的那些文件名。
+
+							*viminfo-file-marks*
+大寫位置標記 ('A 到 'Z) 在寫入 viminfo 文件時被保存。數字標記 ('0 到 '9) 則有
+點特殊。在寫入 viminfo 文件時 (退出或者使用 ":wviminfo" 命令)，'0 設置為當前光
+標的位置和所在的文件。舊的 '0 被移到 '1，'1 到 '2，等等。這和 "1 到 "9 刪除用
+的寄存器的處理類似。如果當前光標位置已經在 '0 到 '9 裡，它被移動到 '0，以免保
+存相同的位置兩次。結果是，使用 "'0" 可以跳轉回你退出 Vim 時所在的文件和行號。
+要立刻執行之，試用以下命令: >
+
+	vim -c "normal '0"
+
+在 csh 兼容的外殼裡，你可為此建立一個別名: >
+
+	alias lvim vim -c '"'normal "'"0'"'
+
+在 bash 兼容的外殼裡: >
+
+	alias lvim='vim -c "normal '\''0"'
+
+'viminfo' 裡可以使用 "r" 標誌位來指定什麼文件不需要保存位置標記。
+
+
+viminfo 文 件 名					*viminfo-file-name*
+
+- 在 Unix 和 OS/2 上，viminfo 文件的缺省文件名是 "$HOME/.viminfo"。Amiga 是
+  "s:.viminfo"，MS-DOS 和 Win32 則是 "$HOME\_viminfo"。對於後兩者，如果沒有設
+  置 $HOME，使用 "$VIM\_viminfo"。如果 $VIM 也沒有設置，使用 "c:\_viminfo"。對
+  於 OS/2，如果沒有設置 $HOME 但設置了 $VIM，使用 "$VIM/.viminfo"。
+- 'viminfo' 選項裡的 'n' 標誌位可以用來指定另外一個 viminfo 文件名
+  |'viminfo'|。
+- Vim 的 "-i" 參數可以用來設置另外一個文件名 |-i|。如果給出的文件名是 "NONE"
+  (全是大寫)，不讀寫任何 viminfo 文件。下面給出的這些命令裡也可以這麼使用！
+- 下面給出的命令裡，可以給定另外一個文件名。它覆蓋缺省文件名和 'viminfo' 或者
+  "-i" 給定的文件名 (除非它是 NONE)。
+
+
+字 符 編 碼						*viminfo-encoding*
+
+viminfo 文件的文本使用 'encoding' 選項指定的編碼。通常你總是使用相同的
+'encoding' 值，這沒有問題。不過，如果使用不同於寫入時使用的 'encoding' 的值讀
+取 viminfo 文件，有些文本 (非 ASCII 字符) 可能不正確。如果不能接受，你可以在
+'viminfo' 選項裡加上 'c' 標誌位: >
+	:set viminfo+=c
+Vim 會試圖從 viminfo 文件寫入時所使用的 'encoding' 值轉換到當前的 'encoding'
+值。這需要 Vim 編譯時帶上 |+iconv| 特性。文件名不會被轉換。
+
+
+手 動 讀 寫						*viminfo-read-write*
+
+兩個命令可以用來手動讀寫 viminfo 文件。這可以用來在兩個運行中的 Vim 程序之間交
+換寄存器的值: 先在其中一個輸入 ":wv"，再在另外一個用 ":rv"。注意 如果寄存器裡
+已經有內容，那麼需要 ":rv!" 才行。也要 注意 這意味著所有的內容都被第一個 Vim
+實例的信息所覆蓋，包括命令行歷史等。
+
+viminfo 文件本身也可以手動修改，不過我們建議你從已有的 viminfo 開始，保證格式
+沒有錯誤。一旦你熟悉了，該文件格式很容易理解。這可以用來建立另一個 viminfo 文
+件，比如說 "~/.my_viminfo"，包含每次啟動 Vim 你想要的設置。比如，你可以用某些
+數據預先載入寄存器，或者把特定的命令放在命令行歷史裡。.vimrc 文件這樣的一行 >
+	:rviminfo! ~/.my_viminfo
+可以用來載入這些信息。你甚至可以為不同的文件類型應用不同的 viminfo (比如 C 代
+碼) 上。通過使用 ":autocmd" 命令 (見 |:autocmd|) 就可以根據文件名自動載入。
+
+							*viminfo-errors*
+一旦 Vim 在讀入 viminfo 文件時檢測到錯誤，以後就不會覆蓋那個文件。如果有超過
+10 個錯誤，Vim 停止該 viminfo 文件的讀取。這可以防止在給錯 viminfo 文件名字的
+情況下，不小心覆蓋該文件。比如，這可能發生於以下場合: 輸入 "vim -i file" 但實
+際想輸入 "vim -R file" (是的，有人不小心這麼幹過)。如果你仍然想覆蓋有錯誤的
+viminfo 文件，或者修正這個錯誤，或者先刪除這個文件 (在 Vim 運行的時候。這樣大
+部分的信息仍然可以恢復)。
+
+						   *:rv* *:rviminfo* *E195*
+:rv[iminfo][!] [file]	讀入 viminfo 文件 [file] (缺省: 見上)。
+			如果給出 [!]，那麼任何已經給出的信息 (寄存器、位置標
+			記、|v:oldfiles|，等等) 都會被覆蓋。{Vi 無此功能}
+
+					*:wv* *:wviminfo* *E137* *E138* *E574*
+:wv[iminfo][!] [file]	寫到 viminfo 文件 [file] (缺省: 見上)。
+			該文件的信息先被讀入，以合併原有和新的信息。如果使用
+			[!]，舊的信息不會先讀取，而是只寫入系統自己內部的信
+			息。如果 'viminfo' 為空，會寫入不超過 100 個文件的位置
+			標記。
+			如果你得到錯誤 "E138: Can't write viminfo file"，檢查
+			有沒有舊的臨時文件沒刪除 (比如 ~/.viminf*) 還有你是否
+			可以寫入 .viminfo 文件所在的目錄。
+			{Vi 無此功能}
+
+						*:ol* *:oldfiles*
+:ol[dfiles]		列出 viminfo 文件中存儲位置標記的文件。該列表在啟動時
+			讀入，其後只有 ":rviminfo!" 能改變它。另見
+			|v:oldfiles|。
+			其中的編號可用於 |c_#<|。
+			{Vi 無此功能，僅當編譯時加入 |+eval| 特性才有效}
+
+:bro[wse] ol[dfiles][!]
+			像 |:oldfiles| 那樣列出文件名，然後提示要求輸入編號。
+			如果編號合法，編輯列表裡指定的文件。
+			如果得到 |press-enter| 提示時你可以按 "q" 鍵並且還能得
+			到輸入文件編號的提示。
+			! 用來放棄已修改的緩衝區。|abandon|
+			{僅當編譯時使用 tiny 或 small 特性才有效}
+
+ vim:tw=78:ts=8:ft=help:norl:

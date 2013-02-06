@@ -1,0 +1,550 @@
+*various.txt*   For Vim version 7.3.  最近更新: 2010年8月
+
+
+		  VIM 參考手冊    by Bram Moolenaar
+				譯者: Willis
+				http://vimcdoc.sf.net
+
+
+各種其他命令						*various*
+
+1. 其他命令			|various-cmds|
+2. 用 Vim 代替 less 或 more	|less|
+
+==============================================================================
+1. 其他命令						*various-cmds*
+
+							*CTRL-L*
+CTRL-L			清屏並重畫屏幕。重畫可能稍後發生，在處理完預讀入之後。
+
+							*:redr* *:redraw*
+:redr[aw][!]		立即重畫屏幕。如果有 !，先清屏。
+			這對在執行腳本或函數的中間要刷新屏幕，或者在置位了
+			'lazyredraw' 而執行映射的過程中間都有用。
+
+						*:redraws* *:redrawstatus*
+:redraws[tatus][!]	重畫當前窗口的狀態行。如果有 !，重畫所有的狀態行。它適
+			用於 'statusline' 包含有不能自動更新項目的時候。
+
+							*N<Del>*
+<Del>			輸入數字的時候: 刪除上一位數字。 注意: 如果你想要 <BS>
+			做同樣的事，在 .vimrc 裡加入如下的映射: >
+				:map CTRL-V <BS>   CTRL-V <Del>
+<			如果你的 <Del> 鍵工作不正常，可參見 |:fixdel|。
+
+:as[cii]	或					*ga* *:as* *:ascii*
+ga			顯示光標下字符的 ascii 值，分別以十進制、十六進制和八
+			進制顯示。例如，如果光標下是 'R':
+				<R>  82,  Hex 52,  Octal 122 ~
+			如果該字符不是標準的 ASCII 字符，但據 'isprint' 選項可
+			以顯示，則另給出不可顯示的版本。另外，如果該字符大於
+			127，還顯示 <M-X> 形式的結果。例如:
+				<~A>  <M-^A>  129,  Hex 81,  Octal 201 ~
+				<p>  <|~>  <M-~>  254,  Hex fe,  Octal 376 ~
+			(其中的 <p> 是某個特殊字符)
+			文件裡的 <Nul> 字符內部以 <NL> 存儲，但顯示為:
+				<^@>  0,  Hex 00,  Octal 000 ~
+			如果字符有合成用字符，同時顯示它們。'maxcombine' 的值
+			這時不起作用。
+			助記: 得到 (Get) Ascii 值。{Vi 無此功能}
+
+							*g8*
+g8			顯示光標下字符 (假定其為 |UTF-8| 編碼) 的各字節的十六
+			進制值。它會同時顯示合成用字符。'maxcombine' 的值這時
+			不起作用。
+			一個帶三個合成用字符的字符示例:
+				e0 b8 81 + e0 b8 b9 + e0 b9 89 ~
+			{Vi 無此功能} {僅當編譯時加入 |+multi_byte| 特性才有
+			效}
+
+							*8g8*
+8g8			尋找光標所在或之後的非法 UTF-8 字節序列。兩種情形下這
+			可以工作:
+			1. 如果 'encoding' 是任何 8 位編碼
+			2. 如果 'encoding' 是 "utf-8" 而 'fileencoding' 是任何
+			   8 位編碼
+			所以它可以用來編輯本來應該是 UTF-8 但因為包含了非法字
+			節而讀入時被當作 8 位編碼的文件。
+			文件尾不迴繞。
+			注意 如果光標在非法字節上或者光標在多字節字符的中間，
+			此命令不移動光標。
+			{Vi 無此功能} {僅當編譯時加入 |+multi_byte| 特性才有
+			效}
+
+						*:p* *:pr* *:print* *E749*
+:[range]p[rint][flags]
+			顯示 [range] 範圍裡的行 (缺省是當前行)。
+			注意: 如果你要打印你的文本到紙張上，見 |:hardcopy|。
+			GUI 上可以使用 File.Print 菜單項。
+			|ex-flags| 說明 [flags]。
+
+:[range]p[rint] {count} [flags]
+			顯示 {count} 行，從 [range] 指定的範圍開始 (缺省是當前
+			行 |cmdline-ranges|)。
+			|ex-flags| 說明 [flags]。
+
+							*:P* *:Print*
+:[range]P[rint] [count] [flags]
+			和 ":print" 相同。Vi 裡加入這個功能，很明顯地，是給那
+			些按 Shift 鍵太久的人用的 ...
+			|ex-flags| 說明 [flags]。
+
+							*:l* *:list*
+:[range]l[ist] [count] [flags]
+			和 :print 相同，但是不可顯示字符用 '^' 代替，行尾加上
+			$。這可用 'listchars' 選項改變。
+			|ex-flags| 說明 [flags]。
+
+							*:nu* *:number*
+:[range]nu[mber] [count] [flags]
+			和 :print 相同，但每行之前顯示行號 (也參見 'highlight'
+			和 'numberwidth' 選項)。
+			|ex-flags| 說明 [flags]。
+
+							*:#*
+:[range]# [count] [flags]	
+			和 :number 相同。
+
+							*:#!*
+:#!{anything}		忽略，從而你可以用下面的方式開始 Vim 腳本: >
+				#!vim -S
+				echo "this is a Vim script"
+				quit
+<
+							*:z* *E144*
+:{range}z[+-^.=]{count}	顯示包圍 {range} 指定行的若干行文本，如果沒有 {range},
+			這顯示當前行上下的文本。如果有 {count}，它指定你能看到
+			的行數。否則，如果只有一個窗口，使用 'window' 選項。不
+			然，使用當前的窗口大小。
+
+			:z 可以單獨使用，也可以後跟數個標點符號中的一個。他們
+			有如下的效果:
+
+			標記   首行          末行           新位置      ~
+			----   ----------    ---------      ------------
+			+      當前行  	     向前 1 屏      向前 1 屏
+			-      向後 1 屏     當前行         當前行
+			^      向後 2 屏     向後 1 屏      向後 1 屏
+			.      向後 1/2 屏   向前 1/2 屏    向前 1/2 屏
+			=      向後 1/2 屏   向前 1/2 屏    當前行
+
+			不指定任何標記相當於指定 "+"。如果標記是 "="，當前行會
+			被連字符組成的兩行包圍。
+
+:{range}z#[+-^.=]{count}				*:z#*
+			和 ":z" 類似，但顯示行號。
+			{Vi 並非所有版本都有此功能和所有這些參數}
+
+							*:=*
+:= [flags]		顯示末行的行號。
+			|ex-flags| 說明 [flags]。
+	
+:{range}= [flags]	顯示 {range} 範圍內最後一行的行號。例如，打印當前行
+			號: >
+				:.=
+<			|ex-flags| 說明 [flags]。
+
+:norm[al][!] {commands}					*:norm* *:normal*
+			執行若干普通模式命令 {commands}。這使得在命令行上執行
+			普通模式命令成為可能。{commands} 的執行就像從鍵盤輸入
+			那樣。撤銷命令會撤銷所有的命令。
+			如果發生錯誤，結束執行。
+			如果給出 [!]，不使用映射。
+			{commands} 必須是完整的命令。如果 {commands} 沒有完整
+			給出一個命令，未完成的最後那個命令會被終止，如同鍵入了
+			<Esc> 或 <C-C> 一樣。":normal" 還在工作的時候，顯示不
+			會被刷新。這意味著插入命令也必須完整 (要開始插入模式，
+			見 |:startinsert|)。":" 命令也必須完整。而且你不能用
+			"Q" 或 "gQ" 啟動 Ex 模式。
+			{commands} 不能以空格開始，如果要，前面加個計數 1
+			(一)。"1 " 就是一個空格。
+			{commands} 裡忽略 'insertmode' 選項。
+			該命令後面不能跟其他命令。因為任何 '|' 都被認為是命令
+			的一部分。
+			該命令可以遞歸使用，但是深度不能超過 'maxmapdepth'。
+			如果一個不可重新映射的映射 |:noremap| 調用該命令，它的
+			參數就因而還是有可能被重新映射。
+			一個替代的方法是 |:execute|，它可以用表達式作為參數。
+			這樣就可使用可顯示字符來代表特殊字符。
+			例如: >
+				:exe "normal \<c-w>\<c-w>"
+<			{Vi 當然無此功能}
+			{僅當編譯時加入 |+ex_extra| 特性才可用}
+
+:{range}norm[al][!] {commands}				*:normal-range*
+			在 {range} 指定的範圍中的每行執行若干普通模式命令
+			{commands}。在執行 {commands} 之前，光標先定位在該行的
+			的第一列。除此以外，和沒有給出範圍的 ":normal" 命令並
+			無差別。
+			{Vi 無此功能}
+			{僅當編譯時加入 |+ex_extra| 特性才可用}
+
+							*:sh* *:shell* *E371*
+:sh[ell]		該命令啟動一個外殼。外殼退出後 (執行完 "exit" 命令)，
+			你會回到 Vim。外殼命令的名字來自 'shell' 選項。
+							*E360*
+			注意: 當 Vim 在 Amiga 上通過編譯器的 QuickFix 模式時啟
+			動時，該命令不能使用。這是因為編譯器把標準輸入設為非交
+			互模式。
+
+							*:!cmd* *:!* *E34*
+:!{cmd}			在外殼裡執行 {cmd} 命令。也可參見 'shell' 和
+			'shelltype' 選項。
+			{cmd} 裡的任何 '!' 都被前一個外部命令所取代 (參見
+			'cpoptions')，除非之前有反斜槓。這時反斜槓被去掉。例
+			如: "!ls" 之後的 "!echo ! \! \\!" 實際執行
+			"echo ls ! \!"。
+			命令執行之後，檢查當前文件的修改時間 |timestamp|。
+			{cmd} 裡的 '|' 會傳給外殼，你不能用來附加 Vim 命令。
+			見 |:bar|。
+			{cmd} 以換行符結尾，其後的內容被理解為另外一個 ":" 命
+			令。不過，如果換行之前有反斜槓，該反斜槓被去掉，{cmd}
+			繼續接受參數。無論之前有多少個反斜槓都是如此。只有一個
+			會被去掉。
+			Unix 上命令通常在非交互的外殼裡運行。如果你希望用交互
+			外殼 (比如要用別名機制 aliases)，設置 'shellcmdflags'
+			為 "-ic"。Win32 上可參見 |:!start|。
+			Vim 在命令結束以後重畫屏幕，因為命令可能顯示任何文本。
+			因此，你會有一個按回車的提示，以便你看到執行結果。要避
+			免這一點: >
+				:silent !{cmd}
+<			這樣屏幕就不會重畫。如果確實有輸出，你需要用 CTRL-L 或
+			":redraw!" 來刷新。
+			參見 |shell-window|。
+
+							*:!!*
+:!!			重複上次的 ":!{cmd}"。
+
+							*:ve* *:version*
+:ve[rsion]		顯示編輯器的版本號。如果編譯器能解釋 "__DATE__"，也顯
+			示編譯的日期。不然，顯示固定的發佈日期。
+			然後，顯示 Vim 編譯時所帶特性的信息。如果某特性之前有
+			'+'，該特性被包含。如果之前有 '-'，該特性沒有包含。要
+			改變編譯時帶的特性，修改 feature.h 並重新編譯 Vim。
+			要在表達式裡確定是否包含某特性，參見 |has()|。
+			以下是特性的總覽。
+			第一列顯示包含該特性的最小版本。
+			   T	tiny (微小)
+			   S	small (小)
+			   N	normal (普通)
+			   B	big (大)
+			   H	huge (巨大)
+			   m	手動設定或者依賴於其他特性
+			 (無)	依賴於系統
+			這樣，如果一個特性標記為 "N"，它包含在 Vim 的 normal、
+			big 和 huge 版本裡。
+
+							*+feature-list*
+   *+ARP*		僅對 Amiga 有效: 支持 ARP
+B  *+arabic*		支持阿拉伯語 |Arabic|
+N  *+autocmd*		|:autocmd|，自動命令
+m  *+balloon_eval*	氣泡表達式支持 |balloon-eval|。如果編譯時包含支持的
+			GUI (Motif、GTK、GUI) 同時還有 Netbeans/Sun Workshop
+			集成或者 |+eval| 特性之一就包含此特性。
+N  *+browse*		|:browse| 命令
+N  *+builtin_terms*	一些內建終端項 |builtin-terms|
+B  *++builtin_terms*	最大內建終端項支持 |builtin-terms|
+N  *+byte_offset*	支持 'statusline' 選項的 'o' 標誌位、"go" 和 ":goto"
+			命令。
+N  *+cindent*		|'cindent'|，C 縮進
+N  *+clientserver*	Unix 和 Win32: 遠程調用 |clientserver|
+   *+clipboard*		剪貼板支持 |clipboard|
+N  *+cmdline_compl*	命令行補全 |cmdline-completion|
+N  *+cmdline_hist*	命令行歷史 |cmdline-history|
+N  *+cmdline_info*	|'showcmd'| 和 |'ruler'|
+N  *+comments*		支持 |'comments'|
+B  *+conceal*		"conceal" 支持，見 |conceal| |:syn-conceal| 等。
+N  *+cryptv*		加密支持 |encryption|
+B  *+cscope*		支持 |cscope|
+m  *+cursorbind*	|'cursorbind'| 支持
+m  *+cursorshape*	|termcap-cursor-shape| 支持
+m  *+debug*		帶調試的編譯。
+N  *+dialog_gui*	支持 |:confirm| 顯示 GUI 對話框。
+N  *+dialog_con*	支持 |:confirm| 顯示控制台對話框。
+N  *+dialog_con_gui*	支持 |:confirm| 顯示 GUI 或控制台對話框。
+N  *+diff*		|vimdiff| 和 'diff'
+N  *+digraphs*		|digraphs| *E196*
+   *+dnd*		"~ 寄存器的拖放支持 |quote_~|。
+B  *+emacs_tags*	|emacs-tags| 文件
+N  *+eval*		表達式計算 |eval.txt|
+N  *+ex_extra*		Vim 附加的 Ex 命令: |:center|、|:left|、|:normal|、
+			|:retab| 和 |:right|
+N  *+extra_search*	|'hlsearch'| 和 |'incsearch'| 選項。
+B  *+farsi*		|farsi| 波斯語言
+N  *+file_in_path*	|gf|、|CTRL-W_f| 和 |<cfile>|
+N  *+find_in_path*	包含文件搜索: |[I|、|:isearch|、|CTRL-W_CTRL-I|、
+			|:checkpath|，等等。
+N  *+folding*		折疊 |folding|
+   *+footer*		信息頁腳 |gui-footer|
+   *+fork*		只對 Unix 有效: |fork| 外殼命令
+   *+float*		浮點數支持
+N  *+gettext*		消息翻譯 |multi-lang|
+   *+GUI_Athena*	只對 Unix 有效: Athena |GUI|
+   *+GUI_neXtaw*	只對 Unix 有效: neXtaw |GUI|
+   *+GUI_GTK*		只對 Unix 有效: GTK+ |GUI|
+   *+GUI_Motif*		只對 Unix 有效: Motif |GUI|
+   *+GUI_Photon*	只對 QNX 有效:  Photon |GUI|
+m  *+hangul_input*	韓語 (Hangul) 輸入支持 |hangul|
+   *+iconv*		編譯時有 |iconv()| 函數
+   *+iconv/dyn*		類似 |iconv-dynamic| |/dyn|
+N  *+insert_expand*	|insert_expand| 插入模式補全
+N  *+jumplist*		跳轉表 |jumplist|
+B  *+keymap*		鍵盤映射表 |'keymap'|
+B  *+langmap*		語言映射表 |'langmap'|
+N  *+libcall*		函數庫調用 |libcall()|
+N  *+linebreak*		|'linebreak'|、|'breakat'| 和 |'showbreak'|
+N  *+lispindent*	|'lisp'|
+N  *+listcmds*		Vim 的緩衝區列表相關命令 |buffer-hidden| 和參數列表
+			|:argdelete|
+N  *+localmap*		支持緩衝區的局部映射 |:map-local|
+m  *+lua*		|Lua| 接口 
+m  *+lua/dyn*		|Lua| 接口 |/dyn|
+N  *+menu*		菜單 |:menu|
+N  *+mksession*		創建會話 |:mksession|
+N  *+modify_fname*	文件名修飾符 |filename-modifiers|
+N  *+mouse*		鼠標處理 |mouse-using|
+N  *+mouseshape*	鼠標形狀 |'mouseshape'|
+B  *+mouse_dec*		只對 Unix 有效: Dec 終端鼠標處理 |dec-mouse|
+N  *+mouse_gpm*		只對 Unix 有效: Linux 終端鼠標處理 |gpm-mouse|
+B  *+mouse_netterm*	只對 Unix 有效: netterm 終端鼠標處理 |netterm-mouse|
+N  *+mouse_pterm*	只對 QNX 有效: pterm 終端鼠標處理 |qnx-terminal|
+N  *+mouse_sysmouse*	只對 Unix 有效: *BSD 控制台鼠標處理 |sysmouse|
+N  *+mouse_xterm*	只對 Unix 有效: xterm 終端鼠標處理 |xterm-mouse|
+B  *+multi_byte*	16 和 32 位字符 |multibyte|
+   *+multi_byte_ime*	Win32 多字節字符的輸入法 |multibyte-ime|
+N  *+multi_lang*	非英語語言支持 |multi-lang|
+m  *+mzscheme*		Mzscheme 接口 |mzscheme|
+m  *+mzscheme/dyn*	Mzscheme 接口 |mzscheme-dynamic| |/dyn|
+m  *+netbeans_intg*	|netbeans|
+m  *+ole*		只對 Win32 GUI 有效: |ole-interface|
+   *+osfiletype*	支持 'osfiletype' 選項和自動命令的文件類型檢查。
+			|autocmd-osfiletypes|
+N  *+path_extra*	'path' 和 'tags' 的向上和向下搜索
+m  *+perl*		Perl 接口 |perl|
+m  *+perl/dyn*		Perl 接口 |perl-dynamic| |/dyn|
+N  *+persistent_undo*	撤銷的永久保存 |undo-persistence|
+   *+postscript*	|:hardcopy| 可以寫 PostScript 文件
+N  *+printer*		|:hardcopy| 命令
+H  *+profile*		|:profile| 命令
+m  *+python*		Python 2 接口 |python|
+m  *+python/dyn*	Python 2 接口 |python-dynamic| |/dyn|
+m  *+python3*		Python 3 接口 |python|
+m  *+python3/dyn*	Python 3 接口 |python-dynamic| |/dyn|
+N  *+quickfix*		|:make| 和 |quickfix| 命令
+N  *+reltime*		|reltime()| 函數，'hlsearch'/'incsearch' 超時，
+			'redrawtime' 選項
+B  *+rightleft*		從右到左輸入 |'rightleft'|
+m  *+ruby*		Ruby 接口 |ruby|
+m  *+ruby/dyn*		Ruby 接口 |ruby-dynamic| |/dyn|
+N  *+scrollbind*	滾動綁定 |'scrollbind'|
+B  *+signs*		標號 |:sign|
+N  *+smartindent*	|'smartindent'|
+m  *+sniff*		SniFF 接口 |sniff|
+N  *+startuptime*	|--startuptime| 參數
+N  *+statusline*	'statusline'、'rulerformat' 選項和 'titlestring' 和
+			'iconstring' 的特殊格式
+m  *+sun_workshop*	|workshop|
+N  *+syntax*		語法高亮 |syntax|
+   *+system()*		只對 Unix 有效: |+fork| 的相反特性
+N  *+tag_binary*	標籤文件的二分查找 |tag-binary-search|
+N  *+tag_old_static*	支持靜態標籤的舊方法 |tag-old-static|
+m  *+tag_any_white*	標籤文件裡允許空白 |tag-any-white|
+m  *+tcl*		Tcl 接口 |tcl|
+m  *+tcl/dyn*		Tcl 接口 |tcl-dynamic| |/dyn|
+   *+terminfo*		用 |terminfo| 代替 termcap
+N  *+termresponse*	支持 |t_RV| 和 |v:termresponse|
+N  *+textobjects*	文本對像 |text-objects| 選擇
+   *+tgetent*		只對非 Unix 有效: 可以使用外部 termcap
+N  *+title*		設置窗口 |'title'|和 'icon'
+N  *+toolbar*		GUI 工具欄 |gui-toolbar|
+N  *+user_commands*	用戶定義命令。|user-commands|
+N  *+viminfo*		|'viminfo'|
+N  *+vertsplit*		垂直分割窗口 |:vsplit|
+N  *+virtualedit*	|'virtualedit'|
+S  *+visual*		可視模式 |Visual-mode|
+N  *+visualextra*	額外的可視模式命令 |blockwise-operators|
+N  *+vreplace*		|gR| 和 |gr|
+N  *+wildignore*	忽略文件通配 |'wildignore'|
+N  *+wildmenu*		匹配菜單 |'wildmenu'|
+S  *+windows*		多於一個窗口
+m  *+writebackup*	|'writebackup'| 缺省打開
+m  *+xim*		X 輸入法 |xim|
+   *+xfontset*		X 字體集支持 |xfontset|
+   *+xsmp*		XSMP (X 會話管理) 支持
+   *+xsmp_interact*	交互 XSMP (X 會話管理) 支持
+N  *+xterm_clipboard*	只對 Unix 有效: xterm 剪貼板處理
+m  *+xterm_save*	保存和恢復 xterm 屏幕 |xterm-screens|
+N  *+X11*		只對 Unix 有效: 可以恢復窗口標題 |X11|
+
+							*/dyn* *E370* *E448*
+			有些特性可能會顯示 "/dyn"，表明該特性只有在動態調入相
+			關庫時才可用。
+
+:ve[rsion] {nr}		現在已被忽略。以前用來檢查 .vimrc 文件的版本號。現在取
+			消的原因是因為你可以用 ":if" 命令區別不同版本的不同行
+			為。{Vi 無此功能}
+
+							*:redi* *:redir*
+:redi[r][!] > {file}	重定向消息到文件 {file}。將命令的輸出消息寫到該文件，
+			直到重定向結束。消息也同時顯示在屏幕上。如果有 [!]，覆
+			蓋已存在的文件。如果沒有但文件 {file} 存在，該命令會失
+			敗。
+			一次只能激活一個 ":redir"。也就是，調用 ":redir" 開始
+			重定向到新的目標之前，任何已激活的重定向都會被關閉。
+			如果不想在屏幕上顯示消息或者命令的回顯，在函數里調用命
+			令，以 ":silent call Function()" 方式調用該函數。
+			一個替代方案是使用 'verbosefile' 選項，它也可以和
+			":redir" 組合使用。
+			{Vi 無此功能}
+
+:redi[r] >> {file}	重定向消息到文件 {file}，如果文件 {file} 已存在，附加
+			在其後。{Vi 無此功能}
+
+:redi[r] @{a-zA-Z}
+:redi[r] @{a-zA-Z}>	重定向消息到寄存器 {a-z}。如果給出的名字是大寫 {A-Z}，
+			附加到已有內容之後。寄存器名後的 '>' 可選。
+			{Vi 無此功能}
+:redi[r] @{a-z}>>	附加消息到寄存器 {a-z}。{Vi 無此功能}
+
+:redi[r] @*>		
+:redi[r] @+>		重定向消息到選擇區或剪貼板。為了後向兼容，寄存器名後的
+			'>' 可以省略。見 |quotestar| 和 |quoteplus|。
+			{Vi 無此功能}
+:redi[r] @*>>		
+:redi[r] @+>>		附加消息到選擇區或剪貼板。{Vi 無此功能}
+
+:redi[r] @">		重定向消息到無名寄存器。為了後向兼容，寄存器名後的 '>'
+			可以省略。{Vi 無此功能}
+:redi[r] @">>		附加消息到無名寄存器。{Vi 無此功能}
+
+:redi[r] => {var}	重定向消息到變量。如果變量不存在，建立之。如果變量已經
+			存在，它被初始化為空字符串，而且保持為空，直到重定向結
+			束為止。只能使用字符串變量。重定向開始後，如果變量被刪
+			除或加鎖或類型被改變，那麼將來的命令輸出消息會報錯。
+			{Vi 無此功能}
+
+:redi[r] =>> {var}	附加消息到已有的變量。只能使用字符串變量。
+			{Vi 無此功能}
+
+:redi[r] END		結束消息的重定向。{Vi 無此功能}
+
+						*:sil* *:silent*
+:sil[ent][!] {command}	安靜地執行命令 {command}。不顯示正常的消息，也不會把它
+			加進消息歷史。
+			如果有 [!]，同時跳過錯誤消息，檢測到錯誤時，命令和映射
+			也也不會被終止。但還是會相應設置 |v:errmsg|。
+			如果沒有 [!]，錯誤信息會使得其後的所有消息都被正常顯
+			示。
+			|:redir| 開始的重定向會繼續工作，但可能有些細微差異。
+			命令輸出仍然重定向，但屏幕上看不到。例如: >
+			    :redir >/tmp/foobar
+			    :silent g/Aap/p
+			    :redir END
+<			要安靜地執行普通模式命令，用 |:normal| 命令。例如，要
+			搜索字符串且不給出任何消息: >
+			    :silent exe "normal /path\<CR>"
+<			":silent!" 可以用來執行命令，不管該命令是否失敗都繼續
+			執行。
+			例如: >
+			    :let v:errmsg = ""
+			    :silent! /^begin
+			    :if v:errmsg != ""
+			    : ... 模式沒找到
+<			":silent" 還可以避免敲入回車 (hit-enter) 的提示。執行
+			外部命令時，這可能會使屏幕顯示混亂。這時，用 |CTRL-L|
+			可以清理。
+			":silent menu ..." 定義一個不會回顯命令行命令的菜單。
+			但該命令仍然產生消息。如果連這也不要，在命令本身前用
+			":silent": ":silent menu .... :silent command"。
+
+						*:uns* *:unsilent*
+:uns[ilent] {command}	非安靜模式執行命令 {command}。僅當在用了 |:silent| 之
+			後才有意義。
+			用此命令可以在用了 |:silent| 之後還是可以給出消息。下
+			例中，|:silent| 用於避免讀入文件時給出消息，而
+			|:unsilent| 用於列出每個文件的第一行。 >
+    		:silent argdo unsilent echo expand('%') . ": " . getline(1)
+<
+
+						*:verb* *:verbose*
+:[count]verb[ose] {command}
+			執行命令 {command}，執行期間 'verbose' 設為 [count]。
+			如果忽略 [count]，缺省為 1。":0verbose" 可以用來設置
+			'verbose' 為零。
+
+			在此基礎之上再應用 ":silent"，可以產生相應詳細度的消息
+			但不顯示。":silent" 和 ":verbose" 的組合因而可以只在內
+			部產生消息，然後用 |v:statusmsg| 或相關命令進行檢查。
+			例如: >
+				:let v:statusmsg = ""
+				:silent verbose runtime foobar.vim
+				:if v:statusmsg != ""
+				:  " foobar.vim 找不到
+				:endif
+<			如果和別的命令相連接，":verbose" 只適用於第一個命令: >
+				:4verbose set verbose | set verbose
+<				  verbose=4 ~
+				  verbose=0 ~
+			要記錄 verbose 消息到文件，用 'verbosefile' 選項。
+
+							*:verbose-cmd*
+如果 'verbose' 非零，列出 Vim 選項、鍵映射、縮寫、用戶定義的函數或命令、高亮組
+或者自動命令的值會同時顯示它最近被定義的位置。如果手動定義，不會有這個 "Last
+set" 消息。如果在執行函數、用戶命令或者自動命令時定義，報告它定義所在的腳本。
+{僅當編譯時加入 |+eval| 特性才有效}
+
+							*K*
+K			運行程序，查找光標下的關鍵字。該程序的名字由
+			'keywordprg' (kp) 選項給出 (缺省是 "man")。該關鍵字由
+			字母、數值和 'iskeyword' 裡的字符組成，它出現在光標所
+			在或右側的位置。以下命令可以達到同樣的效果 >
+				:!{program} {keyword}
+<			在 Vim 的 tools 目錄下有一個示例程序。它叫作 'ref'，做
+			簡單的拼寫檢查。
+			特例:
+			- 如果 'keywordprg' 為空，使用 ":help" 命令。此時，如
+			  果要找到更多幫助，應該在 'iskeyword' 裡加入更多的字
+			  符。
+			- 如果 'keywordprg' 是 "man"，K 之前的計數會被插在
+			  "man" 命令之後和關鍵字之前。例如，如果光標在 "mkdir"
+			  之上用 "2K"，結果是: >
+				!man 2 mkdir
+<			- 如果 'keywordprg' 是 "man -s"，K 之前的計數會插在
+			  "-s" 之後。如果沒有計數，則去掉 "-s"。
+			{Vi 無此功能}
+
+							*v_K*
+{Visual}K		和 "K" 類似，但用可視的高亮文本代替關鍵字。只在高亮文
+			本不超過一行時有效。{Vi 無此功能}
+
+[N]gs							*gs* *:sl* *:sleep*
+:[N]sl[eep] [N]	[m]	停止 (睡眠) [N] 秒。如果有 [m]，停止 [N] 毫秒。"gs" 前
+			的計數總是表示秒數。缺省值是 1 秒。 >
+			     :sleep	     "睡眠一秒
+			     :5sleep	     "睡眠五秒
+			     :sleep 100m     "睡眠一百毫秒
+			     10gs	     "睡眠十秒
+<			可以被 CTRL-C (MS-DOS 上的 CTRL-Break) 中斷。
+			"gs" 代表 "goto sleep"。
+			睡眠時如果在可見位置的話，光標定位於文本處。
+			{Vi 無此功能}
+
+							*g_CTRL-A*
+g CTRL-A		只有在 Vim 編譯時定義了 MEM_PROFILING 才有效 (這很少
+			見): 顯示內存用量的統計。只對調試 Vim 有用。
+
+==============================================================================
+2. 用 Vim 代替 less 或 more					*less*
+
+如果你用 less 或 more 程序來查閱文件，你不會有語法高亮。所以，你也許會更喜歡
+用 Vim。你可以用外殼腳本 "$VIMRUNTIME/macros/less.sh" 來做到這一點。
+
+這個外殼腳本用到 Vim 腳本 "$VIMRUNTIME/macros/less.vim"。它設置了一些映射來模
+擬 less 支持的命令。除此以外，你可以正常使用 Vim 命令。
+
+這還沒有盡善盡美。例如，即使查閱短的文件，Vim 還是會使用整屏。但對大多數應用而
+言，這已經足夠好了。何況你還有語法高亮呢。
+
+"h" 鍵給你一個可用命令的簡短小結。
+
+ vim:tw=78:ts=8:ft=help:norl:

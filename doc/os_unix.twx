@@ -1,0 +1,57 @@
+*os_unix.txt*   For Vim version 7.3.  最近更新：2005年3月
+
+
+			VIM 用戶手冊  Bram Moolenaar 著
+		      譯者：yemao http://vimcdoc.sf.net
+
+
+							*unix* *Unix*
+本文件介紹了 Unix 版本的 vim 的一些特殊之處。
+
+首先，要在 Unix 上編譯 vim，請參考 src 目錄下的 "INSTALL" 文件和 "Makefile" 文
+件。
+
+默認幫助文件名為 "/usr/local/lib/vim/help.txt"
+同時，vim 會使用 "$HOME/.vimrc" 和 "$HOME/.exrc" 而不是 "s:.vimrc" 和
+"s:.exrc"。另外它會首先使用 /usr/local/etc/vimrc 文件。注意，如果
+"/usr/local/share" 已經存在，就會使用它來代替 "/usr/local/lib"。
+
+臨時文件 (用於過濾程序) 默認會放在 "/tmp" 下，如果你想把它們放在別處，那麼必須
+設置環境變量 $TMPDIR 為你放臨時文件的目錄。
+
+通過擴展通配符，你可以使用 '~' (用戶主目錄) 及 '$' (系統環境變量)。
+
+							*fork* *spoon*
+執行外部命令時，會盡可能調用 fork()/exec()，不然會調用 system()。使用後者速度
+會有所減慢。正因為有兩個函數可以被調用，":version" 輸出信息就有兩種，當調用
+fork()/exec() 時，輸出 |+fork|，否則輸出 |+system|。編譯時可以修改。
+(GUI 上關於 fork (進程分叉) 的詳細信息參考 |gui-fork|。)
+
+Unix 上的終端刷新常常比較慢 (比如串行終端和 suntools 下的 shell 窗口)，所以默
+認情況下的 'showcmd' 選項和 'ruler' 選項都是關閉的。如果你所使用的終端比較快的
+話，可以把它們打開。甚至可以試試 'ttyfast' 選項。
+
+在 xterm 下使用 Vim，只要把 'mouse' 選項設成 "a" 就可以使用鼠標了。如果你有權
+限使用 X-server，當你用鼠標拖動的時候，可以進行 gui 風格的複製和粘貼，而你還會
+看到可視反饋。如果你還是想用 xterm 的複製和粘貼，使用鼠標時按住 shift 鍵，具體
+請參考 |mouse-using|。只要你的 xterm 版本夠新，設置一下 'ttymouse' 選項就可以
+在拖動的時候得到可視反饋。
+
+							*terminal-colors*
+要在 Vim 裡顯示彩色，可以參考以下例子 (假定你的終端支持色彩顯示，而 "T_Co" 為
+空或零): >
+   :set t_me=^[[0;1;36m     " 正常模式 (撤銷 t_mr 和 t_md)
+   :set t_mr=^[[0;1;33;44m  " 反轉 (逆轉) 模式
+   :set t_md=^[[1;33;41m    " 粗體模式
+   :set t_se=^[[1;36;40m    " 突出模式結束
+   :set t_so=^[[1;32;45m    " 突出模式開始
+   :set t_ue=^[[0;1;36m     " 下劃線模式結束
+   :set t_us=^[[1;32m       " 下劃線模式開始
+[注意，^[ 是 <Esc>，可以用 CTRL-V <Esc> 來輸入。]
+
+而在真正的彩色終端下，可以使用 ":highlight" 命令。
+
+另外，文件 "tools/vim132" 是一個 shell 腳本。在 vt100 和與其類似的終端下，它可
+以使 Vim 使用 132 列模式。
+
+ vim:tw=78:ts=8:ft=help:norl:

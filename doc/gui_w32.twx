@@ -1,0 +1,453 @@
+*gui_w32.txt*	For Vim version 7.3.  最後更新: 2008年4月
+
+
+		  VIM 參 考 手 冊    作者：Bram Moolenaar
+		                     譯者: Dasn、Willis
+		                     http://vimcdoc.sf.net
+
+
+Vim 的 Win32 圖形用戶界面				*gui-w32* *win32-gui*
+
+1. 啟動圖形界面			|gui-w32-start|
+2. 設置 Vim 為默認的編輯器	|vim-default-editor|
+3. 使用剪貼板			|gui-clipboard|
+4. 命令行命令			|gui-shell-win32|
+5. 特殊顏色			|win32-colors|
+6. Windows 對話框和瀏覽器	|gui-w32-dialogs|
+7. 命令行參數			|gui-w32-cmdargs|
+8. 雜項				|gui-w32-various|
+
+其它相關文章：
+|gui.txt|	所有的 GUI 版本的通用功能
+|os_win32.txt|	Win32 版本特有的功能
+
+{Vi 沒有 Windows 圖形界面}
+
+==============================================================================
+1. 啟動圖形界面						*gui-w32-start*
+
+Vim 的 Win32 GUI 版本 (gvim) 呈現給你的是一個真正 Windows 圖形界面程序。無論你
+用什麼方式啟動它，也不管你是否修改了它的文件名，gvim 總是啟動一個圖形界面。
+
+圖形界面程序一直在 Windows 子系統裡運行。大多數命令行會在啟動 gvim 之後立即返
+回提示符。如果沒有返回，那你應該使用 "start" 命令: >
+	start gvim [option] file ..
+
+注意: 所有的字體 (無論粗體還是斜體) 必須大小相同！！！如果不是，那你可能什麼字
+都看不到或者只能看到一些雜亂無章的文字。Vim 不會檢查文字的大小。需要強調一點，
+這裡的字體大小是以 "像素" 為單位計算的。有些字體的大小以 "點數" 為單位計算，這
+時即便你選的兩種字體的 "點" 數相同，但它們的像素數卻可能不同。另外，與字體位置
+相關的屬性 (比如：ascent 和 descent) 也必須相同。(ascent 和 descent 是用來說明
+字體高度的兩種屬性，具體可以參考相關資料  譯者)
+
+Win32 GUI 版本裡有一個額外的菜單選項 "編輯/選擇字體"，它能調用標準的 Windows
+字體選擇對話框。
+
+設定菜單的高度對 Win32 GUI 不起作用。
+
+							*gui-win32-maximized*
+如果你想讓 Vim 在啟動時最大化窗口，可以把下面的命令加到你的 vimrc 或 gvimrc 文
+件中: >
+	au GUIEnter * simalt ~x
+<
+								*gui-w32s*
+gvim.exe 還有一個特別的版本，可以在 Windows 3.1 或 3.11 的 Win32s 子系統運行。
+參見 |win32s|。
+
+
+插件方式使用 Vim					*gui-w32-windowid*
+
+gvim 正常啟動時，建立它自己的頂層窗口。如果傳給 Vim 命令行選項 |--windowid| 和
+一個十進制或十六進制的參數，Vim 會建立窗口號為給定 ID 的窗口的子窗口。這樣，
+Vim 就可以作為另一個應用的插件。這實際上是一個程序員接口，必須要有配套的應用來
+正確啟動 Vim 才行。
+
+==============================================================================
+2. 設定 Vim 為默認的文本編輯器				*vim-default-editor*
+
+設定 Vim 為某一類文件的默認編輯器：
+1. 打開 Windows 資源管理器
+2. 選擇 查看/選項 -> 文件類型
+3. 選定想讓 gvim 處理的文件類型，然後選擇 gvim 的路徑。(在文件類型選項卡中，你
+   也可以用 3 個空格給沒有擴展名的文件指定關聯程序)。在 "操作" 列表框的 open
+   一欄中輸入: >
+	gvim "%1"
+<  這裡加上引號可以讓程序處理帶空格的文件名。
+   你也可以這樣用: >
+	gvim "%L"
+<  這樣可以在某些場合避免處理短文件名 (8.3 格式)，但我不敢保證在每個地方都好
+   用。
+
+現在你已經做好了 Vim 與文件的關聯了，當你雙擊鼠標打開文件時，Vim 會切換到文件
+所在目錄。
+
+如果你想讓 Vim 打開文件時最大化，可以在 Open 一欄中輸入: >
+	gvim -c "simalt ~x" "%1"
+
+如果你把 Vim 放到了其它目錄 (比如，你剛剛在別的目錄裡安裝了一個新版本的 Vim，
+並且想馬上用它)，用下面的辦法也可以：
+1. 選定想用 Vim 打開的文件
+2. <Shift-F10>
+3. 選 "打開方式……" 菜單項
+4. 點擊 "其它……"
+5. 找到 Vim 的 (新) 位置，點擊 "打開"
+6. 在 "始終使用該程序打開這些文件" 劃勾
+7. <OK>
+
+						*send-to-menu* *sendto*
+你也可以把 Vim 放到 "發送到" 菜單裡去：
+1. 打開資源管理器
+2. 找到你的 sendto 目錄：
+   Windows 95: %windir%\sendto (例如："c:\windows\sendto")
+   Windows NT: %windir%\profiles\%user%\sendto (例如：
+	       "c:\winnt\profiles\mattha\sendto")。
+3. 點右鍵，選 "新建->快捷方式"
+4. 在快捷方式嚮導程序裡點擊 "瀏覽"，找到 VIM/GVIM，程序會得到其完整路徑。
+
+當你使用 "發送到 Vim" 時，Vim 會切換到那個文件的目錄。注意，任何長的目錄名都會
+以短的 (MS-DOS) 的形式出現。這是 Windows "發送到" 功能的一個限制。
+
+						*notepad*
+你可以用 gvim.exe 來替換 notepad.exe，但是這樣會帶來許多副作用。有些程序依賴於
+notepad 參數。比如，有的程序調用 "notepad -p" 來打印文件，但是這些參數放到
+gvim 上就不好用了。所以最好還是別改動 notepad，用別的方法啟動 gvim。
+
+						*win32-popup-menu*
+有一種更直接的方法，就是安裝 "Edit with Vim" 選項到右鍵彈出菜單裡，這樣你就可
+以用 vim 編輯任何文件了。
+
+這種方法可以和上面提到的默認打開方式 (文件關聯) 共存。不同之處在於：如果把 Vim
+設定為默認打開方式，當你用鼠標雙擊該類型的文件時，系統會自動調用 Vim 打開該文
+件。而如果你把 "用 vim 編輯" 加到彈出菜單裡，就可以保留原來的文件關聯，當你想
+用 Vim 處理該文件時，只要在文件上單擊鼠標右鍵，選擇 "Edit with Vim" 即可。例
+如：你可以把 "*.mak" 文件與 make 程序關聯，這樣你就可以通過雙擊文件來調用 make
+程序執行它，通過右鍵 "Edit with Vim" 對 Makefile 進行編輯。
+
+你可以用鼠標右鍵 "Edit with Vim" 打開你選擇的文件。如果你選擇了多個文件，你會
+發現彈出菜單裡有兩個相關選項：
+"Edit with multiple gvims"	-- 為所選的每一個文件打開一個 gvim
+"Edit with single gvim"		-- 用一個 gvim 打開所選的全部文件
+如果已經有一個 gvim 正在運行，彈出菜單裡還會多一個選項：
+"Edit with existing gvim"	-- 用正在運行的 gvim 編輯所選文件
+
+						*install-registry*
+你可以通過安裝程序 "install.exe" 十分容易地把 "Edit with Vim" 加到右鍵菜單中，
+安裝程序會幫你在註冊表中添加幾個鍵值。
+
+當然，你也可以自己修改註冊表。這比較麻煩！盡量用 install.exe 程序。
+
+1, 打開註冊表編輯器 "regedit.exe"
+2, 加入這些鍵值：
+   key		value name		    value ~
+   HKEY_CLASSES_ROOT\CLSID\{51EEE242-AD87-11d3-9C1E-0090278BBD99}
+		{default}		    Vim Shell Extension
+
+HKEY_CLASSES_ROOT\CLSID\{51EEE242-AD87-11d3-9C1E-0090278BBD99}\InProcServer32
+		{default}		    {path}\gvimext.dll
+		ThreadingModel		    Apartment
+   HKEY_CLASSES_ROOT\*\shellex\ContextMenuHandlers\gvim
+		{default}		    {51EEE242-AD87-11d3-9C1E-0090278BBD99}
+   HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\Shell Extensions\Approved
+		{51EEE242-AD87-11d3-9C1E-0090278BBD99}
+					    Vim Shell Extension
+   HKEY_LOCAL_MACHINE\Software\Vim\Gvim
+		path			    {path}\gvim.exe
+   HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\Uninstall\vim 5.6
+		DisplayName		    Vim 5.6: Edit with Vim popup menu entry
+		UninstallString		    {path}\uninstal.exe
+
+   用實際的路徑替換 {path}。
+   不要輸入 {default} (默認)，這是註冊表鍵自身的值。
+
+要從彈出菜單裡刪除 "Edit with Vim"，只要在註冊表裡刪除上面提到的各項即可。卸載
+程序 "uninstall.exe" 可以幫你完成這項工作，用 "控制面板" 的 "添加/刪除程序" 也
+可以。
+
+如果你發現用 "添加/刪除程序" 卸載 gvim 之後，其它類型文件的關聯出錯了，你可以
+自己動手修改過來 (用 "資源管理器"，前面已經提過)。這種情況好像只出現在 NT 系列
+的 Windows 上 (Windows 的漏洞？)。解決辦法：
+1, 找到文件的類型名。打開註冊表編輯器在 \\HKEY_CLASSES_ROOT 下搜索就能找到。
+2, 在資源管理器裡，"查看" > "選項" > "文件類型"。找到該類型文件，單擊 "編輯"。
+   在 "操作" 列表中選擇應該被設置為默認的選項 (正常情況下是 open)，單擊 "設置
+   為默認值"。
+
+
+把 Vim 加入到 "Open With..." 關聯菜單			*win32-open-with-menu*
+
+如果你在 vim 安裝程序裡選擇了 Add Vim to the "Open With..." menu (把 Vim 加入
+"Open With..." 菜單)，這樣你可以通過右鍵菜單調用 Vim 來編輯大多數文件，雖然不
+是所有的文件 (不清楚具體原因)。因而 "Edit with Vim" 菜單選項還是有用的。
+
+還有一個原因，就是加入這個選項之後可以在 Internet Explorer 裡直接調用 Vim 編
+輯當前的 HTML 文檔。要使用這種功能，在 "工具" 菜單 "Internet 選項" 裡，使用
+"程序" 選項卡，"HTML 編輯器" 裡選擇 Vim。如果沒有 Vim 選項，說明 Vim 安裝的不
+正確。
+
+手工安裝可以使用下面的腳本：
+
+----------------------------------------------------------
+REGEDIT4
+
+[HKEY_CLASSES_ROOT\Applications\gvim.exe]
+
+[HKEY_CLASSES_ROOT\Applications\gvim.exe\shell]
+
+[HKEY_CLASSES_ROOT\Applications\gvim.exe\shell\edit]
+
+[HKEY_CLASSES_ROOT\Applications\gvim.exe\shell\edit\command]
+@="c:\\vim\\vim63\\gvim.exe \"%1\""
+
+[HKEY_CLASSES_ROOT\.htm\OpenWithList\gvim.exe]
+
+[HKEY_CLASSES_ROOT\*\OpenWithList\gvim.exe]
+
+----------------------------------------------------------
+
+"c:\\vim\\vim63\\gvim.exe" 是 Vim 程序的實際位置，請根據具體情況修改。
+
+刪除 Vim 可以用 Vim 的卸載程序，或者用 "regedit" 手動刪除註冊表中的這些鍵值。
+
+==============================================================================
+3. 使用剪貼板						*gui-clipboard*
+
+Windows 有一個剪貼板，你可以把文本從別的程序 "剪" 下來，放到剪貼板裡，也可以把
+剪貼板裡的文本 "粘貼" 到別的程序裡。在 Vim 裡有多種辦法完成這些操作。對於其它
+操作系統請參閱 |gui-selections|
+
+寄存器 "* 反應剪貼板裡的內容。|quotestar|
+
+當 'clipboard' 選項的值包括 "unnamed" 時，無名寄存器同樣如此。這樣，你不用在命
+令前加 "* 就可以從剪貼板做剪切/粘貼操作。
+
+默認情況下，'guioptions' 選項裡不包含標誌位 'a'。這意味著如果你通過可視模式選
+定的文本不進行操作，那麼它們不會被複製到剪貼板。當 'guioptions' 包含 'a' 時，
+在你選定文本的同時，這些被選定的文本已經被複製到剪貼板上。
+
+							*mswin.vim*
+如果想用 CTRL-X，CTRL-C 和 CTRL-V 這些標準的 MS-Windows 操作方式怎麼辦？有辦
+法！用 $VIMRUNTIME\mswin.vim 這個腳本解決。你可以把下面這條命令放到你的 _vimrc
+文件裡: >
+	source $VIMRUNTIME/mswin.vim
+
+這樣一來 CTRL-C 就變成 "複製" 命令了，無法用作中止操作命令。改用 CTRL-Break。
+
+CTRL-Z 用於撤銷。這意味著你無法用此快捷鍵掛起 Vim，可用 |:suspend| 代替 (如果
+支持的話)。
+
+						*CTRL-V-alternative* *CTRL-Q*
+因為 CTRL-V 被用做 "粘貼"，所以你不能用它來啟動 "可視列塊" 的選擇模式，不過可
+以用 CTRL-Q 代替。你也可以在插入模式和命令行模式中用 CTRL-Q 代替 CTRL-V。但是
+CTRL-Q 常常被用作控制流，這時候它在某些終端下就不好用了。
+
+備註: gvim 對剪貼板的支持仍有一些漏洞。見 |todo|。
+
+==============================================================================
+4. 命令行命令						*gui-shell-win32*
+
+Vim 用另一個窗口執行外部命令，這使得 Vim 可以運行任何命令。外部命令運行時使用
+單獨的環境，這和你在 DOS 提示符下運行命令是一樣的。
+
+							*win32-vimrun*
+Vim 通過調用 "vimrun" 間接執行外部命令。所以 vimrun.exe 必須包含在搜索路徑內才
+能工作，或者把它和 gvim.exe 放到同一個目錄下。如果找不到 "vimrun"，命令會直接
+執行，但 DOS 窗口會在程序運行完畢後立即關閉。
+警 告：如果你這時用 "X" 按鈕關閉命令提示符窗口，並且在彈出確認終止程序對話框時
+選擇了 "是"，Vim 也會同時被關閉。(用 ":!start" 這種異步方式運行外部命令時，不
+會出現這種情況。)
+
+在 Win95 上，Vim 使用的命令提示符窗口總是使用 25x80 個字符，這樣做是為了和 DOS
+兼容 (這很有必要！)。使用缺省系統字體。在 WinNT 上，Vim 使用的命令提示符窗口使
+用在 "控制面板" 裡給 "Console" 預先定義的設置。在 Win32s 上 DOS 窗口的屬性決定
+於 Windows 目錄下的 _default.pif 文件。
+
+							*msdos-mode*
+如果程序彈出一個對話框說："This program is set to run in MS-DOS..." 你可以通過
+修改該程序的 MS-DOS 快捷方式的屬性來解決這個問題：
+－用 Windows 資源管理器找到系統所用的 command.com。可能是
+  c:\command.com，c:\dos\command.com，c:\windows\command.com 等等。
+－鼠標右鍵點擊 "command.com"，選 "屬性"。
+－在 "程序" 選項卡裡選擇 "高級"。
+－去掉 "MS-DOS 模式" 前的對勾。
+－點擊兩次 "確定"。
+
+
+							*win32-!start*
+通常 Vim 在一個命令結束之前不會繼續進行下面的工作 (這對 Vim 從命令行中捕獲輸出
+是很有用的)。如果你想讓 Vim 啟動一個命令後立即返回，在 Win95 和 WinNT 上可以這
+樣做: >
+	:!start {command}
+在 Win32s 中，你不得不另外開一個 MS-DOS 窗口代替。千萬別忘了，當你切換回 Vim
+的時候，一定讓 Windows 3.1x 在後台繼續運行那個你要執行的程序。
+
+==============================================================================
+5. 特殊顏色						*win32-colors*
+
+在 Win32 上，可以使用通常的 DOS 顏色。參見 |dos-colors|。
+
+另外，系統顏色也一樣可以使用。它們以 Sys_XXX 的形式出現，這裡 XXX 是相應的顏色
+名稱 (對大小寫不敏感)，如下表所示：(更翔實的描述可以參看 Win32 手冊)。
+注意: Win32s 中對下列顏色的支持不完全。
+
+Sys_3DDKShadow		Sys_3DFace			Sys_BTNFace
+Sys_3DHilight		Sys_3DHighlight			Sys_BTNHilight
+Sys_BTNHighlight	Sys_3DLight			Sys_3DShadow
+Sys_BTNShadow		Sys_ActiveBorder		Sys_ActiveCaption
+Sys_AppWorkspace	Sys_Background			Sys_Desktop
+Sys_BTNText		Sys_CaptionText			Sys_GrayText
+Sys_Highlight		Sys_HighlightText		Sys_InactiveBorder
+Sys_InactiveCaption	Sys_InactiveCaptionText		Sys_InfoBK
+Sys_InfoText		Sys_Menu			Sys_MenuText
+Sys_ScrollBar		Sys_Window			Sys_WindowFrame
+Sys_WindowText
+
+可能最有用的值是下面這些：
+	Sys_Window	    正常的窗口背景顏色
+	Sys_WindowText      正常的窗口文字顏色
+	Sys_Highlight       加亮的背景顏色
+	Sys_HighlightText   加亮的文字顏色
+
+還有一些額外可供使用的顏色：
+Gray、Grey、LightYellow、SeaGreen、Orange、Purple、SlateBlue、Violet。
+
+								*rgb.txt*
+此外，還可以用在文件 "rgb.txt" 中定義的顏色。這個文件對於 X11 的用戶來說是再
+熟悉不過了。下面是從中抽取的幾行: >
+
+  255 218 185		   peach puff
+  205 133  63		   peru
+  255 181 197		   pink
+
+該文件看起來就是這個樣子：3 個十進制數分別代表顏色的 R (紅)、G (綠)、B (藍)，
+然後是顏色的名字。四個字段用空格分開。
+
+你可以從任何的 X11 發行中得到 "rgb.txt"。它位於 "/usr/X11R6/lib/X11/" 之類的目
+錄中。對於 Vim ，"rgb.txt" 必須放在 $VIMRUNTIME 目錄裡，也就是說，該文件可以在
+"$VIMRUNTIME/rgb.txt" 找到。
+
+==============================================================================
+						*gui-w32-dialogs* *dialog*
+6. Windows 對話框和瀏覽器
+
+Vim 的控制台版本在各個平台上提供的用戶界面是類似的，同樣 Vim 的 Win32 GUI 版本
+也會用與其它平台相似的視窗組件進行操作。
+
+
+6.1 對話框
+
+用 "confirm" 命令族 (例如：'confirm' 選項，|:confirm| 命令和 |confirm()| 函數)
+調用的對話框是基於 GUI 而不是像其它版本那樣是基於控制台的。選項 'guioptions'
+中的標誌位 'c' 可以改變這種情況。
+
+6.2 文件瀏覽器
+
+如果你在文件編輯命令前加上 ":browse"，Vim 就會彈出一個文件選擇窗口，選擇現存
+文件。參見 |:browse|。
+
+6.3 撕下菜單 (Tearoff Menus)
+
+Vim 的 Win32 GUI 模擬 Motif 的 "撕下菜單"。在每項菜單的頂部有一個 "剪刀" 的標
+志。選擇後會出現一個浮動窗口，窗口上的按鈕與菜單上的選項一一對應。直接點擊這些
+按鈕與點擊菜單裡的選項是一樣的 (包括子菜單)，只是不用每次到菜單裡去找了。
+
+當你要反覆使用埋藏在子菜單裡很深位置的命令時，這個功能就很有用了。
+
+這些撕下菜單分離後，可以放在任何你喜歡的地方，並且總在 gvim 主窗口上方。你可以
+像一般的窗口一樣關掉它們；如果你退出 gvim，它們也會自動關閉。
+
+							*:tearoff* *:te*
+:te[aroff] {name}	撕下菜單 {name}。菜單中必須至少有一個選項，但是不必出
+			現在主菜單欄裡 (參見 |win32-hidden-menus|)。
+
+例如: >
+	:tearoff File
+這條命令把 "File" 菜單 (如果存在的話) 撕下來。
+>
+	:amenu ]Toolbar.Make	:make<CR>
+	:tearoff ]Toolbar
+這兩條命令創建了一個浮動菜單，這個菜單不在主菜單欄裡。
+
+注意: 以 ']' 開頭的菜單名不會在菜單欄裡顯示。
+
+==============================================================================
+7. 命令行參數						*gui-w32-cmdargs*
+
+在微軟的 Windows 系統裡對命令行參數的分析沒有一個標準的做法。GVim 不得不提供一
+種方法來對命令行進行分析。這種方法和用於編譯 vim 的編譯系統提供的缺省方法可能
+會有不同。主要的不同是有關 " (雙引號) 的特殊用法。
+參數 "C:\My Music\freude.txt" 和 "+/Sch\"iller" 的處理方法是相同的。但是對於參
+數 "+/Sch""iller" 的處理 gvim 和 vim 是不同的，這要看編譯時用了哪些功能。
+
+規則是：
+	a) 參數是一個可視字符串。
+	b) 參數之間被空白字符分割。
+	c) 如果參數里包含空白字符，可以用 " (雙引號) 參數括起來。
+	d) 零或多個反斜槓 (\) 後跟一個雙引號 (") 的序列是比較特殊的。反斜槓的
+	   有效個數減半 (往下取整)。偶數個反斜槓便不再接納其後的空格符和製表符
+	   為參數的一部分。奇數個反斜槓生成一個按本義出現的雙引號。
+
+所以：
+	"	是一個有特殊意義的雙引號
+	\"	是一個按本義出現的雙引號
+	\\"	是一個反斜槓和一個有特殊意義的雙引號
+	\\\"	是一個反斜槓和一個按本義出現的雙引號
+	\\\\"	是兩個反斜槓和一個有特殊意義的雙引號
+	\\\\\"	是兩個反斜槓和一個按本義出現的雙引號
+	等等。
+
+例如： >
+	gvim "C:\My Music\freude" +"set ignorecase" +/"\"foo\\" +\"bar\\\"
+
+打開文件 "C:\My Music\freude" 並依次執行行模式命令： >
+	set ignorecase; /"foo\ 和 /bar\"
+
+(譯者注: 依此解釋，輸入的命令行似有誤。最後一個參數應為 +/"bar\\\")。
+
+==============================================================================
+8. 雜項							*gui-w32-various*
+
+							*gui-w32-printing*
+菜單 "文件/打印"，會打印出經過語法高亮的文本，參見 |:hardcopy|。如果你只想打印
+原始文本，並且已經安裝好了默認的打印機，可以用下面這條命令: >
+	:w >>prn
+
+Vim 支持許多 MS-Windows 的標準特性。一些相關的介紹可以在別的地方找到：參見
+|'mouse'|，|win32-hidden-menus|。
+
+							*drag-n-drop-win32*
+你可以把一個或多個文件拖到 Vim 窗口裡，Vim 會用一般的方式打開它們。
+參見 |drag-n-drop|。
+
+							*:simalt* *:si*
+:si[malt] {key}		模擬 Alt-{key} 組合鍵。
+			{Vi 無此功能} {僅適用 Win32 版本}
+
+正常情況下，為了增加鍵映射 (map) 的數量，Vim 控制所有 Alt-{key} 組合鍵。但是這
+樣做可能與用 Alt-{key} 訪問菜單的標準方法衝突。
+一個快速的解決辦法是：設置 'winaltkeys' 選項的值為 "yes"。但是這樣阻止了所有與
+Alt 鍵有關的映射。另一個辦法是：設置 'winaltkeys' 選項為 "menu"。這樣與菜單有
+關的快捷鍵有 Windows 管理，其餘的與 Alt 相關的映射仍然好用。但這樣又產生了對當
+前狀態的依賴性。
+要解決這個問題，就要用 :simalt 命令告訴 Vim ('winaltkeys' 不要設置為 "yes") 虛
+擬一個 Windows 風格的 Alt 按鍵行為。你可以用它來映射 Alt 組合鍵 (或者任何其它
+鍵) 來產生標準的 Windows 操作。下面是一些例子: >
+
+	:map <M-f> :simalt f<CR>
+這個命令通過把 Alt-F 映射為模擬按鍵的 Alt 和 F，使你按下 Alt-F 時彈出 "文件"
+菜單 (對於缺省的 Menu.vim 而言) >
+	:map <M-Space> :simalt ~<CR>
+這個命令通過映射 Alt-Space 彈出 Vim 窗口的系統菜單。注意: ~ 在 simalt 命令裡代
+表 <Space> (空格)。 >
+	:map <C-n> :simalt ~n<CR>
+把 CTRL-N 映射成 Alt-Space + N。也就是打開窗口的系統菜單，然後按 N，最小化 Vim
+窗口。
+
+備註 鍵映射取決於你使用的語言。
+
+						*intellimouse-wheel-problems*
+用智能鼠 (Intellimouse) 的滑輪會引起 Vim 不能接收輸入。到：
+	ControlPanel - Mouse - Wheel - UniversalScrolling - Exceptions
+
+把 gvim 加到列表裡就可以了。這個問題僅在使用智能鼠驅動程序 2.2 版本，並且打開
+"Universal Scrolling" 時才會出現。
+
+ vim:tw=78:sw=4:ts=8:ft=help:norl:

@@ -1,0 +1,437 @@
+*usr_90.txt*	For Vim version 7.3.  最近更新：2009年4月
+
+		     VIM USER MANUAL - by Bram Moolenaar
+		   譯者：lang2  http://vimcdoc.sf.net
+
+				安裝 Vim
+
+								*install*
+在你開始使用 Vim 之前你必須安裝它。根據你的系統不同，安裝可能很簡單，也可能稍
+微複雜一點。這一章會給出一些提示，同時也敘述如何升級。
+
+|90.1|	Unix
+|90.2|	MS-Windows
+|90.3|	升級
+|90.4|	常見安裝問題
+|90.5|	卸載 Vim
+
+     前一章：|usr_45.txt|  選擇你的語言
+       目錄：|usr_toc.txt|
+
+==============================================================================
+*90.1*	Unix
+
+首先你要決定的是：要為整個系統安裝 Vim 還是為單個用戶。安裝過程幾乎是一樣的。
+但是 Vim 安裝的路徑不同。
+   對於系統安裝來說基目錄常使用 "/usr/local"。但對於你的系統可能也不同。看看其
+它的軟件包是安裝在哪裡的。
+   當為單個用戶安裝時，你可以使用你的主目錄作為基目錄。Vim 的文件將被放置到
+"bin" 和 "shared/vim" 等子目錄中。
+
+
+從 一 個 程 序 包 安 裝
+
+你可以取得為許多不同的 Unix 系統預先編譯好的可執行文件。下面的鏈接給出一個很長
+的列表:
+
+	http://www.vim.org/binaries.html ~
+
+這些可執行文件是由志願者維護的，所以經常會過時。因此通過源代碼來自己編譯你自己
+的 UNIX 版本是個更好的辦法。同時，從源代碼創建 Vim 編輯器允許你控制可選的特
+性。但這需要一個編譯器。
+
+如果你有一個 Linux 的發行版本，其中的 "vi" 程序很可能是一個最小版的 Vim。例
+如，它可能不支持語法高亮。試試在你的發行版中找另外一個 Vim 程序包，或在網上搜
+搜。
+
+
+從 源 碼 開 始
+
+你需要下面的東西來編譯 Vim:
+
+	-  一個編譯器 (最好用 GCC)
+	-  GZIP 程序 (可以從 from www.gnu.org 得到)
+	-  Vim 源碼和運行時歸檔文件
+
+下面這個文件提供了一個鏡像列表，它可以幫助你找到距離你最近的鏡像從而提高下載的
+速度:
+
+	ftp://ftp.vim.org/pub/vim/MIRRORS ~
+
+如果你覺得夠快的話，或者就用主站 ftp.vim.org。進入到 "unix" 目錄你就可以找到一
+組文件。文件名中會含有版本名。最好下載最新的版本。
+   有兩種辦法可以下載 Vim 的 Unix 文件：一個包括所有東西的大文檔；或者是四個較
+小的可以裝載一張軟盤上的小文件。對於 6.1 版那個大文件叫:
+
+	vim-6.1.tar.bz2 ~
+
+你需要 bzip2 程序來將其解壓縮。如果你沒有，可以下載那四個小些的文件。那些可以
+用 gzip 程序來解壓縮。在 Vim 6.1 中它們叫:
+
+	vim-6.1-src1.tar.gz ~
+	vim-6.1-src2.tar.gz ~
+	vim-6.1-rt1.tar.gz ~
+	vim-6.1-rt2.tar.gz ~
+
+
+編 譯
+
+先建立一個工作目錄，例如: >
+
+	mkdir ~/vim
+	cd ~/vim
+
+在其中解開下載的文檔。如果你下載了那個大文檔，你可以這樣解壓縮: >
+
+	bzip2 -d -c path/vim-6.1.tar.bz2 | tar xf -
+
+把 "path" 改變為你下載文件所在的路徑。 >
+
+	gzip -d -c path/vim-6.1-src1.tar.gz | tar xf -
+	gzip -d -c path/vim-6.1-src2.tar.gz | tar xf -
+	gzip -d -c path/vim-6.1-rt1.tar.gz | tar xf -
+	gzip -d -c path/vim-6.1-rt2.tar.gz | tar xf -
+
+如果你覺得缺省的特性就夠了的話，照下面這樣直接編譯 Vim 就行了: >
+
+	cd vim61/src
+	make
+
+make 程序會執行 configure 並編譯所有的東西。後邊我們會介紹如何將不同的特性編譯
+進 Vim。
+   如果在編譯時出現錯誤，請仔細的查看錯誤信息。編譯程序會給出對於錯誤的提示。
+希望你能據此更正錯誤。你可能需要關閉一些特性。Makefile 也給出了一些可能適合你
+的特定系統的提示。
+
+
+測 試
+
+現在你可以試試你的編譯成功了沒有: >
+
+	make test
+
+這將執行一系列的測試腳本來確認 Vim 能正常的工作。測試的過程中 Vim 會多次啟動，
+也會閃過各種各樣的文本和信息。如果測試成功的話你最終會看到:
+
+	test results: ~
+	ALL DONE ~
+
+如果你得到 "TEST FAILURE" 的信息，有些測試失敗了。如果有一兩個測試失敗，Vim 可
+能還可以工作，不過不太完美。但是如果你看到大量的錯誤信息或者測試無法完成，那一
+定是有麻煩了。要麼嘗試自己解決，要麼找個能幫助你的人。你可以在
+|maillist-archive| 中查找解決辦法。如果實在解決不了，你可以在 |maillist| 中提
+問看看有沒有人能幫你。
+
+
+安 裝
+							*install-home*
+如果你想安裝在自己的 home 目錄，編輯 Makefile 並查找這樣的一行:
+
+	#prefix = $(HOME) ~
+
+把行首的那個 # 去掉。
+   當你要為整個系統安裝的時候，Vim 很可能已經為你選擇好了一個合適的安裝目錄。
+你也可以照下面講的自己選擇一個，但你必須先改變身份為 root。
+
+要安裝 Vim 執行: >
+
+	make install
+
+這將把所有相關的文件轉移到正確的地方。現在你可以試著運行一下 vim 以確認沒有問
+題。下面兩個簡單的測試可以檢查 Vim 能不能正確地找到那些運行時文件: >
+
+	:help
+	:syntax enable
+
+如果不成功的話，使用下面的命令來查看 Vim 是在哪兒找那些文件的: >
+
+	:echo $VIMRUNTIME
+
+你還可以用 "-V" 參數來啟動 Vim，那樣你可以得到更多的啟動信息: >
+
+	vim -V
+
+別忘了本手冊假設你用某一特定的方式使用 Vim。在安裝完成之後，請依照
+|not-compatible| 裡面的指示來要求 Vim 以該方式運行。
+
+
+選 擇 特 性
+
+Vim 有多種方法可以選擇其特性。一個簡單 (直接) 的辦法就是編輯 Makefile。那裡有
+很多的指令和例子。通常你只要去掉一行的註釋就可以打開或關閉某一特性。
+   另外你也可以運行 "configure" 程序。這使得你可以手動指明你所希望的特性。缺點
+是你得知道在命令行上輸入什麼。
+   下面列出一些最可能引起你興趣的 configure 參數。同樣的，你也可以通過編輯
+Makefile 來設定。
+
+	--prefix={directory}		安裝 Vim 的頂級目錄。
+
+	--with-features=tiny		關掉很多特性。
+	--with-features=small		關掉一些特性。
+	--with-features=big		打開更多的特性。
+	--with-features=huge		打開大多數特性。
+					參閱 |+feature-list| 察看每一種方式
+					的詳細特性列表。
+
+	--enable-perlinterp		開啟 Perl 接口。類似的還有為
+					ruby、python 和 tcl 準備的參數。
+
+	--disable-gui			不編譯 GUI 界面。
+	--without-x			不編譯 X-windows 相關的特性。
+					當兩個同時使用的時候，Vim 不會連接
+					X 服務器，這會使啟動更快些。
+
+察看所有參數的列表使用: >
+
+	./configure --help
+
+這裡你可以找到各個特性的一些解釋，以及指向其它更多信息的鏈接: |feature-list|。
+   對於那些喜歡冒險的人，你可以編輯 "feature.h" 文件。你還可以自己改動源代碼！
+
+==============================================================================
+*90.2*	MS-Windows
+
+有兩種方法可以安裝 Vim 的 Microsoft Windows 版本。你可以選擇自己解壓縮幾個文
+檔，或者使用一個自動安裝程序。多數使用較新的電腦的用戶會選擇第二種方法。對於第
+一種方法你需要:
+
+	- 包含 Vim 可執行程序的文檔。
+	- Vim 運行時歸檔文件。
+	- 解壓縮程序。
+
+下面這個文件提供了一個鏡像列表，它可以幫助你找到距離你最近的鏡像從而提高下載的
+速度:
+
+	ftp://ftp.vim.org/pub/vim/MIRRORS ~
+
+如果你覺得夠快的話，或者就用主站 ftp.vim.org。進入到 "pc" 目錄就可以找到一組文
+件。文件的名字中含有版本名。最好下載最新的版本。這裡我們用 "61" 為例，表示 6.1
+版。
+
+	gvim61.exe		自動安裝程序。
+
+第二種方法你就只需要這個了。執行該程序並依照提示操作就可以了。
+
+第一種方法你需要選擇下列的其中一個可執行文檔:
+
+	gvim61.zip		一般的 MS-Windows GUI 版本。
+	gvim61ole.zip		帶有 OLE 支持的 MS-Windows GUI 版本。
+				更消耗內存，支持與其他 OLE 程序的接口。
+	vim61w32.zip		32 位 MS-Windows 控制台版本。適用於
+				Win NT/2000/XP 命令窗口。不能很好地在
+				Win 95/98 內運行。
+	vim61d32.zip		32 位 MS-DOS 版本。適用於 Win 95/98 命令窗口。
+	vim61d16.zip		16 位 MS-DOS 版本。僅適用於老系統。
+				不支持長文件名。
+
+你只需要其中的一個就夠了。不過你可以同時安裝一個 GUI 版本和一個控制台版本。但
+是包含有運行時文件的歸檔文件總是必需的。
+
+	vim61rt.zip		運行時文件。
+
+使用你的解壓縮程序把文件解出來。例如，使用 "unzip" 程序: >
+
+	cd c:\
+	unzip path\gvim61.zip
+	unzip path\vim61rt.zip
+
+這將把文件解壓縮到 "c:\vim\vim61" 目錄。如果你已經有一個 "vim" 目錄了，你需要
+進入其上級目錄。
+   現在進入那個 "vim\vim61" 目錄，然後執行安裝程序: >
+
+	install
+
+仔細的察看並選擇你想要的。當你最終選擇 "do it" 的時候安裝程序將根據你的選項執
+行安裝的步驟。
+   安裝程序不會移走運行時文件。它們會被原封不動留在你解壓縮的地方。
+
+如果你對可執行文件包含的特性不滿意的話，你可以試著自己編譯 Vim。從你取得可執行
+文檔同樣的地方取得源代碼。你需要一個有對應的 makefile 文件的編譯器。
+可以使用 Microsoft Visual C，但是它很昂貴。免費的 Borland 命令行編譯器 5.5 也
+可以。還有免費的 MingW 和 Cygwin 編譯器。查閱 src/INSTALLpc.txt。
+
+==============================================================================
+*90.3*	升級
+
+如果你已經有一個版本的 Vim 並想安裝另一個，這裡就是你需要做的。
+
+
+UNIX
+
+當你鍵入 "make install" 命令時，運行時文件將被拷貝到一個該版本專有的目錄，而不
+會覆蓋現存版本的文件。這樣就便可以同時運行兩個版本的 Vim。
+   但是可執行文件 "vim" 將覆蓋老的版本。如果你不在乎保留老的版本，這樣就沒問
+題。你還可以手動刪除那些老版本的運行時文件。只要刪除掉那個版本所在目錄及其下所
+有文件即可。例: >
+
+	rm -rf /usr/local/share/vim/vim58
+
+通常該目錄裡不會有你改動過的文件。如果你的確改動了，例如，"filetype.vim" 文
+件，你最好把改動合併到新的版本然後在刪除老的文件。
+
+如果你比較小心，希望先試試新的版本，你可以用另外的名字安裝新的版本。你需要指定
+一個 configure 參數。例如: >
+
+	./configure --with-vim-name=vim6
+
+在運行 "make install" 之前，你可以使用 "make -n install" 命令來查看安裝會不會
+覆蓋現有的重要文件。
+   當你最終決定啟用新版本的時候，你要做的僅僅是將可執行文件改名為 "vim"。例: >
+
+	mv /usr/local/bin/vim6 /usr/local/bin/vim
+
+
+MS-WINDOWS
+
+升級幾乎和安裝一個新版本一樣。把新版本的文件解壓縮到上一版本的同樣位置。會對於
+新版本的文件生成一個新的目錄。例如："vim61"。你的運行時文件，vimrc 文件，
+viminfo 文件等等，會被原樣保留。
+   如果你想同時運行兩個版本，你就得做點作些手工活了。別運行安裝程序。那樣會覆
+蓋老版本的一些文件。用全路徑來運行新的可執行文件。程序會自動找到它需要的運行時
+文件。然而，如果你在別的地方設定了 $VIMRUNTIME 的值，這個法子就不靈了。
+   如果你對升級滿意的話，你可以刪除掉前一版本的文件。參閱 |90.5|。
+
+==============================================================================
+*90.4*	常見安裝問題
+
+這一節列舉一些安裝過程中常見的麻煩並給出一些解決辦法。同時也回答一些安裝相關的
+問題。
+
+
+Q: 我沒有 Root 權限。怎麼安裝 Vim? (Unix)
+
+使用下面的配置命令可以將 Vim 安裝到目錄 $HOME/vim: >
+
+	./configure --prefix=$HOME
+
+這樣你可以安裝一個個人拷貝。請將 $HOME/bin 加入 path 中，以便執行本編輯器。參
+閱 |install-home|。
+
+
+Q: 我屏幕上的顏色不對。(Unix)
+
+用下面的命令檢查終端的設置: >
+
+	echo $TERM
+
+如果列出的終端類型不正確，更正之。查閱 |06.2| 可以得到更多的提示。另一個解決辦
+法是使用 Vim 的 GUI 版本。名為 gvim。這樣你就不需要一個正確的終端設置了。
+
+
+Q: 我的 Backspace 和 Delete 鍵工作不正常
+
+對於這兩個鍵 (<BS>、<Del>)，什麼鍵產生它們的鍵碼不是很清楚。首先檢查一下你的
+$TERM 設置。如果沒什麼錯誤，試試這個: >
+
+	:set t_kb=^V<BS>
+	:set t_kD=^V<Del>
+
+第一行你需要鍵入 CTRL-V 在按 backspace 鍵。第二行你需要鍵入 CTRL-V 再按 Delete
+鍵。你可以把這兩行加入到你的 vimrc 文件中，參見 |05.1|。 這樣做的一個缺點是如
+果你換用另外一個終端程序的話，這些設置可能就不起作用了。其他的解決辦法可以在 
+|:fixdel| 中找到。
+
+
+Q: 我使用 RedHat Linux。我能使用系統自帶的 Vim 嗎？
+
+缺省情況下 RedHat 僅安裝一個 Vim 的最小版本。找一個叫
+"Vim-enhanced-version.rpm" 的安裝包就行了。
+
+
+Q: 我怎麼才能打開語法高亮？怎麼才能使用插件？
+
+使用那個 vimrc 腳本的例子。在這兒你可以找到詳細地解釋: |not-compatible|。
+
+在第 6 章閱讀有關語法高亮的解釋: |usr_06.txt|。
+
+
+Q: 有沒有一個好的 vimrc 文件可以使用？
+
+到 www.vim.org 網站去找找。
+
+
+Q: 哪兒可以找到好的 Vim 插件？
+
+看看 Vim-online 網站: http://vim.sf.net。很多用戶在那裡上載了非常有用的 Vim 腳
+本。
+
+
+Q: 哪有更多的技巧提示？
+
+看看 Vim-online 網站: http://vim.sf.net。那裡收集了很多用戶的提示。你也可以在
+|maillist-archive| 裡查找。
+
+==============================================================================
+*90.5*	卸載 Vim
+
+雖然這幾乎不可能發生，但是萬一你希望完全卸載 Vim，本節告訴你怎麼做。
+
+
+UNIX
+
+如果你是通過一個軟件包安裝 Vim 的，看看你的軟件包管理器是如何卸載一個軟件包
+的。如果你是通過源代碼安裝的你可以用這個命令卸載: >
+
+	make uninstall
+
+然而，如果你已經將那些文件刪除或者你使用的是別人提供的歸檔，你就沒法這樣做了。
+那就只能手動刪除那些文件。這裡給出一個例子，假設你是以 root 身份將 Vim 安裝到
+"/usr/local" 下的: >
+
+	rm -rf /usr/local/share/vim/vim61
+	rm /usr/local/bin/eview
+	rm /usr/local/bin/evim
+	rm /usr/local/bin/ex
+	rm /usr/local/bin/gview
+	rm /usr/local/bin/gvim
+	rm /usr/local/bin/gvim
+	rm /usr/local/bin/gvimdiff
+	rm /usr/local/bin/rgview
+	rm /usr/local/bin/rgvim
+	rm /usr/local/bin/rview
+	rm /usr/local/bin/rvim
+	rm /usr/local/bin/rvim
+	rm /usr/local/bin/view
+	rm /usr/local/bin/vim
+	rm /usr/local/bin/vimdiff
+	rm /usr/local/bin/vimtutor
+	rm /usr/local/bin/xxd
+	rm /usr/local/man/man1/eview.1
+	rm /usr/local/man/man1/evim.1
+	rm /usr/local/man/man1/ex.1
+	rm /usr/local/man/man1/gview.1
+	rm /usr/local/man/man1/gvim.1
+	rm /usr/local/man/man1/gvimdiff.1
+	rm /usr/local/man/man1/rgview.1
+	rm /usr/local/man/man1/rgvim.1
+	rm /usr/local/man/man1/rview.1
+	rm /usr/local/man/man1/rvim.1
+	rm /usr/local/man/man1/view.1
+	rm /usr/local/man/man1/vim.1
+	rm /usr/local/man/man1/vimdiff.1
+	rm /usr/local/man/man1/vimtutor.1
+	rm /usr/local/man/man1/xxd.1
+
+
+MS-WINDOWS
+
+如果你是用那個自動安裝程序安裝的話你可以運行 Vim 目錄下 (例如 "c:\vim\vim61")
+的 "uninstall-gui" 程序。你也可以通過開始菜單來運行。這可以刪除大多數的文件菜
+單以及桌面快捷方式。有些文件可能只有待 Windows 重新啟動之後才能被刪除。
+   你可能被提示來刪除整個 "vim" 目錄。那裡面很可能有你的 vimrc 文件以及其他你
+創建的運行時文件。要當心。
+
+否則，如果你使用了那些 zip 文檔安裝了 Vim 的話，最好使用 "uninstal" 程序。(注
+意最後沒有那個 l)。它就在 "install" 程序所在的目錄， 例如，"c:\vim\vim61"。用
+通常的那個 "install/remove software" 頁也一樣有效。
+   然而，這只會清除 Vim 的註冊表信息。你得自己刪除硬盤上的那些文件。簡單的選中
+"vim\vim61" 目錄並刪除就可以了。那裡邊不應該包含任何你所改動過的文件，不過你可
+能希望先檢查一下。
+   "vim" 目錄很有可能包含有你的 vimrc 文件以及其它你創建的運行時文件。你可能想
+保留它。
+
+==============================================================================
+
+目 錄: |usr_toc.txt|
+
+版權： 參見 |manual-copyright|  vim:tw=78:ts=8:ft=help:norl:

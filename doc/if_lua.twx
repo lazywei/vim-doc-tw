@@ -1,0 +1,222 @@
+*if_lua.txt*    For Vim version 7.3.  最近更新: 2010年7月
+
+
+		  VIM 參 考 手 冊         by Luis Carvalho
+				譯者: Willis
+				http://vimcdoc.sf.net
+
+
+Vim 的 Lua 接口         				*lua* *Lua*
+
+1. 命令         		|lua-commands|
+2. vim 模塊             	|lua-vim|
+3. 緩衝區用戶數據		|lua-buffer|
+4. 窗口用戶數據			|lua-window|
+
+{Vi 沒有任何以上的命令}
+
+僅當 Vim 編譯時加入 |+lua| 特性時 Lua 接口才可用。
+
+==============================================================================
+1. 命令         					*lua-commands*
+
+							*:lua*
+:[range]lua {chunk}
+			執行 Lua 語言塊 {chunk}。{Vi 無此功能}
+
+示例:
+>
+	:lua print("Hello, Vim!")
+	:lua local curbuf = vim.buffer() curbuf[7] = "line #7"
+<
+
+:[range]lua << {endmarker}
+{script}
+{endmarker}
+			執行 Lua 腳本 {script}。{Vi 無此功能}
+			注意: 如果編譯時沒有加入 Lua 特性，此命令不能工作。要
+			避免錯誤，見 |script-here|。
+
+{endmarker} 之前_不能_有任何空白。如果 "<<" 之後的 {endmarker} 省略，{script}
+之後必須加上句號 '.'，就像 |:append| 和 |:insert| 命令那樣。
+這種形式的 |:lua| 命令主要用於在 Vim 腳本中嵌入 Lua 代碼。
+
+示例:
+>
+	function! CurrentLineInfo()
+	lua << EOF
+	local linenr = vim.window().line
+	local curline = vim.buffer()[linenr]
+	print(string.format("Current line [%d] has %d chars",
+		linenr, #curline))
+	EOF
+	endfunction
+<
+
+							*:luado*
+:[range]luado {body}	在 [range] 行範圍的每行執行 Lua 函數
+			"function (line) {body} end"，其中，函數參數是每行的文
+			本，結尾的 <EOL> 不計。函數返回值為字符串時用來替代當
+			前行的文本。缺省的 [range] 是整個文件: "1,$"。
+			{Vi 無此功能}
+
+示例:
+>
+	:luado return string.format("%s\t%d", line:reverse(), #line)
+
+	:lua require"lpeg"
+	:lua -- balanced parenthesis grammar:
+	:lua bp = lpeg.P{ "(" * ((1 - lpeg.S"()") + lpeg.V(1))^0 * ")" }
+	:luado if bp:match(line) then return "-->\t" .. line end
+<
+
+							*:luafile*
+:[range]luafile {file}
+			執行 Lua {file} 文件中的腳本. {Vi 無此功能}
+			整個參數用作單個文件名。
+
+示例:
+>
+	:luafile script.lua
+	:luafile %
+<
+
+以上的命令都可執行一段 Lua 代碼塊 (chunk)，或從命令行 (:lua 和 :luado)，或從文
+件 (:luafile)，並可給出行範圍 [range]。和 Lua 解釋器類似，每個代碼塊都有自己的
+作用域，所以命令之間只有全局變量可以共享。Lua 缺省庫中 "table"、"string"、
+"math"、和 "package" 可用，而 "io" 和 "debug" 不可用，"os" 只提供以下函數:
+"date"、"clock"、"time"、"difftime" 和 "getenv"。此外，Lua 的 "print" 函數的輸
+出重定向到 Vim 消息區，參數以空格而不是製表符分隔。
+
+Lua 使用 "vim" 模塊 (見 |lua-vim|) 來對 Vim 發出指令以及對緩衝區
+(|lua-buffer|) 和窗口 (|lua-window|) 進行管理。不過在 |sandbox| 中執行命令時，
+修改緩衝區內容、打開新緩衝區和改變光標位置的過程收到限制。
+
+
+==============================================================================
+2. vim 模塊						*lua-vim*
+
+Lua 通過 "vim" 模塊和 Vim 進行接口。輸入行範圍的首末行分別存入 "vim.firstline"
+和 "vim.lastline"。該模塊也包含一些對緩衝區、窗口以及當前行查詢的例程、Vim 調
+用和命令執行，以及其它各種操作。
+
+	vim.isbuffer(value)	如果 "value" 是緩衝區用戶數據，返回 'true'。否
+				則返回 'false' (見 |lua-buffer|)。
+
+	vim.buffer([arg])	如果 "arg" 是數值，返回緩衝區列表中編號為
+				"arg" 的緩衝區。如果 "arg" 為字符串，返回完整
+				明或簡短名為 "arg" 的緩衝區。這兩種情況下，如
+				果找不到緩衝區，返回 'nil'。此外，如果
+				"toboolean(arg)" 為 'true'，返回緩衝區列表的首
+				個緩衝區，否則返回當前緩衝區。
+
+	vim.iswindow(value)	如果 "value" 是窗口用戶數據，返回 'true'。否則
+				返回 'false' (見 |lua-window|)。
+
+	vim.window([arg])	如果 "arg" 是數值，返回編號為 "arg" 的窗口，如
+				果找不到，返回 'nil'。此外，如果
+				"toboolean(arg)" 為 'true'，返回首個窗口，否則
+				返回當前窗口。
+
+	vim.command({cmd})	執行 vim (ex 模式) 命令 {cmd}。
+				示例: >
+					:lua vim.command"set tw=60"
+					:lua vim.command"normal ddp"
+<
+	vim.eval({expr})	計算表達式 {expr} (見 |expression|)，把結果轉
+				化為 Lua 格式並返回。Vim 字符串和數值被直接轉
+				為響應的 Lua 字符串和數值類型。Vim 列表和字典
+				被轉化為 Lua 表 (列表成為以整數為鍵的表)。
+				示例: >
+					:lua tw = vim.eval"&tw"
+					:lua print(vim.eval"{'a': 'one'}".a)
+<
+	vim.line()		返回當前行 (沒有結尾的 <EOL>)，Lua 字符串。
+
+	vim.beep()		鳴笛。
+
+	vim.open({fname})	為文件 {fname} 打開新緩衝區並返回之。注意 並不
+				把該緩衝區設為當前緩衝區。
+
+
+==============================================================================
+3. 緩衝區用戶數據					*lua-buffer*
+
+緩衝區用戶數據代表 vim 的緩衝區。緩衝區用戶數據 "b" 包含以下屬性和方法:
+
+屬性
+----------
+	o "b()" 設置 "b" 為當前緩衝區。
+	o "#b" 是緩衝區 "b" 的行數。
+	o "b[k]" 代表行號 k: "b[k] = newline" 把第 "k" 行替換為字符串
+	    "newline"，還有 "b[k] = nil" 刪除第 "k" 行。
+	o "b.name" 包含緩衝區 "b" 的簡短名 (只讀)。
+	o "b.fname" 包含緩衝區 "b" 的完整名 (只讀)。
+	o "b.number" 包含緩衝區 "b" 在緩衝區列表的位置 (只讀)。
+
+方法
+-------
+	o "b:insert(newline"[, pos]")" 在緩衝區 "pos" (可選) 位置插入
+	    "newline" 字符串。"pos" 缺省值為 "#b + 1"。如果 "pos == 0"，
+	    "newline" 將成為緩衝區的首行。
+	o "b:next()" 返回緩衝區列表中 "b" 的下一個緩衝區。
+	o "b:previous()" 返回緩衝區列表 "b" 的前一個緩衝區。
+	o "b:isvalid()" 如果緩衝區 "b" 對應 "真正的" (內存沒有釋放的) Vim 緩
+	    沖區時，返回 'true' (布爾值)。
+
+示例:
+>
+	:lua b = vim.buffer() -- 當前緩衝區
+	:lua print(b.name, b.number)
+	:lua b[1] = "first line"
+	:lua b:insert("FIRST!", 0)
+	:lua b[1] = nil -- 刪除首行
+	:lua for i=1,3 do b:insert(math.random()) end
+	:3,4lua for i=vim.lastline,vim.firstline,-1 do b[i] = nil end
+	:lua vim.open"myfile"() -- 打開緩衝區，設為當前緩衝區
+
+	function! ListBuffers()
+	lua << EOF
+	local b = vim.buffer(true) -- 列表中的首個緩衝區
+	while b ~= nil do
+		print(b.number, b.name, #b)
+		b = b:next()
+	end
+	vim.beep()
+	EOF
+	endfunction
+<
+
+==============================================================================
+4. 窗口用戶數據						*lua-window*
+
+窗口對像代表 vim 窗口。窗口用戶數據 "w" 有以下屬性和方法:
+
+屬性
+----------
+	o "w()" 設置 "w" 為當前窗口。
+	o "w.buffer" 返回窗口 "w" 對應的緩衝區 (只讀)。
+	o "w.line" 返回窗口 "w" 的光標行位置。
+	o "w.col" 返回窗口 "w" 的光標列位置。
+	o "w.width" 代表窗口 "w" 的寬度。
+	o "w.height" 代表窗口 "w" 的高度。
+
+方法
+-------
+	o "w:next()" 返回 "w" 的下一個窗口。
+	o "w:previous()" 返回 "w" 的前一個窗口。
+	o "w:isvalid()"  如果窗口 "w" 對應 "真正的" (內存沒有釋放的) Vim 窗
+	    口，返回 'true' (布爾值)。
+
+示例:
+>
+	:lua w = vim.window() -- 當前窗口
+	:lua print(w.buffer.name, w.line, w.col)
+	:lua w.width = w.width + math.random(10)
+	:lua w.height = 2 * math.random() * w.height
+	:lua n,w = 0,vim.window(true) while w~=nil do n,w = n + 1,w:next() end
+	:lua print("有 " .. n .. " 個窗口")
+<
+
+==============================================================================
+ vim:tw=78:ts=8:ft=help:norl:

@@ -1,0 +1,872 @@
+*gui.txt*       For Vim version 7.3.  最近更新: 2010年5月
+
+
+		  VIM 參考手冊    by Bram Moolenaar
+				譯者: Willis
+				http://vimcdoc.sf.net
+
+
+Vim 的圖形用戶界面					*gui* *GUI*
+
+1. 啟動 GUI			|gui-start|
+2. 滾動條			|gui-scrollbars|
+3. 鼠標控制			|gui-mouse|
+4. 使用 GUI 進行選擇		|gui-selections|
+5. 菜單				|menus|
+6. 附加				|gui-extras|
+7. 外殼命令			|gui-shell|
+
+其它的 GUI 文檔:
+|gui_x11.txt|	關於 X11 GUI 的特定內容。
+|gui_w32.txt|	關於 Win32 GUI 的特定內容。
+
+{Vi 沒有這裡的任何命令}
+
+==============================================================================
+1. 啟動 GUI					*gui-start* *E229* *E233*
+
+首先，需要確定你確實有包含 GUI 代碼的 Vim 版本。你可以用 ":version" 命令檢查這
+一點。它應該輸出 "with xxx GUI"，而 "xxx" 是 X11-Motif、X11-Athena、Photon、
+GTK、GTK2 等，或者 "MS-Windows 32 bit GUI version"。
+
+如何啟動 GUI 決定於你的系統。多數情況下，你可以這樣啟動 Vim 的 GUI 版本:
+    gvim [options] [files...]
+
+GUI 和非 GUI 版本在 Vim 的 X11 版本上都可以運行。見 |gui-x11-start|。
+
+			*gui-init* *gvimrc* *.gvimrc* *_gvimrc* *$MYGVIMRC*
+gvimrc 文件是 GUI 專用的啟動命令應該放置的地方。它總在 |vimrc| 文件之後執行。
+如果你有這樣的文件，$MYGVIMRC 環境變量保存它的名字。
+
+當 GUI 開始時，開展以下初始化操作 (按照給出的順序):
+- 'term' 選項設為 "builtin_gui"，復位終端選項到其 GUI 的缺省值
+  |terminal-options|。
+- 如果存在系統菜單文件，執行之。該文件名通常是 "$VIMRUNTIME/menu.vim"。你需要
+  用 ":version" 檢查這一點。另見 |$VIMRUNTIME|。要跳過菜單載入，在
+  'guioptions' 裡加入 'M'。		*buffers-menu* *no_buffers_menu*
+  系統菜單文件包含 "Buffers" 菜單。如果你不需要，在你的 .vimrc (不是
+  .gvimrc！) 裡，設置 "no_buffers_menu" 變量: >
+	:let no_buffers_menu = 1
+< 注意: 切換語法高亮也會載入菜單文件，因此屏蔽 Buffers 菜單必須在 ":syntax on"
+  之前。
+  路徑名被截短到 35 個字符。你可以截短到不同的長度，例如 50:
+	:let bmenu_max_pathlen = 50
+- 如果啟動 Vim 時 使用 "-U {gvimrc}" 命令行選項，初始化過程會讀入 {gvimrc} 文
+  件。以下的步驟被跳過。如果 {gvimrc} 為 "NONE"，初始化過程不讀入任何文件。
+- 對 Unix 和 MS-Windows 而言，如果系統 gvimrc 存在，執行之。該文件的名字通常是
+  "$VIM/gvimrc"。你可以用 ":version" 檢查這一點。另見 |$VIM|。
+- 嘗試以下步驟，只使用第一個可用的:
+  - 如果 GVIMINIT 環境變量存在而且非空，把它作為 Ex 命令執行之。
+  - 如果用戶 gvimrc 文件存在，執行之。該文件的名字通常是 "$HOME/.gvimrc"。用
+    ":version" 檢查之。
+  - 對 Win32 而言，如果沒設置 $HOME，使用 "$VIM\_gvimrc"。
+  - 如果 "_gvimrc" 文件沒找到，嘗試 ".gvimrc"。反之亦然。
+  第一個找到的文件名保存在 $MYGVIMRC 裡，除非後者已經被設置。
+- 如果置位 'exrc' 選項 (缺省_並非_如此)，執行文件 ./.gvimrc。如果該文件不屬於
+  你，有一些安全的限制。如果 ".gvimrc" 找不到，嘗試 "_gvimrc"。Macintosh 和
+  DOS/Win32 環境下先嘗試 "_gvimrc"。
+
+注意: 如果 Vim 啟動時使用 "-u NONE" 而且沒有給出 "-U" 參數，或者使用 "-U
+NONE"，則除了第一步以外，都不執行。
+
+這些步驟都在普通 Vim 初始化之_後_執行，比如讀取 .vimrc 文件。見
+|initialization|。
+GUI 窗口只在全部的初始化執行完畢後才會打開。如果你希望在打開 GUI 窗口後執行某
+些命令，使用 |GUIEnter| 自動事件。例如: >
+	:autocmd GUIEnter * winpos 100 50
+
+你可以使用 gvimrc 文件設置你自己定制的菜單 (見 |:menu|)，並初始化其它你希望和
+終端版本不同的設置。
+
+建議你把自己的 GUI 初始化部分放在:
+	Unix		    $HOME/.gvimrc
+	OS/2		    $HOME/.gvimrc 或 $VIM/.gvimrc
+	MS-DOS 和 Win32     HOME/_gvimrc 或 $VIM/_gvimrc
+	Amiga		    s:.gvimrc 或 $VIM/.gvimrc
+
+若干選項只有在 GUI 版本的 Vim 裡才有意義。它們是 'guicursor'、'guifont'、
+'guipty' 和 'guioptions'。和其它選項一樣，他們的文檔在 |options.txt|。
+
+如果使用 Motif 或者 Athena 版本的 GUI (不適用於 GTK+ 或 Win32 版本)，可以使用
+一些 X 資源。見 |gui-resources|。
+
+另外一個在不同場合下設置顏色的方法是使用高亮組。"Normal" 組用來設置背景和前景
+色。示例 (看上去很悅目): >
+
+	:highlight Normal guibg=grey90
+
+"guibg" 和 "guifg" 設置覆蓋正常的背景和前景設置。其它 Normal 高亮組的設置都沒
+有用到。使用 "guifont" 選項設置字體。
+
+要設置光標在不同模式下的顏色，也請查看 'guicursor' 選項。
+
+Vim 試圖在啟動時使窗口在屏幕上的大小合適，以免部分內容不可見。在 X 窗口系統
+下，這需要一些猜測。使用 'guiheadroom' 選項，你可以改變窗口標題和任務欄的高
+度。
+
+						*:winp* *:winpos* *E188*
+:winp[os]
+		顯示 GUI vim 窗口以像素計的當前左上角位置。並非在所有系統上都
+		可以。
+
+:winp[os] {X} {Y}							*E466*
+		把 GUI vim 窗口放在給定 {X} 和 {Y} 坐標。坐標應指定以像素計的
+		窗口左上角的位置。並非在所有系統上都可以。
+		可以在 (新版的) xterm 裡使用 |xterm-color|。
+		如果 GUI 窗口還沒有打開，坐標值被記住，直到窗口打開為止。該位
+		置會被調整，使得窗口在屏幕上大小合適 (如果可能)。
+
+						    *:win* *:winsize* *E465*
+:win[size] {width} {height}
+		設置窗口高度為 {width} 寬 {height} 高，以字符計。
+		已廢棄，應使用 ":set lines=11 columns=22"。
+		如果你得到比期待中少的行數，檢查 'guiheadroom' 選項。
+
+如果你運行 X 窗口系統，你可以這樣得到關於 Vim 運行所在的窗口的信息: >
+	:!xwininfo -id $WINDOWID
+
+==============================================================================
+2. 滾動條						*gui-scrollbars*
+
+系統有若干垂直滾動條和一個水平滾動條。你可以用 'guioptions' 選項設置會出現哪一
+個。
+
+界面看起來是這樣 (使用 ":set guioptions=mlrb" 的情形下):
+
+		       +------------------------------+
+		       | File  Edit		 Help | <- 菜單欄 (m)
+		       +-+--------------------------+-+
+		       |^|			    |^|
+		       |#| 文本區域		    |#|
+		       | |			    | |
+		       |v|__________________________|v|
+ Vim 窗口間的       -> |-+ File.c	       5,2  +-|
+ 普通狀態行            |^|""""""""""""""""""""""""""|^|
+		       | |			    | |
+		       | | 另一個文件緩衝區。       | |
+		       | |			    | |
+		       |#|			    |#|
+ 左滾動條 (l)       -> |#|			    |#| <- 右滾動條  (r)
+		       |#|			    |#| 
+		       | |			    | |
+		       |v|			    |v|
+		       +-+--------------------------+-+
+		       | |< ####		   >| | <- 底部滾動條  (b)
+		       +-+--------------------------+-+ 
+
+任何滾動條或者菜單都可以關閉，只要在 'guioptions' 字符串裡沒有相應的字母就行
+了。底部滾動條只有在置位 'nowrap' 時才有用。
+
+
+垂 直 滾 動 條						*gui-vert-scroll*
+
+每個 Vim 窗口都有緊挨著的滾動條，可以上下滾動來實現緩衝區內文本的位置移動。滾
+動條拇指 (thumb) 指示緩衝區可見的部分。如果滾動條被一直往下拖動，最後文件的末
+行會出現在窗口的頂部。
+
+如果窗口被縮小到零高度 (因為另一個窗口的增大)，其滾動條消失。在窗口恢復時才重
+新出現。
+
+如果窗口被垂直分割，該窗口會在成為當前窗口時得到滾動條。想像當前窗口的正中間有
+一條貫穿窗口的垂直線。如果兩邊都有滾動條，而當前窗口的中間線屬於左半邊，那麼
+右面的滾動條列包含當前窗口右邊各窗口的滾動條。另外一側也是如此。
+
+水 平 滾 動 條						*gui-horiz-scroll*
+
+水平滾動條 (出現在 Vim GUI 的底部) 可以在 'wrap' 選項關閉時用來水平滾動文本。
+滾動條拇指的大小設置會使得最長可見行的文本可以最大限度的左右滾動。光標在有必要
+時才會移動，使得它總保持在一個可視的字符上 (除非置位了 'virtualedit')。
+
+計算最長可見行的長度需要若干計算，而且每次有改變的時候對需要進行。如果這需要太
+多時間，或者你不希望光標跳到別的行上，在 'guioptions' 裡包含 'h' 標誌位。這
+樣，滾動限於當前光標所在文本行上。
+
+							*athena-intellimouse*
+如果你有 Intellimouse 鼠標並且 X 服務器支持滾輪，那你就可以用滾輪在 gvim 裡上
+下滾動文本。XFree86 4.0 和以後的版本都沒有問題，一些老的版本裡你需要加上補丁。
+見 |scroll-mouse-wheel|。
+
+對較老的 XFree86 版本你需要給 X 服務器打上補丁。以下頁面有關於 Linux 上使用
+Intellimouse 的一點信息，還有補丁和 X 服務器可執行文件的鏈接 (後者也許不一定有
+你需要的):
+    http://www.inria.fr/koala/colas/mouse-wheel-scroll/
+
+==============================================================================
+3. 鼠標控制						*gui-mouse*
+
+鼠標只有在 'mouse' 選項設置合適的標誌位時才會工作。如果打開了 GUI 的時候還沒有
+設置 'mouse'，'mouse' 選項會自動設為 "a"，使得它除了在 |hit-enter| 提示以外的
+所有的模式下都能使用。如果你不希望這樣，修改 'mouse' 選項的一個好地方是在
+"gvimrc" 文件裡。
+
+其它相關的選項:
+'mousefocus'	窗口焦點隨鼠標指針改變 |gui-mouse-focus|
+'mousemodel'	哪個鼠標按鈕執行什麼動作
+'mousehide'	輸入文本時隱藏鼠標指針
+'selectmode'	開始選擇模式還是可視模式
+
+一個設置這些選項的快速方法是使用 ":behave" 命令。
+							*:behave* *:be*
+:be[have] {model}	設置鼠標和選擇的行為。可接受的參數是:
+			   mswin	MS-Windows 行為
+			   xterm	Xterm 行為
+
+			":behave" 的使用改變了以下選項:
+			選項		mswin			xterm	~
+			'selectmode'	"mouse,key"		""
+			'mousemodel'	"popup"			"extend"
+			'keymodel'	"startsel,stopsel"	""
+			'selection'	"exclusive"		"inclusive"
+
+在 $VIMRUNTIME 目錄下，有一個腳本叫 |mswin.vim|。它會定義一些 MS-Windows 的剪
+切/複製/粘貼的鍵盤映射，但這是_不_兼容的，因為它使用了 CTRL-V、 CTRL-X 和
+CTRL-C 鍵。不過如果你不在意，使用這個命令: >
+	:so $VIMRUNTIME/mswin.vim
+
+關於使用鼠標滾輪進行滾動的部分，見 |scroll-mouse-wheel|。
+
+
+3.1 使用鼠標移動光標					*gui-mouse-move*
+
+在文本緩衝區某處點擊鼠標左鍵，就會移動光標到那裡！
+在此模式下工作	    當 'mouse' 包含...時 ~
+普通模式	    'n' 或 'a'
+可視模式	    'v' 或 'a'
+插入模式	    'i' 或 'a'
+
+選擇模式和可視模式一樣處理。
+
+你可以和操作符一起使用這個功能，比如 'd' 刪除從當前光標位置到你用鼠標指向的位
+置。即，按 'd'，然後在某處點擊鼠標。
+
+							*gui-mouse-focus*
+可以置位 'mousefocus' 選項使得鍵盤焦點隨著鼠標指針轉移。這意味著，鼠標在哪個窗
+口，哪個窗口就被激活。警告: 使用菜單的時候，這並不完善，因為菜單命令總是針對最
+頂上的窗口。
+
+如果你在 ':' 行上 (或者 '/' 或 '?')，那麼點擊鼠標左鍵或右鍵只會把光標定位在
+':' 行上 (如果 'mouse' 包含 'c'、'a' 或 'A' 的話)。
+
+任何情況下，點擊鼠標中鍵可以用來粘貼當前的選擇內容。
+
+
+3.2 使用鼠標進行選擇					*gui-mouse-select*
+
+鼠標可以用來開始選擇。怎樣開始決定於 'mousemodel' 選項:
+'mousemodel' 是 "extend": 使用鼠標右鍵
+'mousemodel' 是 "popup":  使用鼠標左鍵，按住 Shift 鍵。
+
+如果還沒有開始選擇，那麼選擇範圍從以前的光標位置開始，到鼠標所點擊的位置。如果
+已經有選擇，那麼離鼠標最近的那端會被擴展。
+
+如果 'selectmode' 包含 "mouse"，那麼選擇區處於選擇模式。這意味著輸入正常的文本
+會替代選擇內容。見 |Select-mode|。不然，選擇區處於可視模式。
+
+雙擊可以選擇單詞，三擊可以選擇行，四擊可以選擇矩形塊。
+
+關於如何使用選擇區，見 |gui-selections|。
+
+
+3.3 另一種鼠標的文本選擇				*gui-mouse-modeless*
+							*modeless-selection*
+以下情形使用另一種選擇:
+- 在命令行模式下
+- 在命令行窗口中，指針在另外一個窗口
+- 在 |hit-enter| 提示時
+- 當前模式不在 'mouse' 選項裡
+- 在 GUI 模式裡，按住 CTRL 和 SHIFT 鍵
+因為 Vim 就像沒有選擇區那樣繼續，而且沒有和選擇區相關聯的模式，這種選擇稱為無
+模式的選擇。可以選擇任何在 Vim 窗口裡的文本。在文本開始的地方鼠標左鍵，拖到尾
+部再釋放。要擴展選擇，在 'mousemodel' 為 "extend" 的時候，使用鼠標右鍵；在
+'mousemodel' 為 "popup" 的時候，使用鼠標左鍵並按住 Shift 鍵。
+
+選擇區在選擇文本滾動或者改變時被撤銷。
+
+在命令行上 CTRL-Y 可以用來複製選擇區到剪貼板裡。在插入模式下，可以使用
+CTRL-O : CTRL-Y <CR>。如果 'guioptions' 包含 a 或 A (X11 上的缺省值)，選擇被自
+動複製到 "* 寄存器裡。
+
+這時用鼠標中鍵就可以粘貼文本。非 X11 系統上，可以使用 CTRL-R +。
+
+
+3.4 在狀態行上使用鼠標					*gui-mouse-status*
+
+在 Vim 窗口下方的狀態行上點擊鼠標左鍵或者右鍵使得該窗口成為當前窗口。實際上，
+這發生在鼠標釋放的時候 (以區別拖動時的點擊操作)。
+
+使用鼠標左鍵，狀態行可以上下拖動，從而調整上下窗口的大小。這樣並不改變窗口焦
+點。
+
+這同樣適用於垂直分割線: 點擊把焦點給左側的窗口，左右拖動使得兩側窗口更寬和更
+窄。
+
+
+3.5 各種鼠標點擊					*gui-mouse-various*
+
+    <S-LeftMouse>	正向搜索鼠標點擊所在的單詞。
+			當 'mousemodel' 為 "popup" 時，該操作開始或者擴展選擇
+			區。
+    <S-RightMouse>	反向搜索鼠標點擊所在的單詞。
+    <C-LeftMouse>	跳轉到鼠標點擊所在的標籤上。
+    <C-RightMouse>	跳回上次標籤跳轉之前的位置 (等同於 "CTRL-T")
+
+
+3.6 鼠標映射						*gui-mouse-mapping*
+
+鼠標事件，包括各種修飾符，可以被映射。例如: >
+   :map <S-LeftMouse>     <RightMouse>
+   :map <S-LeftDrag>      <RightDrag>
+   :map <S-LeftRelease>   <RightRelease>
+   :map <2-S-LeftMouse>   <2-RightMouse>
+   :map <2-S-LeftDrag>    <2-RightDrag>
+   :map <2-S-LeftRelease> <2-RightRelease>
+   :map <3-S-LeftMouse>   <3-RightMouse>
+   :map <3-S-LeftDrag>    <3-RightDrag>
+   :map <3-S-LeftRelease> <3-RightRelease>
+   :map <4-S-LeftMouse>   <4-RightMouse>
+   :map <4-S-LeftDrag>    <4-RightDrag>
+   :map <4-S-LeftRelease> <4-RightRelease>
+這些映射使得選擇的使用方式符合和 Motif 應用方式，Shift + 鼠標左鍵允許擴展可視
+區域，而不是鼠標右鍵。
+
+帶修飾符的鼠標映射不適用於無模式的選擇。
+
+
+3.7 拖放							*drag-n-drop*
+
+你可以拖放一個或多個文件到 Vim 窗口裡，這樣，它們就會被打開，如果執行了
+|:drop| 命令那樣。
+
+如果這麼做的時候你按住 Shift，Vim 改變到第一個放下的文件所在的目錄。如果你按住
+Ctrl，Vim 總會為文件分割出一個新的窗口。不然，只有當前緩衝區被改變的時候才會這
+麼做。
+
+你可以在 Vim 裡放下目錄。這會為該目錄啟動探索器插件 (假設該插件被打開，不然你
+會得到錯誤信息)。按住 Shift 這改變到該目錄。
+
+如果 Vim 碰巧在編輯命令行，放下文件的名字和目錄會插入在光標位置上。這使得你在
+任何 Ex 命令上都可以使用這些名字。特殊字符 (空格、製表、雙引號、'|'、非
+MS-Windows 系統上的反斜槓) 會被轉義。
+
+==============================================================================
+4. 使用 GUI 進行選擇					*gui-selections*
+
+							*quotestar*
+你可以用鼠標進行選擇 (見 |gui-mouse-select|)，或者使用 Vim 的可視模式 (見
+|v|)。如果 'guioptions' 裡包含 'a'，那麼無論什麼時候開始選擇 (可視或選擇模
+式)，或者選擇內容發生改變的時候，Vim 成為窗口系統的主選擇區的擁有者
+(MS-Windows 上使用 |gui-clipboard|；X11 上使用 |x11-selection| - 不管具體哪個
+更合適，你應該據此理解所謂的主選擇區)。
+
+							*clipboard*
+有一個特殊的寄存器可以存放選擇內容，這就是 "* 寄存器。除非選擇文本的相關信息發
+生改變 (比如你在某處按了鼠標左鍵)，或者另一個應用想要粘貼選擇文本。這時，文本
+被放到 "* 寄存器裡。例如，剪切一行並使之當前的選擇區並放到剪貼板上: >
+
+	"*dd
+
+類似的，你想粘貼別的應用的選擇內容，比如通過點擊鼠標中鍵，的時候，該選擇內容被
+先放到 "* 寄存器上，然後再像其它寄存器那樣被 'put' (放置)。例如，放置選擇內容
+(剪貼板的內容) 可以這樣: >
+
+	"*p
+
+如果在 X11 中使用該寄存器，另見 |x11-selection|。那裡也解釋了相關的 "+ 寄存
+器。
+
+注意 在從一個 Vim 粘貼文本到另一個單獨的 Vim 的時候，選擇類型 (字符、行、或塊)
+也會被複製。對於其它應用，類型總是面向字符的。不過，如果文本通過
+|x11-cut-buffer| 傳輸，選擇類型_總_會丟失。
+
+當 'clipboard' 選項包含了 "unnamed" 字符串的時候，無名寄存器和 "* 相同。這樣，
+你可以抽出和粘貼選擇內容，而無須在這些命令前面附加 "*。
+
+==============================================================================
+5. 菜單							*menus*
+
+用戶手冊 |usr_42.txt| 有本節內容的簡單介紹。
+
+
+5.1 使用菜單						*using-menus*
+
+基本上，菜單和映射類似。你可以定義自己的菜單，多少都可以。
+Vim  的長期用戶不太用菜單。但是它的優勢在你可以增加自己的菜單和菜單項。它們在
+你記不住鍵序列的功能的時候很有用。
+
+關於如何創建不同語言的菜單，見 |:menutrans|。
+
+							*menu.vim*
+缺省菜單從 "$VIMRUNTIME/menu.vim" 文件裡讀取。關於該路徑從何而來，見
+|$VIMRUNTIME|。 你可以設置你自己的菜單。從缺省菜單開始是一個好主意。你可以增加
+更多項目，或者如果完全不喜歡缺省菜單，從刪除所有菜單開始 |:unmenu-all|。你可以
+把下行加到 .vimrc (不是 .gvimrc) 文件以禁止缺省的菜單的調入: >
+	:let did_install_default_menus = 1
+如果你也不想載入 Syntax 菜單: >
+	:let did_install_syntax_menu = 1
+Syntax 菜單第一項可以用來顯示包含所有可用的文件類型的菜單 (載入需要不少時間)。
+如果你確實想要啟動時就同時得到所有文件類型，加入: >
+		:let do_syntax_sel_menu = 1
+
+<
+							*console-menus*
+儘管本文檔討論 GUI，你其實也可以在控制台模式使用菜單。你需要自行載入
+|menu.vim|，因為在那裡，這一步不是自動進行的。你可以使用 |:emenu| 命令和帶
+'wildmenu' 的命令行補全，從而能像真實的菜單系統那樣對菜單項進行訪問。要做到這
+一點，在你的 .vimrc 文件裡放入如下命令: >
+	:source $VIMRUNTIME/menu.vim
+	:set wildmenu
+	:set cpo-=<
+	:set wcm=<C-Z>
+	:map <F4> :emenu <C-Z>
+按 <F4> 會啟動菜單。你可以用光標移動鍵來選擇菜單項。按 <Enter> 執行。如果你想
+取消，按 <Esc>。
+本功能需要在編譯時加入 |+menu| 特性。
+
+							*tear-off-menus*
+GTK+ 和 Motif 支持可撕下的菜單。它們是一種有粘性的菜單，亦即一直在屏幕上存在的
+彈出式菜單。如果它們不能調整大小，可能你在 defaults 文件裡使用了類似於
+"Vim*geometry" 的設置。你應該使用 "Vim.geometry"。
+
+Win32 GUI 版本模擬 Motif 的可撕下菜單。實際上，Motif 用戶很容易說出兩者的區
+別，但我們只希望能一樣有用就夠了。你也可以同時使用 |:tearoff| 命令和
+|hidden-menus|，來創建不在主菜單欄出現的浮動菜單。
+
+
+5.2 創建新的菜單					*creating-menus*
+
+				*:me*  *:menu*  *:noreme*  *:noremenu*
+				*:am*  *:amenu* *:an*      *:anoremenu*
+				*:nme* *:nmenu* *:nnoreme* *:nnoremenu*
+				*:ome* *:omenu* *:onoreme* *:onoremenu*
+				*:vme* *:vmenu* *:vnoreme* *:vnoremenu*
+				*:xme* *:xmenu* *:xnoreme* *:xnoremenu*
+				*:sme* *:smenu* *:snoreme* *:snoremenu*
+				*:ime* *:imenu* *:inoreme* *:inoremenu*
+				*:cme* *:cmenu* *:cnoreme* *:cnoremenu*
+				*E330* *E327* *E331* *E336* *E333*
+				*E328* *E329* *E337* *E792*
+要創建新的菜單項，使用 ":menu" 命令群。它們和 ":map" 命令群非常類似，但是第一
+個參數是菜單項名。形式為 '.' 分隔的菜單或子菜單的路徑，例如: >
+
+   :menu File.Save  :w<CR>
+   :inoremenu File.Save  <C-O>:w<CR>
+   :menu Edit.Big\ Changes.Delete\ All\ Spaces  :%s/[ ^I]//g<CR>
+
+最後一項會在菜單欄裡創建一個新的項目 "Edit"，在它上面按下鼠標鍵，會彈出菜單，
+裡面包含 "Big Changes" 一項，這又是包含 "Delete All Spaces" 項的一個子菜單。如
+果選擇了該項，執行操作。
+
+菜單名裡可用的特殊字符:
+
+	&	下一個字符是快捷鍵。確信該快捷鍵在 (子) 菜單裡只使用一次。如果
+		你想插入按本義出現的 "&"，使用 "&&"。
+	<Tab>	分隔菜單名和右對齊的文本。這被用來顯示等價的命令輸入。為了方便
+		起見，這裡可以使用文本 "<Tab>"。如果你使用真正的製表鍵，別忘了
+		在前面加上反斜槓！
+示例: >
+
+   :amenu &File.&Open<Tab>:e  :browse e<CR>
+
+[按文本直接輸入]
+通過快捷鍵 "F" (按著 <Alt> 鍵)，然後 "O"，就可以使用這個菜單。第二部分顯示為
+"Open     :e"。這裡 ":e" 右對齊，而 "O" 有下劃線，指示這是那個快捷鍵。
+
+":amenu" 命令可以用來一次定義所有模式下的菜單項。要使得該命令正確工作，在有些
+模式下需要自動插入一個字符:
+	模式		前面插入	後面附加	~
+	普通		不需要		不需要
+	可視		<C-C>		<C-\><C-G>
+	插入		<C-\><C-O>
+	命令行		<C-C>		<C-\><C-G>
+	等待操作符	<C-C>		<C-\><C-G>
+
+附加 CTRL-\ CTRL-G 是為了能在置位 'insertmode' 的時候回到插入模式。
+|CTRL-\_CTRL-G|
+
+示例: >
+
+   :amenu File.Next	:next^M
+
+等價於: >
+
+   :nmenu File.Next	:next^M
+   :vmenu File.Next	^C:next^M^\^G
+   :imenu File.Next	^\^O:next^M
+   :cmenu File.Next	^C:next^M^\^G
+   :omenu File.Next	^C:next^M^\^G
+
+小心: 插入模式下，因為使用 CTRL-O，只對單個普通模式的命令有效。如果你有兩個或
+多個命令，必須使用 ":imenu" 命令。要在任何模式下插入文本，可以使用表達式寄存器
+: >
+
+   :amenu Insert.foobar   "='foobar'<CR>P
+
+注意這裡使用 'cpoptions' 裡的 '<' 和 'k' 標誌位 (如果包含了它們，<> 形式和原始
+的鍵碼都不會被識別)。
+
+注意 命令行模式下的 <Esc> 執行該命令，和映射的情況相同。這是 Vi 兼容的行為。使
+用 CTRL-C 退出命令行模式。
+
+						*:menu-<silent>* *:menu-silent*
+要定義在命令行上不會回顯的菜單，增加 "<silent>" 作為第一個參數。例如: >
+	:menu <silent> Settings.Ignore\ case  :set ic<CR>
+":set ic" 在使用該菜單時不會回顯。但是執行命令時給出的消息仍然會。要把那些也去
+掉，在執行命令時增加 ":silent": >
+	:menu <silent> Search.Header :exe ":silent normal /Header\r"<CR>
+"<silent>" 也可以出現 (但只能) 在 "<special>" 或 "<script>" 之後。
+
+					*:menu-<special>* *:menu-special*
+定義菜單時，特殊鍵可用 <> 記法，即使 'cpoptions' 包含了 "<" 標誌位也沒問題。可
+用於不希望看到設置 'cpoptions' 時出現副作用的場合。例如: >
+	:menu <special> Search.Header /Header<CR>
+"<special>" 必須是第一個參數或出現 (但只能) 在 "<silent>" 或 "<script>" 之後。
+
+						*:menu-<script>* *:menu-script*
+菜單的 "to" 部分會檢查映射。如果你不想這樣。使用 ":noremenu" 命令 (或者特定模
+式下的類似命令)。
+如果你需要局部於腳本的映射，增加 "<script>" 作為 ":menu" 的第一個或緊跟在
+"<silent>" 或 "<special>" 之後的參數。
+
+							*menu-priority*
+你可以給菜單指定優先級。高優先級的菜單出現在右邊。優先級在 ":menu" 命令之前以
+數字形式給出。例如: >
+	:80menu Buffer.next :bn<CR>
+
+缺省菜單有如下的優先級:
+	File		10
+	Edit		20
+	Tools		40
+	Syntax		50
+	Buffers		60
+	Window		70
+	Help		9999
+
+如果沒有或者給出優先級為零，則使用 500。
+彈出菜單不使用優先級。
+
+如果系統支持 (Motif 和 GTK+)，Help 菜單會出現在菜單欄的最右側。GTK+ 2 版本已經
+不再繼續這麼做，因為該環境現在不再鼓勵右對齊幫助菜單的界面設計風格。
+
+你可以使用超過 9999 的優先級，使得菜單能出現在 Help 菜單之後。但這是不合標準的
+做法，並不鼓勵。最高的可能優先級大約是 32000。最低為 1。
+
+							*sub-menu-priority*
+相同的機制可以用來定位子菜單。這裡，優先級用出現在菜單名前且用句號分隔的優先級
+列表給出: >
+	:menu 80.500 Buffer.next :bn<CR>
+子菜單優先級只有在不想該項目在正常的位置出現的時候才需要。例如，把某個子菜單放
+在其它項目之前: >
+	:menu 80.100 Buffer.first :brew<CR>
+也可以把子菜單放在其它項目之後，並期望使用缺省優先級的未來項目會加在它之前: >
+	:menu 80.900 Buffer.last :blast<CR>
+如果不給出某個數字，使用缺省值 500: >
+	:menu .900 myMenu.test :echo "text"<CR>
+菜單優先級只有在建立新菜單時才會用到。一旦已經存在 (比如，在別的模式下)，優先
+級不會改變。因此，優先級只有在菜單第一次用到的時候才需要給出。彈出菜單是一個例
+外。每個模式都有單獨的菜單 (普通、操作符等待、可視、插入、命令行)。每個菜單裡
+的順序可以不同。這和菜單欄的菜單不同，那裡所有模式下都使用相同的順序。
+注意: 現在，子菜單優先級不是在所有版本的 GUI 上都能工作。
+
+							*menu-separator* *E332*
+菜單項可以用一個特殊項目分隔，它在項目間插入一些空白。根據不同系統情況，有的顯
+示為一條線，有的顯示為虛線。這些項目必須以 '-' 開始和結尾。兩者之間的部分用來
+給出一個獨一無二的名字。和正常的項目一樣，也可以使用優先級。例如: >
+	:menu Example.item1	:做些事
+	:menu Example.-Sep-	:
+	:menu Example.item2	:做些別的事
+注意分隔符也需要一個右手邊的表達式。是什麼沒有關係，因為該項目永遠不會選到。簡
+單點，用單個冒號就可以了。
+
+							*gui-toolbar*
+目前，只有 Win32、Athena、Motif、GTK+ (X11) 和 Photon GUI 才有工具欄。適當的時
+候，在其它 GUI 上也會開放這一功能。缺省的工具欄在 menu.vim 裡定義。
+工具欄顯示與否有 'guioptions' 裡的 'T' 字母控制。你可以同時有菜單和工具欄，或
+者只用其中一項，甚至全不要。其外觀通過 'toolbar' 選項控制。你可以在圖像、文本
+或者兩者兼有之間選擇。
+
+							*toolbar-icon*
+工具欄定義為一個特殊的菜單，名為 ToolBar。它只有一層。Vim 如此解釋該菜單裡面的
+項目:
+1)  如果給出 "icon=" 參數，則使用該名字指定的文件。這個文件可以給出完整路徑，
+    或者只是基礎名。如果是後者，在 'runtimepath' 的 "bitmaps" 目錄裡搜索該文
+    件，就像第三點那樣。例如: >
+	:amenu icon=/usr/local/pixmaps/foo_icon.xpm ToolBar.Foo :echo "Foo"<CR>
+	:amenu icon=FooIcon ToolBar.Foo :echo "Foo"<CR>
+<   注意在第一個例子裡，需要包含擴展名，而第二個例子就不需要。
+    如果該文件不能打開，則嘗試下面的步驟。
+    文件名裡的空格必須用反斜槓轉義。
+    菜單優先級必須在 icon 參數_之後_給出: >
+	:amenu icon=foo 1.42 ToolBar.Foo :echo "42!"<CR>
+2)  名為 'BuiltIn##' 的項目，其中 ## 是一個數字，用來指定 Vim 第 ## 個內建的位
+    圖。目前，有 31 個編號的位圖，從 0 到 30。它們包含了多數常見的編輯操作
+    |builtin-tools|。 >
+	:amenu ToolBar.BuiltIn22 :call SearchNext("back")<CR>
+3)  首先在 'runtimpath' 裡的 "bitmaps" 裡搜索某個其它名字的項目。如果找到，該
+    位圖文件被用作工具按鈕的圖像。注意 準確的文件名和具體的操作系統有關: 例
+    如，Win32 上命令 >
+	:amenu ToolBar.Hello :echo "hello"<CR>
+<   會找到文件 'hello.bmp'。在 GTK+/X11 上則是 'Hello.xpm'。在 GTK+ 2 上則按序
+    查找文件 'Hello.png'、'Hello.xpm' 和 'Hello.bmp'，最先找到的被使用。
+    MS-Windows 和 GTK+ 2 上位圖被縮放到合適的按鈕大小。在 MS-Windows 上，18 乘
+    18 像素最好。
+    在 MS-Windows 上，位圖使用標準的調色板，使用 16 色。淺灰色的像素會被替換成
+    窗口框架的顏色，而深灰色像素被換成窗口陰影的顏色。根據你的系統，也許可以使
+    用比這個更多的顏色。
+4)  如果該位圖找不到，Vim 在內建名字的列表裡查找該名字。因為每個內建按鈕圖像都
+    有名字。
+    因此，如果沒有 open.bmp 的話，命令 >
+	:amenu ToolBar.Open :e
+<   會顯示內建的 "open a file" 按鈕圖標。
+    在 menu.vim 裡可以看到所有內建的名字。
+5)  如果以上都不行，就顯示一個可用的空白按鈕。
+
+							*builtin-tools*
+號  名字		正常定義的操作  ~
+00  New			打開新窗口
+01  Open		瀏覽要在當前窗口打開的文件
+02  Save		把緩衝區寫回文件
+03  Undo		撤銷上次改變
+04  Redo		重做上次撤銷的改變
+05  Cut			刪除選擇的文本到剪貼板
+06  Copy		複製選擇的文本到剪貼板
+07  Paste		從剪貼板粘貼文本
+08  Print		打印當前緩衝區
+09  Help		打開緩衝區，顯示 Vim 的內建幫助
+10  Find		開始搜索命令
+11  SaveAll		把所有修改過的緩衝區寫回文件
+12  SaveSesn		把當前的情況寫到會話文件
+13  NewSesn		創建一個新的會話文件
+14  LoadSesn		載入會話文件
+15  RunScript		瀏覽文件，並作為 Vim 腳本執行
+16  Replace		執行 substitute 命令，給出提示
+17  WinClose		關閉當前窗口
+18  WinMax		使得當前窗口使用盡量多行
+19  WinMin		使得當前窗口使用盡量少行
+20  WinSplit		分割當前窗口
+21  Shell		啟動外殼
+22  FindPrev		反向再次搜索
+23  FindNext		正向再次搜索
+24  FindHelp		提示關鍵字，搜索相關幫助
+25  Make		運行 make，跳到第一個錯誤
+26  TagJump		跳轉至光標所在的標籤
+27  RunCtags		運行 Ctags，為當前目錄的文件構造標籤
+28  WinVSplit		垂直分割當前窗口
+29  WinMaxWidth		使得當前窗口使用盡量多列
+30  WinMinWidth		使得當前窗口使用盡量少列
+
+					*hidden-menus* *win32-hidden-menus*
+在 Win32 和 GTK+ GUI 上，以 ']' 開始的菜單名使得該菜單不會在主菜單欄裡出現。你
+可以用 |:popup| 或者 |:tearoff| 命令來顯示之。
+
+							*popup-menu*
+在 Win32、GTK+、Motif、Athena 和 Photon GUI 上，你可以定義特殊的 "PopUp" 菜
+單。如果 'mousemodel' 設為 popup 或者 popup_setpos，這將是按下鼠標右鍵時顯示的
+菜單。
+
+
+5.3 顯示菜單如何被映射					*showing-menus*
+
+要看看現有的菜單是如何被映射的，在 menu 命令之後只使用一個參數 (就像你使用
+":map" 命令那樣)。如果指定的菜單是一個子菜單，那麼所有該子樹下面的層次結構都會
+顯示。如果 :menu 後面不給出任何參數，顯示所在模式下的_所有_菜單項 (例如，命令
+行模式下顯示 :cmenu)。
+
+該列表裡，在右手邊表達式之前顯示的特殊字符的含義是:
+*	菜單是通過 "nore" 形式定義的，以禁止重映射。
+&	菜單定義時包含了 "<script>"， 使得重映射只限於局部於腳本的映射。
+-	菜單被屏蔽。
+
+注意 在 menu 命令裡輸入菜單名時，按 <Tab> 可以用來補全菜單項目名。
+
+
+5.4 執行菜單						*execute-menus*
+
+						*:em*  *:emenu* *E334* *E335*
+:[range]em[enu] {menu}		從命令行上執行 {menu} 菜單。缺省執行普通模式的
+				命令。如果給出行範圍 range，執行可視模式的菜
+				單。
+				如果從 <c-o> 那裡調用，執行插入模式命令。例如:
+>
+	:emenu File.Exit
+
+如果控制台模式的 vim 編譯時加入 WANT_MENU，你可以用 :emenu 來訪問你已經習慣的
+的 GUI 模式下有用的菜單項目。關於一個能用於此目的的選項，見 'wildmenu'。例子又
+可以見 |console-menus|。
+
+如果使用行範圍 range，並且選擇的行和 '<、'> 指定的範圍相同，則使用最近一次可視
+選擇的範圍執行菜單命令。
+
+
+5.5 刪除菜單						*delete-menus*
+
+						*:unme*  *:unmenu*
+						*:aun*   *:aunmenu*
+						*:nunme* *:nunmenu*
+						*:ounme* *:ounmenu*
+						*:vunme* *:vunmenu*
+						*:xunme* *:xunmenu*
+						*:sunme* *:sunmenu*
+						*:iunme* *:iunmenu*
+						*:cunme* *:cunmenu*
+要刪除一個菜單項或者整個子菜單，使用 umenu 命令，類似於 unmap 命令。例如: >
+    :unmenu! Edit.Paste
+
+會刪除插入和命令行模式下的 Edit 菜單的 Paste 項。
+
+注意 在 umenu 命令裡輸入菜單名時，按 <Tab> 可以用來補全菜單項目名。
+
+要刪除所有的菜單，可用:				*:unmenu-all*  >
+	:unmenu *	" 刪除普通和可視模式下的所有菜單
+	:unmenu! *	" 刪除插入和命令行模式下的所有菜單
+	:aunmenu *	" 刪除所有模式下的所有菜單
+
+如果你想去掉菜單欄: >
+	:set guioptions-=m
+
+
+5.6 屏蔽菜單					*disable-menus*
+
+						*:menu-disable* *:menu-enable*
+如果你不想刪除某個菜單，但想暫時屏蔽之，可以在 ":menu" 命令裡使用 "enable" 或
+"disable" 關鍵字。例如: >
+	:menu disable &File.&Open\.\.\.
+	:amenu enable *
+	:amenu disable &Tools.*
+
+和其它 menu 命令一樣，該命令作用於指定的模式上。注意 需要包含進來 "&" 這樣的字
+符，以便找到經過翻譯的名字。如果參數是 "*"，所有的菜單都受到影響。否則，給定的
+菜單名和下面所有的子菜單 (如果存在的話) 都會受影響。
+
+
+5.7 菜單示例					*menu-examples*
+
+這裡是一個如何用 menu 增加菜單項的例子。你可以為光標下的關鍵字增加菜單項。使用
+寄存器 "z"。 >
+
+  :nmenu Words.Add\ Var		wb"zye:menu! Words.<C-R>z <C-R>z<CR>
+  :nmenu Words.Remove\ Var	wb"zye:unmenu! Words.<C-R>z<CR>
+  :vmenu Words.Add\ Var		"zy:menu! Words.<C-R>z <C-R>z <CR>
+  :vmenu Words.Remove\ Var	"zy:unmenu! Words.<C-R>z<CR>
+  :imenu Words.Add\ Var		<Esc>wb"zye:menu! Words.<C-R>z <C-R>z<CR>a
+  :imenu Words.Remove\ Var	<Esc>wb"zye:unmenu! Words.<C-R>z<CR>a
+
+(這裡的右手邊表達式使用 <> 記法，你可以複製/粘貼這裡的文本來測試這些映射，或者
+把這些行加到你的 gvimrc 文件裡；"<C-R>" 是 CTRL-R，"<CR>" 是 <CR> 鍵。|<>|)
+
+
+5.8 工具提示 (Tooltips) 和菜單提示
+
+見用戶手冊的 |42.4| 一節。
+
+							*:tmenu* *:tm*
+:tm[enu] {menupath} {rhs}	為菜單或者工具定義提示。{僅存在於 X11 和 Win32
+				GUI}
+
+:tm[enu] [menupath]		列出菜單提示。{僅存在於 X11 和 Win32 GUI}
+
+							*:tunmenu* *:tu*
+:tu[nmenu] {menupath}		刪除菜單或者工具的提示。{僅存在於 X11 和 Win32
+				GUI}
+
+如果為某菜單項定義了提示，當鼠標移過該項目時，命令行區域會出現該提示，就像標準
+Windows 菜單提示出現在狀態欄那樣。(除非 Vim 在命令行模式的時候，這時當然什麼都
+不會顯示。)
+如果為某工具欄項目定義了提示，當鼠標移過該按鈕時，提示以通常的方式出現。要改變
+它們的顏色，使用 |hl-Tooltip| 高亮組。
+
+"提示" 可以為每個菜單項目定義。例如，在這樣定義菜單項時: >
+	:amenu MyMenu.Hello :echo "Hello"<CR>
+提示可以這樣定義: >
+	:tmenu MyMenu.Hello Displays a greeting.
+然後這樣刪除: >
+	:tunmenu MyMenu.Hello
+
+現在，工具提示只有在 X11 和 Win32 GUI 上才支持。不過，在不遠的將來，應該在其它
+gui 平台上也會出現。
+
+":tmenu" 菜單和其它菜單命令使用相同的參數。":tunmenu" 刪除已存在的菜單提示，使
+用方式和其它的 umenu 命令一樣。
+
+如果菜單項目不再合法，(即，在所有模式下，它的動作都被刪除) Vim 為你刪除菜單的
+提示 (和菜單項)。這意味著 :aunmenu 徹底刪除了菜單項目 - 你不需要再運行
+:tunmenu 了。
+
+
+5.9 彈出式菜單
+
+在 Win32 和 GTK+ GUI 上，你可以在光標位置下生成一個菜單。這和 PopUp 菜單類似，
+除了你可以彈出任何菜單樹以外。
+
+該命令只是為了後向兼容才存在，不鼓勵使用。因為它的行為很奇特。
+
+							*:popup* *:popu*
+:popu[p] {name}			彈出菜單 {name}。菜單名必須有至少一項子項，但
+				不一定需要出現在菜單欄上 (見 |hidden-menus|)。
+				{僅在 Win32 和 GTK GUI 上有效}
+
+:popu[p]! {name}		和上面類似，但使用鼠標指針所在的位置，而不是光
+				標位置。
+
+示例: >
+	:popup File
+會使得 "File" 菜單 (如果有的話) 出現在文本光標 (如果有 ! 則是鼠標指針) 的位置
+上。 >
+
+	:amenu ]Toolbar.Make	:make<CR>
+	:popup ]Toolbar
+會創建一個彈出式菜單，該菜單並不存在於主菜單欄中。
+
+注意 ']' 開始的菜單不會顯示。
+
+==============================================================================
+6. 附加							*gui-extras*
+
+這一節說明其它和 GUI 相關的特性。
+
+- 在 GUI 上，按 escape 之後不需要等一秒，因為沒有鍵碼會以 <Esc> 開始。
+
+- 在 GUI 上，輸入 ^V 緊跟一個特殊鍵會插入 "<Key>"，因為所用到的內部字符串沒有
+  意義。也可以按下修飾符，得到 "<Modifiers-Key>"。
+
+- 在 GUI 上，修飾符 SHIFT、CTRL 和 ALT (或 META) 可以在映射裡和特殊鍵或鼠標一
+  起使用，例如 :map <M-LeftDrag> <LeftDrag>
+
+- 在 GUI 上，若干普通鍵在映射等命令裡可以帶修飾符，它們是 <Space>、<Tab>、
+  <NL>、<CR> 和 <Esc>。
+
+- 要在 Vim 腳本裡檢查是不是使用 GUI，你可以這麼使用: >
+
+	if has("gui_running")
+	   echo "是的，我們有 GUI"
+	else
+	   echo "無聊的老終端"
+	endif
+<						*setting-guifont*
+- 如果你在多個系統上使用同一個 vimrc 文件，你可以這樣設置不同類型的 GUI 專用的
+  選項: >
+
+	if has("gui_running")
+	    if has("gui_gtk2")
+		:set guifont=Luxi\ Mono\ 12
+	    elseif has("x11")
+		" Also for GTK 1
+		:set guifont=*-lucidatypewriter-medium-r-normal-*-*-180-*-*-m-*-*
+	    elseif has("gui_win32")
+		:set guifont=Luxi_Mono:h12:cANSI
+	    endif
+	endif
+
+MS Mincho 是一個推薦的日文字體。相關信息見: http://www.lexikan.com/mincho.htm
+
+==============================================================================
+7. 外殼命令						*gui-shell*
+
+X11 GUI 上，外部命令在 gvim 窗口裡執行。見 |gui-pty|。
+
+警 告: 在 X11 GUI 上執行外部命令不總是可以的。"普通" 的命令，像 "ls"、"grep"、
+"make" 大多數沒問題。需要一個智能終端的命令，比如 "less" 和 "ispell" 就不行。
+有的可能掛起，需要從另外一個終端殺死進程才能終止。所以，要小心一點。
+
+Win32 GUI 上，外部命令在一個單獨的窗口上執行。見 |gui-shell-win32|。
+
+ vim:tw=78:sw=4:ts=8:ft=help:norl:

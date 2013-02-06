@@ -1,0 +1,87 @@
+*if_sniff.txt*	For Vim version 7.3.  最近更新: 2006年2月
+
+
+		  VIM 參考手冊
+		by Anton Leherbauer (toni@takefive.co.at)
+				譯者: Willis
+				http://vimcdoc.sf.net
+
+
+SNiFF+ 和 Vim				    *sniff*
+
+1. 簡介					    |sniff-intro|
+2. 命令					    |sniff-commands|
+3. 編譯 VIM 時加入 SNiFF+ 接口		    |sniff-compiling|
+
+{Vi 沒有任何一項以上的功能}		  *E275* *E274* *E276* *E278* *E279*
+
+SNiFF+ 接口只有在 Vim 編譯時加入 |+sniff| 特性才能使用。
+
+==============================================================================
+1. 簡介						*sniff-intro*
+
+以下使用 SNiFF+ 的功能可用:
+
+   * Vim 能被用來應答所有的編輯請求。
+   * 當 Vim 保存一個文件時，SNiFF+ 識別和更新所有瀏覽器
+   * Vim 中可以直接調用 SNiFF+ 命令
+
+如何和 SNiFF+ 一起使用 VIM
+   1. 確保 SNiFF+ 已經在運行。
+   2. 在屬性對話框的編輯器視圖中設置 'External Editor' 字段為 'Emacs/Vim'。
+   3. 啟動 Vim
+   4. 連接到 SNiFF+ (:sniff connect)
+
+一旦連接建立，SNiFF+ 調用 Vim 來執行所有的顯示和編輯源代碼的請求。另一方面，你
+也可以用 :sniff 命令對 SNiFF+ 發出查詢。
+
+==============================================================================
+2. 命令						*sniff-commands*
+
+			    *:sniff* *:sni*
+:sni[ff] request [symbol]   給 sniff 發送請求 request 和帶一個可選的參數
+			    symbol。 {Vi 無此功能}
+:sni[ff]		    顯示所有可能的請求和連接狀態
+
+很多請求需要一個 symbol (標識符) 作為參數。如果省略，Vim 會使用當前光標下的單
+詞。可用的請求包括:
+
+請求		       對應	描述
+-------------------------------------------------------------------------------
+connect			sc	和 SNiFF+ 建立連接。
+				確保 SNiFF+ 已經做了相應的屬性設置。
+disconnect		sq	和 SNiFF+ 斷開連接。用命令 :sniff connect
+				(或者 'sc' )，你在任何時候可以重新連接。
+toggle			st	在實現和定義文件間切換
+find-symbol		sf	在符號瀏覽器中調入 symbol
+browse-class		sb	在類瀏覽器中調入類 symbol
+superclass		ss	編輯 symbol 的超類
+overridden		so	編輯 symbol 的被重寫的方法
+retrieve-file		srf	檢取當前文件中的 symbol
+retrieve-project	srp	檢取當前項目中的 symbol
+retrieve-all-projects	srP	檢取所有項目中的 symbol
+retrieve-next		sR	用當前檢取器的設置檢取下一個 symbol
+goto-symbol		sg	轉到 symbol 的定義或者實現
+hierarchy		sh	在層次瀏覽器上調入 symbol
+restr-hier		sH	同上，但只顯示相關的類
+xref-to			sxt	啟動一個針對 symbol 的引用查詢，並把結果調入
+				交叉引用器
+xref-by			sxb	啟動一個針對 symbol 的被引用查詢
+xref-has		sxh	啟動一個針對 symbol 的引用組件查詢
+xref-used-by		sxu	啟動一個針對 symbol 的被引用組件查詢
+show-docu		sd	顯示 symbol 的文檔
+gen-docu		sD	產生 symbol 的文檔
+
+對應表在文件 'sniff.vim' 中定義，這個文件是所有 SNiFF+ 產品的一個組成部分
+($SNIFF_DIR/config/sniff.vim)。它會在 Vim 連接到 SNiFF+ 時被執行。
+
+==============================================================================
+3. 編譯 VIM 時加入 SNiFF+ 接口			*sniff-compiling*
+
+要在編譯 Vim 是加入 SNiFF+ 支持，你需要兩個額外的源文件: if_sniff.c 和
+if_sniff.h。
+在 Unix 上: 編輯 Makefile，去掉註釋行 "--enable-sniff"。或者手動執行
+configure，在命令行裡加入該參數。
+在 NT 上: 在 make 命令執行時加上 SNIFF=yes。
+
+ vim:tw=78:ts=8:ft=help:norl:

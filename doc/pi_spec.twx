@@ -1,0 +1,95 @@
+*pi_spec.txt*   For Vim version 7.3.  最近更新: 2006年7月
+
+				作者: Gustavo Niemeyer ~
+				譯者: Willis
+				http://vimcdoc.sf.net
+
+這是一個針對 rpm 規格文件的文件類型插件。
+
+此 Vim 插件讓你輕鬆更新 RPM 規格 (spec) 文件的更新記錄段 (%changelog section) 
+的內容。如果該段還不存在，它可以為你新建段。如果你今天還沒有更新，它會幫你建立
+新的說明入口 (entry)。如果你還沒有提供格式串 (|spec_chglog_format|)，它會詢問
+你的 email 地址，然後自動為你提供該格式串。
+
+1. 如何使用		|spec-how-to-use-it|
+2. 自定義		|spec-customizing|
+
+==============================================================================
+1. 如何使用					*spec-how-to-use-it*
+
+spec_chglog 插件提供如下映射:
+
+	:map <buffer> <LocalLeader>c <Plug>SpecChangelog
+
+這意味著在規格文件裡你可以通過按 |maplocalleader| 鍵 (缺省是 '\') 加 'c' 來執
+行這個插件。如果你還沒有設置 |spec_chglog_format|，此時插件會要求你提供 email
+地址，編輯過程裡會用到這個地址。
+
+每次你運行此插件，它檢查更新記錄，看看最近的說明入口是否今天由你寫入。如果是，
+在此入口中插入新建更新記錄，如果不是，它會建立一個新的更新記錄入口。如果你打開
+|spec_chglog_release_info|，它同時還會檢查文件名，版本和發佈版本是不是匹配。如
+果你自己還沒有更新該軟件包的發佈號的話。這個插件能夠智能地詢問你是否要這麼做。
+
+設置鍵盤映射					*spec-setting-a-map*
+-------------
+
+正如你應該已經知道的，可以設置鍵盤映射執行任何 Vim 命令 (對此而言，其實還有別
+的)。如果你不喜歡缺省的映射 <LocalLeader>c，可以自己定義。下面說明在 .vimrc 文
+件裡如何作此設置。比如，要把本插件映射到 <F5> 鍵:
+>
+	au FileType spec map <buffer> <F5> <Plug>SpecChangelog
+<
+備註: 本插件會尊重你的本人意願，不會再次把它的缺省設置強加於你。
+
+該命令只會在規格文件的緩衝區中定義這個映射。
+
+
+==============================================================================
+2. 自定義					*spec-customizing*
+
+格式串						*spec_chglog_format*
+-----------------
+
+你可以輕鬆地定制自己的規格文件入口的樣式。為此，只須在 .vimrc 文件中這樣設置
+"spec_chglog_format" 變量: >
+
+	let spec_chglog_format = "%a %b %d %Y My Name <my@email.com>"
+<
+注意 "%a %b %d %Y" 是最常用的格式。如果你不提供格式串，第一次運行 SpecChanglog
+命令時，它會詢問 email 地址，然後為你構造 |spec_chglog_format| 變量。這種方式
+下，你只要提供 email 地址一次。
+
+要知道可用的格式串選項，察看 strftime() 函數的 man 手冊頁。
+
+何處插入新的更新記錄				*spec_chglog_prepend*
+-------------------------
+
+本插件通常把新的 %changelog 更新記錄 (注意: 不是入口本身) 加在現有的記錄之後。
+如果你設置了 spec_chglog_prepend 變量 >
+
+	let spec_chglog_prepend = 1
+
+那麼新記錄將加在已有記錄之前。
+
+加入發佈信息					*spec_chglog_release_info*
+----------------------
+
+如果你願意，本插件自動在每個更新記錄入口中加入發佈信息。這麼做的一個好處是能控
+制軟件包每次更改之後是否更新發佈號。如果包的版本或發行號沒有更新，它詢問你是否
+要這麼做。要打開這個功能，在 .vimrc 中加入以下代碼: >
+
+	let spec_chglog_release_info = 1
+
+這樣，更新記錄入口的首個記錄就會像這樣: >
+
+	+ name-1.0-1cl
+
+如果你不喜歡發佈更新功能，也不想每次檢測到舊的發佈號時都回答 "No"，可以關閉此
+功能 >
+
+	let spec_chglog_never_increase_release = 1
+
+
+一切順利！！
+
+vim:tw=78:ts=8:ft=help:norl:

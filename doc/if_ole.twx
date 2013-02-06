@@ -1,0 +1,195 @@
+*if_ole.txt*    For Vim version 7.3.  最後更新: 2009年4月
+
+
+		  VIM 參 考 手 冊    作者: Paul Moore
+		                     譯者: Dasn
+		                     http://vimcdoc.sf.net
+
+
+Vim 的 OLE 接口						*ole-interface*
+
+1. 激活 OLE 功能		|ole-activation|
+2. 方法				|ole-methods|
+3. "normal" 命令		|ole-normal|
+4. 註冊				|ole-registration|
+5. 與微軟的 Visual Studio 集成	|MSVisualStudio|
+
+{Vi 沒有這些功能}
+
+OLE 只有在編譯時加入 |+ole| 才可以使用。參見 src/if_ole.INSTALL。
+有一點不同之處在於它使用 客戶機服務器 模式進行通信 |clientserver|。
+
+==============================================================================
+1. 激活 OLE 功能					*ole-activation*
+
+Vim 可以作為 OLE 服務器運行，能被任意的 OLE 客戶端訪問，例如：我們可以用
+Visual Basic，Python，或者 Perl 與 Vim 通信。Vim 的程序名 (在 OLE 中稱為
+"ProgID") 是 "Vim.Application"。
+
+因此，要啟動一個 Vim 實例 (或者要與一個已經啟動的實例通信)，你應該使用類似於下
+面的代碼：
+
+[Visual Basic] >
+	Dim Vim As Object
+	Set Vim = CreateObject("Vim.Application")
+
+[Python] >
+	from win32com.client.dynamic import Dispatch
+	vim = Dispatch('Vim.Application')
+
+[Perl] >
+	use Win32::OLE;
+	$vim = new Win32::OLE 'Vim.Application';
+
+[C#] >
+        // 在項目中加入 VIM 的引用。
+        // 選擇 COM 標籤頁。
+        // 選擇 "VIM Ole Interface 1.1 Type Library"
+	Vim.Vim vimobj = new Vim.Vim();
+
+Vim 不能作為 "隱藏" 的 OLE 服務器來運行，這一點 Vim 不像其它一些 OLE 服務器。
+Vim 的 OLE 客戶端啟動時，一個 Vim 程序的實例會立刻顯現出來。簡單地斷開 OLE 連
+接不能關掉 Vim 實例，需要顯式地執行退出命令才可以 (例如，:qa!，:wqa)。
+
+==============================================================================
+2. 方法							*ole-methods*
+
+Vim 為客戶端提供了四種方法。
+
+							*ole-sendkeys*
+SendKeys(keys)		執行一系列鍵擊。
+
+這個函數只需要一個參數，參數 keys 代表要敲擊的字符串。通過此函數發送這些字符串
+和你直接在 Vim 裡敲擊鍵盤的效果是一樣的。特殊鍵可以用它們的 <..> 名字，就像映
+射的右手邊裡的格式一樣 (參考 |:map| 特殊鍵的表達方式譯者)。備註: 不支持 Ex 模
+式下的 "normal" 命令  見下面 |ole-normal|。
+
+例子：(Visual Basic 語法) >
+	Vim.SendKeys "ihello<Esc>"
+	Vim.SendKeys "ma1GV4jy`a"
+
+這個例子假設 Vim 處於普通模式，要強制進入普通模式，可以在字符序列前加入
+CTRL-\ CTRL-N，就像這樣： >
+
+	Vim.SendKeys "<C-\><C-N>ihello<Esc>"
+
+(譯者註：下面是 Perl 語法：  >
+
+	$vim->SendKeys("<C-\\><C-N>ihello<Esc>");
+<
+	備註: 在 Perl 語法裡，特殊字符前需要加 "\"。)
+
+CTRL-\ CTRL-N 使得 Vim 從插入模式或命令行模式返回普通模式。
+備註: 不能用這個命令發送 Vim 命令的一部分。
+							*ole-eval*
+Eval(expr)		計算表達式的值。
+
+函數只有一個參數 expr，Vim 正常格式的表達式 (參考 |expression|)。返回值是一個
+包含表達式結果的字符串。|List| 通過連接項目並插入換行符以轉化為字符串。
+
+例子：(Visual Basic 語法) >
+
+	Line20 = Vim.Eval("getline(20)")
+	Twelve = Vim.Eval("6 + 6")		' 注意，這是一個字符串。
+	Font = Vim.Eval("&guifont")
+<
+							*ole-setforeground*
+SetForeground()		讓 Vim 窗口轉入前台工作。
+
+這個函數沒有參數，沒有返回值。
+
+例子：(Visual Basic 語法) >
+
+	Vim.SetForeground
+<
+							*ole-gethwnd*
+GetHwnd()	返回 Vim 窗口的句柄。
+
+這個函數沒有參數，它返回 Vim 主窗口的句柄。你可以用它來控制 Vim 窗口，或者跟蹤
+窗口的 z-深度 等位置。
+
+例子：(Visual Basic 語法) >
+
+	Vim_Hwnd = Vim.GetHwnd
+<
+
+==============================================================================
+3. "normal" 命令					*ole-normal*
+
+因為 Vim 是通過 Ex 模式下的 :normal 命令來實現對 OLE 命令的處理，所以 Vim 不能
+通過 OLE 執行 :normal 命令。如果你這樣做，肯定沒用。至於產生的結果，可許沒什麼
+害處，也許不能預料。
+
+現在沒有辦法能捕獲這種錯誤，所以用戶在使用的時候要注意有這麼一個限制。
+==============================================================================
+4. 註冊						*ole-registration* *E243*
+
+在 Vim 作為 OLE 服務器運行之前，必須向系統註冊。如果你想註冊，可以在運行 Vim 
+的時候加一個參數 "-register"。
+							*-register*  >
+	gvim -register
+
+如果運行 OLE 版本的 gvim 時，Vim 的 OLE 服務沒有註冊，gvim 會彈出一個對話框，
+讓你選擇是否註冊，選擇 "Yes" 註冊。
+
+有時候可能註冊不會成功，這可能是因為註冊表不可寫。如果是這個原因，你需要以管理
+員的身份來運行 gvim。
+
+一旦註冊，Vim 的路徑就會被存儲到註冊表裡。在你移動、刪除或升級 Vim 之前，應該
+使用 "-unregister" 清除這些註冊信息。
+							*-unregister*  >
+	gvim -unregister
+
+系統會使用最先註冊的 Vim 執行 OLE 命令。如果 Vim 已經運行，那麼就使用當前運行
+的 Vim。如果你不想讓 (多個) Vim 響應 OLE 命令，請使用非 OLE 版本的 Vim，並且把
+它放到別的目錄裡。這時，OLE 版本的 Vim 路徑不應包含在你的正常路徑裡，這樣當你
+鍵入 "gvim" 時啟動的才是非 OLE 版本。
+
+							*-silent*
+如果不想讓 Vim 在註冊時彈出對話框，可以在前面加 "-silent" 參數：
+>
+	gvim -silent -register
+	gvim -silent -unregister
+
+==============================================================================
+5. 與微軟的 Visual Studio 集成			*MSVisualStudio* *VisVim*
+
+Vim 的 OLE 版本可以用做 Visual Studio 的文本編輯器。這被稱作 "VisVim"。OLE 版
+本的軟件包裡有一個 runtime 目錄，詳細的說明請參閱該目錄下的 README_VisVim.txt
+文件。
+
+
+在 Visual Studio .Net 裡使用 Vim ~
+
+.Net 裡不再需要 VisVim 了，因為 .Net Studio 已經提供了外部編輯器的支持。按以下
+步驟進行:
+
+在 .Net Studio 裡，選擇菜單 Tools->External Tools...
+加入
+     Title     - Vim
+     Command   - c:\vim\vim63\gvim.exe
+     Arguments - --servername VS_NET --remote-silent "+call cursor($(CurLine), $(CurCol))" $(ItemPath)
+     Init Dir  - 空
+
+現在在 .Net 裡打開文件時，可以在 .Net 菜單裡選擇: Tools->Vim
+
+這樣就能在 Vim 裡打開文件。
+可以把該外部命令作為圖標加入，把它放在任何你喜歡的位置上。也可以把它設為你的缺
+省編輯器。
+
+如果你有進一步的改進，請到 Vim 郵件列表上發帖，以告知我們。
+
+--servername VS_NET
+建立 vim 的新實例，名為 VS_NET。這樣如果你從 VS 裡打開多個文件，它們會使用相同
+的 Vim 實例。這樣，你可以運行多個 Vim 的備份，但可以控制在哪個裡編輯 VS 文件。
+
+--remote-silent "+call cursor(10, 27)"
+              - 把光標放在第 10 行第 27 列
+Vim 裡 >
+   :h --remote-silent 可以瞭解詳情
+
+[.Net 的評注由 Dave Fishburn 和 Brian Sturk 提供]
+
+==============================================================================
+ vim:tw=78:ts=8:ft=help:norl:
+

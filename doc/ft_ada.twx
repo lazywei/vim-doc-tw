@@ -1,0 +1,470 @@
+*ft_ada.txt*	For Vim version 7.3.  最近更新: 2010年7月
+
+
+		    ADA 文 件 類 型 參 考 手 冊~
+				譯者: Willis
+				http://vimcdoc.sf.net
+
+ADA								      *ada.vim*
+
+1.  語法高亮				    |ft-ada-syntax|
+2.  插件				    |ft-ada-plugin|
+3.  全能補全				    |ft-ada-omni|
+    3.1 使用 "gnat xref" 的全能補全		|gnat-xref|
+    3.2 使用 "ctags" 的全能補全			|ada-ctags|
+4.  編譯器支持	    			    |ada-compiler|
+    4.1 GNAT					|compiler-gnat|
+    4.1 Dec Ada					|compiler-decada|
+5.  參考				    |ada-reference|
+    5.1 選項					|ft-ada-options|
+    5.2 函數	    				|ft-ada-functions|
+    5.3 命令					|ft-ada-commands|
+    5.4 變量	    				|ft-ada-variables|
+    5.5 常數	    				|ft-ada-constants|
+8.  附加插件	    			    |ada-extra-plugins|
+
+==============================================================================
+1. 語法高亮 ~
+							       *ft-ada-syntax*
+
+本模式為 2005 年版的 Ada ("Ada 2005") 設計，它支持面向對像編程，受保護的類型，
+等等。它也能處理為原始 Ada 語言的代碼 ("Ada83"、"Ada87"、"Ada95")，不過代碼裡
+如果使用 Ada 2005 才有的關鍵字的話，顏色顯示會不正確 (不過這樣的代碼本來也應該
+修正)。更多關於 Ada 的信息，見 http://www.adapower.com。
+
+Ada 模式正確地處理一些情況。
+
+例如，它知道 "-5" 裡的 "-" 是數字的一部分，但 "A-5" 裡的該字符則是操作符。通
+常，引用別的編譯單元 (unit) 的 "with" 或 "use" 語句使用 C 裡面的 "#include" 相
+同的色彩。如果你為 "Conditional" 或 "Repeat" 組指定了不同的色彩，那麼 "end if"
+和 "end loop" 會根據它們所在的組被分別標色。
+
+你可以用 vim 的 "highlight" 命令來給出不同的顏色 (例如，要改變循環的顯示方式，
+輸入命令 ":hi Repeat"，後面跟色彩的規格說明；在普通終端上，色彩規格
+ctermfg=White 通常就有不錯的顯示效果)。
+
+本 Ada 模式可以設置若干選項。完整的列表可以參見 |ft-ada-options|。
+
+給選項賦值就可以打開。例如，要打開一個選項:
+ >
+    > let g:ada_standard_types = 1
+>
+可用 ":unlet" 關閉。例如:
+>
+    > unlet g:ada_standard_types
+
+使用 ":" 並在命令行輸入這些命令就可以在載入 Ada 文件時臨時設置選項。要永久設
+置，把 "let" 命令加到你的 "~/.vimrc" 文件裡，無需冒號。
+
+即使在慢速 (90Mhz) PC 上，該模式也很快。但如果你還是覺得速度無法忍受，可以打開
+|g:ada_withuse_ordinary|。
+
+置位 |g:ada_folding| 時，加入語法折疊的指令 (|fold-syntax|)。
+
+==============================================================================
+2. 文件類型插件 ~
+					       *ft-ada-indent* *ft-ada-plugin*
+
+Ada 插件提供以下支持:
+
+ - 自動縮進	    	(|indent.txt|)
+ - 插入補全	    	(|i_CTRL-N|)
+ - 用戶定義補全	    	(|i_CTRL-X_CTRL-U|)
+ - 標籤搜索		(|tagsrch.txt|)
+ - Quick Fix		(|quickfix.txt|)
+ - 退格處理	  	(|'backspace'|)
+ - 註釋處理	    	(|'comments'|、|'commentstring'|)
+
+當且僅當打開 Ada 文件時，本插件才激活 Ada 模式的功能，並把 Ada 相關的條目加到
+主菜單和彈出菜單中。
+
+==============================================================================
+3. 全能補全 ~
+								 *ft-ada-omni*
+
+Ada 全能補全 (|i_CTRL-X_CTRL-O|) 使用 "gnat xref -v" 或 "exuberant Ctags
+(http://ctags.sourceforge.net) 創建的標籤數據庫。補全函數會自動地識別創建標籤
+文件使用的工具。
+
+------------------------------------------------------------------------------
+3.1 使用 "gnat xref" 的全能補全 ~
+								   *gnat-xref*
+
+GNAT XREF 使用編譯器的內部信息 (ali-文件) 來產生標籤文件。它的優點是 100% 正
+確，也能進行深層的嵌套分析。不過代碼必須能通過編譯，生成器相當慢，而且產生的標
+簽文件只為每個條目包含了 Ctags 提供的基本信息 - 不足以應付一些高級的 Vim 代碼
+瀏覽器插件的需要。
+
+備註: "gnat xref -v" 非常難用，因為它幾乎沒有任何診斷輸出 - 如果沒有輸出，通常
+       是因為輸入的參數有問題。這裡是一些重要的提示:
+
+1)  你需要先編譯代碼，並使用 "-aO" 選項指向你的 .ali 文件。
+2)  "gnat xref -v ../Include/adacl.ads" 不行 - 應該用 "gnat xref -v
+    -aI../Include adacl.ads" 代替。
+3)  "gnat xref -v -aI../Include *.ad?" 不行 - 用 "cd ../Include" 然後 "gnat
+    xref -v *.ad?"
+4)  項目管理支持徹底不能用 - 試都不用試 "gnat xref -Padacl.gpr"。
+5)  使用排過序的標籤文件時 VIM 速度更快 - 用 "sort --unique --ignore-case
+    --output=tags tags"。
+6)  記住在第一行插入 "!_TAG_FILE_SORTED 2 %sort ui" 來標記該文件為已排序。
+
+------------------------------------------------------------------------------
+3.2 使用 "ctags" 的全能補全 ~
+								   *ada-ctags*
+
+Exuberant Ctags 使用自己的多語言代碼分析器。分析速度快，產生很多附加的信息
+(因此得名 "Exuberant (豐富的) Ctags")，並且能處理尚不能編譯的文件。
+
+有大量其它的 Vim 工具使用 exuberant Ctags。
+
+You 需要安裝帶有 Ada 支持補丁的 Exuberant Ctags 版本。GNU Ada 項目提供這樣的版
+本 (http://gnuada.sourceforge.net)。
+
+Exuberant Ctags 的 Ada 分析器還很新 - 不要過多期望完整的支持。
+
+==============================================================================
+4.  編譯器支持 ~
+								*ada-compiler*
+
+Ada 模式支持多個 Ada 編譯器，並會自動在打開 Ada 源代碼時載入
+|g:ada_default_compiler| 設置的編譯器。提供的編譯器插件分為兩部分: 實際的編譯
+器插件和支持函數及變量的集合。這樣方便了為你的開發環境專門定制的編譯器插件的開
+發。
+
+------------------------------------------------------------------------------
+4.1 GNAT ~
+							       *compiler-gnat*
+
+GNAT 是僅有的 free ((免費的) 啤酒和 (自由的) 言論) Ada 編譯器。它有若干在許可
+證條款上有出入的不同版本。
+
+按 <F7> 時，GNAT 編譯器插件執行編譯並立即顯示結果。你可以設置項目文件如下:
+ >
+ > call g:gnat.Set_Project_File ('my_project.gpr')
+
+設置項目的同時，也建立 Vim 會話 (|views-sessions|)，這樣 - 就像 GPS 那樣 - 為
+所有項目分別記住已打開的文件、窗口位置、等等。
+
+								*gnat_members*
+GNAT 對 象 ~
+
+							       *g:gnat.Make()*
+g:gnat.Make()
+		調用 |g:gnat.Make_Command| 並在 |quickfix| 窗口裡顯示結果。
+
+							     *g:gnat.Pretty()*
+g:gnat.Pretty()
+		調用 |g:gnat.Pretty_Program|
+
+							       *g:gnat.Find()*
+g:gnat.Find()
+		調用 |g:gnat.Find_Program|
+
+							       *g:gnat.Tags()*
+g:gnat.Tags()
+		調用 |g:gnat.Tags_Command|
+
+						   *g:gnat.Set_Project_File()*
+g:gnat.Set_Project_File([{file}])
+		設置 gnat 項目文件並載入相應的會話。已經打開的項目會被關閉，其
+		會話也被寫回。如果調用時沒有提供文件名，打開文件選擇對話框來選
+		擇項目文件。如果調用時提供空字符串，關閉項目和相關的會話。
+
+							 *g:gnat.Project_File*
+g:gnat.Project_File	字符串
+		當前項目文件。
+
+							 *g:gnat.Make_Command*
+g:gnat.Make_Command	字符串
+		用於 |g:gnat.Make()| 的外部命令 (|'makeprg'|)。
+
+						       *g:gnat.Pretty_Program*
+g:gnat.Pretty_Program	字符串
+		用於 |g:gnat.Pretty()| 的外部命令
+
+							 *g:gnat.Find_Program*
+g:gnat.Find_Program	字符串
+		用於 |g:gnat.Find()| 的外部命令
+
+							 *g:gnat.Tags_Command*
+g:gnat.Tags_Command	字符串
+		用於 |g:gnat.Tags()| 的外部命令
+
+							 *g:gnat.Error_Format*
+g:gnat.Error_Format	字符串
+		錯誤格式 (|'errorformat'|)
+
+------------------------------------------------------------------------------
+4.2 Dec Ada ~
+					    *compiler-hpada* *compiler-decada*
+					*compiler-vaxada* *compiler-compaqada*
+
+Dec Ada (也叫做 - 按照編年序 - VAX Ada、Dec Ada、Compaq Ada 和 HP Ada) 是一個
+相當古老的 Ada 83 編譯器。提供的支持也很基本: <F7> 編譯當前單元。
+
+Dec Ada 編譯器期待傳入的參數是包 (package) 名而不是文件名。本編譯器插件支持一
+般的文件名格式，並把文件轉換為單元名。可以用 '-' 和 '__' 進行分隔。
+
+							      *decada_members*
+DEC ADA 對 象 ~
+
+							     *g:decada.Make()*
+g:decada.Make()		函數
+		調用 |g:decada.Make_Command| 並在 |quickfix| 窗口裡顯示結果。
+
+							*g:decada.Unit_Name()*
+g:decada.Unit_Name()	函數
+		得到當前文件的單元名。
+
+						       *g:decada.Make_Command*
+g:decada.Make_Command	字符串
+		用於 |g:decadat.Make()| 的外部命令 (|'makeprg'|)。
+
+						       *g:decada.Error_Format*
+g:decada.Error_Format|	string
+		錯誤格式 (|'errorformat'|)。
+
+==============================================================================
+5. 參考 ~
+							       *ada-reference*
+
+------------------------------------------------------------------------------
+5.1 選項 ~
+							      *ft-ada-options*
+
+							*g:ada_standard_types*
+g:ada_standard_types	  布爾型 (如果存在即為真)
+		高亮 Standard 包裡的類型 (例如，"Float")。
+
+							  *g:ada_space_errors*
+						  *g:ada_no_trail_space_error*
+						    *g:ada_no_tab_space_error*
+							 *g:ada_all_tab_usage*
+g:ada_space_errors	  布爾型 (如果存在即為真)
+		高亮多餘空格的錯誤...
+		g:ada_no_trail_space_error
+		    - 但忽略行尾的空格
+		g:ada_no_tab_space_error
+		    - 但忽略空格之後的製表
+		g:ada_all_tab_usage
+		    - 高亮所有製表的使用
+
+							   *g:ada_line_errors*
+g:ada_line_errors	  布爾型 (如果存在即為真)
+		高亮過長的行。注意: 本高亮選項相當佔用 CPU。
+
+							 *g:ada_rainbow_color*
+g:ada_rainbow_color	  布爾型 (如果存在即為真)
+		'(' 和 ')' 使用彩虹色。為此你需要 rainbox_parenthesis。
+
+							       *g:ada_folding*
+g:ada_folding		  集合型 ('sigpft')
+		為 Ada 源代碼提供折疊。
+		    's':    載入時激活語法折疊
+			'p':    折疊包
+			'f':    折疊函數和過程
+			't':    折疊類型
+			'c':    折疊條件句
+		    'g':    載入時激活美化顯示折疊
+			'i':    單個 'is' 和上行一起折疊
+			'b':	單個 'begin' 和上行一起折疊
+			'p':	單個 'private' 和上行一起折疊
+			'x':	單個 'exception' 和上行一起折疊
+		    'i':    載入時激活縮進折疊
+
+		備註: 語法折疊尚處於早期 (不可用) 階段，建議使用縮進或 gnat 美
+		      化折疊。
+
+		要使 gnat 美化折疊可用，建議使用下列設置: -cl3 -M79 -c2 -c3
+		-c4 -A1 -A2 -A3 -A4 -A5
+
+		要使縮進折疊可用，建議使用下列設置: shiftwidth=3 softtabstop=3
+
+								*g:ada_abbrev*
+g:ada_abbrev		  布爾型 (如果存在即為真)
+		增加若干縮寫。此特性或多或少為各種補全的方法取代。
+
+						      *g:ada_withuse_ordinary*
+g:ada_withuse_ordinary	  布爾型 (如果存在即為真)
+		把 "with" 和 "use" 顯示為普通的關鍵字 (用於引用其它編譯單元
+		時，它們通常被特殊高亮)。
+
+							 *g:ada_begin_preproc*
+g:ada_begin_preproc	  布爾型 (如果存在即為真)
+		使用 C 預處理命令的色彩來顯示所有 begin 風格的關鍵字。
+
+						    *g:ada_omni_with_keywords*
+g:ada_omni_with_keywords
+		給全能補全加入 Keywords、Pragmas、Attributes (|compl-omni|)。
+		備註: 你總可以用用戶定義補全方式對它們進行補全
+		(|i_CTRL-X_CTRL-U|)。
+
+						      *g:ada_extended_tagging*
+g:ada_extended_tagging	  枚舉型 ('jump'、'list')
+		使用擴展標籤，可用如下兩個選項
+		    'jump': 使用 tjump 進行跳轉
+		    'list': 把標籤加到 quick fix 列表。
+		普通的標籤不支持函數或操作符重載，因為 C 語言沒有這些特性，而
+		標籤原本是為 C 開發的。
+
+						   *g:ada_extended_completion*
+g:ada_extended_completion
+		為 <C-N> 和 <C-R> 補全 (|i_CTRL-N|) 提供擴展的補全。在這個模式
+		中，'.' 用作標識符的一部分，這樣 'Object.Method' 或
+		'Package.Procedure' 等就能作為一個整體進行補全。
+
+						       *g:ada_gnat_extensions*
+g:ada_gnat_extensions	  布爾型 (如果存在即為真)
+		 支持 GNAT 擴充。
+
+					       *g:ada_with_gnat_project_files*
+g:ada_with_gnat_project_files	 布爾型 (如果存在即為真)
+		 加入 gnat 項目文件關鍵字和屬性。
+
+						      *g:ada_default_compiler*
+g:ada_default_compiler	  字符串
+		設置缺省編譯器。目前支持 'gnat' 和 'decada'。
+
+"存在" 類型視作布爾型，變量定義時取值為真，變量未定義時為假。設置的變量值本身
+無關緊要。
+
+------------------------------------------------------------------------------
+5.3 命令 ~
+							     *ft-ada-commands*
+
+:AdaRainbow							 *:AdaRainbow*
+		切換用於 '(' 和 ')' 的彩虹顏色 (|g:ada_rainbow_color|) 模式。
+		
+
+:AdaLines							   *:AdaLines*
+		切換行錯誤 (|g:ada_line_errors|) 顯示。
+
+:AdaSpaces							  *:AdaSpaces*
+		切換空格錯誤 (|g:ada_space_errors|) 顯示。
+
+:AdaTagDir							  *:AdaTagDir*
+		為當前文件所在目錄建立標籤文件。
+
+:AdaTagFile							 *:AdaTagFile*
+		為當前文件建立標籤文件。
+
+:AdaTypes							   *:AdaTypes*
+		切換標準類型 (|g:ada_standard_types|) 顏色。
+
+:GnatFind							   *:GnatFind*
+		調用 |g:gnat.Find()|
+
+:GnatPretty							 *:GnatPretty*
+		調用 |g:gnat.Pretty()|
+
+:GnatTags							   *:GnatTags*
+		調用 |g:gnat.Tags()|
+
+------------------------------------------------------------------------------
+5.3 變量 ~
+							    *ft-ada-variables*
+
+								      *g:gnat*
+g:gnat			  對像 
+		管理 GNAT 編譯的控制對象。只要 |g:ada_default_compiler| 設為
+		'gnat'，該對像會在載入首個 Ada 源代碼時建立。詳見
+		|gnat_members|。
+
+								    *g:decada*
+g:decada		  對像 
+		管理 Dec Ada 編譯的控制對象。只要 |g:ada_default_compiler| 設
+		為 'decada'，該對像會在載入首個 Ada 源代碼時建立。詳見
+		|decada_members|。
+
+------------------------------------------------------------------------------
+5.4 常數 ~
+							    *ft-ada-constants*
+
+所有常數都是加鎖的。詳見 |:lockvar|。
+
+							     *g:ada#WordRegex*
+g:ada#WordRegex		  字符串
+		搜索 Ada 單詞的正規表達式。
+
+							  *g:ada#DotWordRegex*
+g:ada#DotWordRegex	  字符串
+		搜索句號分隔的 Ada 單詞的正規表達式。
+
+							       *g:ada#Comment*
+g:ada#Comment		  字符串
+		搜索 Ada 註釋的正規表達式。
+
+							      *g:ada#Keywords*
+g:ada#Keywords		  字典的列表
+		關鍵字、屬性等的列表，使用全能補全需要的格式。詳見
+		|complete-items|。
+
+							   *g:ada#Ctags_Kinds*
+g:ada#Ctags_Kinds	  列表的字典
+		由 Ctags 省城的 Ada 支持的各種項目的類型 (kind) 的字典。
+
+------------------------------------------------------------------------------
+5.2 函數 ~
+							    *ft-ada-functions*
+
+ada#Word([{line}, {col}])					  *ada#Word()*
+		返回光標所在 (或在任何給定的行/列上) 的 Ada 實體的全名，必要時
+		刪除空白/換行符。
+
+ada#List_Tag([{line}, {col}])				      *ada#Listtags()*
+		在 quick-fix 窗口列出光標所在 (或在任何給定的行/列上) 的 Ada 
+		實體的所有出現。
+
+ada#Jump_Tag ({ident}, {mode})				      *ada#Jump_Tag()*
+		在標籤跳轉列表中列出光標所在 (或在任何給定的行/列上) 的 Ada 實
+		體的所有出現。模式 (mode) 可以是 'tjump' 或 'stjump'。
+
+ada#Create_Tags ({option})				   *ada#Create_Tags()*
+		用 Ctags 建立標籤文件。選項 (option) 可以設為 'file' 指定當前
+		文件，或 'dir' 指定當前文件所在的目錄，或文件名。
+
+gnat#Insert_Tags_Header()			   *gnat#Insert_Tags_Header()*
+		把標籤文件頭部 (!_TAG_) 信息加入當前文件，GNAT XREF 的輸出沒有
+		該項信息。
+
+ada#Switch_Syntax_Option ({option})		  *ada#Switch_Syntax_Option()*
+		切換高亮選項的開關。用於 Ada 菜單。
+
+								  *gnat#New()*
+gnat#New ()
+		建立一個新 gnat 對象。詳見 |g:gnat|。
+
+
+==============================================================================
+8. 附加插件 ~
+							   *ada-extra-plugins*
+
+可選地，你可以安裝以下附加的插件。它們能和 Ada 模式一起有效工作，以增強 Ada 模
+式的能力。:
+
+backup.vim
+	http://www.vim.org/scripts/script.php?script_id=1537
+	保留任意多個備份，以備不時之需。
+
+rainbow_parenthsis.vim
+	http://www.vim.org/scripts/script.php?script_id=1561
+	非常有用，因為 Ada 只使用 '(' 和 ')'。
+
+nerd_comments.vim
+	http://www.vim.org/scripts/script.php?script_id=1218
+	出色的註釋和撤銷註釋支持，支持幾乎所有編程語言。
+
+matchit.vim
+	http://www.vim.org/scripts/script.php?script_id=39
+	支持任何語言的 '%' 跳轉。正常的 '%' 跳轉只支持 '{}' 風格的語言。Ada 模
+	式會設置需要的搜索模式。
+
+taglist.vim
+	http://www.vim.org/scripts/script.php?script_id=273
+	源代碼瀏覽器側欄。有 Ada 補丁。
+
+Vim 的 GNU Ada 項目發佈 (http://gnuada.sourceforge.net) 包含以上所有的插件。
+
+==============================================================================
+vim: textwidth=78 nowrap tabstop=8 shiftwidth=4 softtabstop=4 noexpandtab
+vim: filetype=help
